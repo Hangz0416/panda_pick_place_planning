@@ -14,6 +14,7 @@ class PandaCollisionChecker:
         arm_joint_indices: Sequence[int],
         joint_limits: Sequence[tuple[float, float]],
         world_body_ids: Sequence[int],
+        allowed_world_contacts: dict[int, set[int]] | None = None,
     ) -> None:
         self.bullet = bullet
         self.physics_client_id = physics_client_id
@@ -21,6 +22,15 @@ class PandaCollisionChecker:
         self.arm_joint_indices = list(arm_joint_indices)
         self.joint_limits = list(joint_limits)
         self.world_body_ids = list(world_body_ids)
+        self.allowed_world_contacts = allowed_world_contacts or {}
+        self.allowed_self_pairs = self._adjacent_link_pairs()
+        hand_links = {7, 8, 9, 10, 11}
+        self.allowed_self_pairs.update(
+            frozenset((first_link, second_link))
+            for first_link in hand_links
+            for second_link in hand_links
+            if first_link != second_link
+        )
 
     def is_valid(self, joints: Sequence[float]) -> bool:
         if not within_joint_limits(joints, self.joint_limits):
@@ -28,22 +38,27 @@ class PandaCollisionChecker:
         previous = self.current_joints()
         self._reset_joints(joints)
         self.bullet.performCollisionDetection(physicsClientId=self.physics_client_id)
-        collision_count = self.current_collision_count()
+        collisions = self.current_collisions()
         self._reset_joints(previous)
         self.bullet.performCollisionDetection(physicsClientId=self.physics_client_id)
-        return collision_count == 0
+        return not collisions
 
     def current_collision_count(self) -> int:
-        collisions: set[tuple[int, int, int]] = set()
+        return len(self.current_collisions())
+
+    def current_collisions(self) -> list[tuple[str, int, int, int]]:
+        collisions: set[tuple[str, int, int, int]] = set()
         for contact in self.bullet.getContactPoints(
             bodyA=self.robot_id,
             bodyB=self.robot_id,
             physicsClientId=self.physics_client_id,
         ):
             first_link, second_link = int(contact[3]), int(contact[4])
-            if first_link == second_link or abs(first_link - second_link) <= 1:
+            if first_link == second_link:
                 continue
-            collisions.add((self.robot_id, first_link, second_link))
+            if frozenset((first_link, second_link)) in self.allowed_self_pairs:
+                continue
+            collisions.add(("self", self.robot_id, first_link, second_link))
 
         for body_id in self.world_body_ids:
             for contact in self.bullet.getContactPoints(
@@ -52,10 +67,10 @@ class PandaCollisionChecker:
                 physicsClientId=self.physics_client_id,
             ):
                 robot_link = int(contact[3])
-                if robot_link < 0:
+                if robot_link in self.allowed_world_contacts.get(body_id, set()):
                     continue
-                collisions.add((body_id, robot_link, int(contact[4])))
-        return len(collisions)
+                collisions.add(("world", body_id, robot_link, int(contact[4])))
+        return sorted(collisions)
 
     def current_joints(self) -> list[float]:
         return [
@@ -77,3 +92,19 @@ class PandaCollisionChecker:
                 float(value),
                 physicsClientId=self.physics_client_id,
             )
+
+    def _adjacent_link_pairs(self) -> set[frozenset[int]]:
+        pairs: set[frozenset[int]] = set()
+        joint_count = self.bullet.getNumJoints(
+            self.robot_id,
+            physicsClientId=self.physics_client_id,
+        )
+        for child_link in range(joint_count):
+            info = self.bullet.getJointInfo(
+                self.robot_id,
+                child_link,
+                physicsClientId=self.physics_client_id,
+            )
+            parent_link = int(info[16])
+            pairs.add(frozenset((parent_link, child_link)))
+        return pairs

@@ -29,7 +29,10 @@ class PyBulletSmokeTest(unittest.TestCase):
 
             self.assertTrue(solution.success, solution.failure_type)
             self.assertIsNotNone(env.collision_checker)
-            self.assertTrue(env.collision_checker.is_valid(env.current_arm_joints()))
+            current_joints = env.current_arm_joints()
+            is_valid = env.collision_checker.is_valid(current_joints)
+            collisions = env.collision_checker.current_collisions()
+            self.assertTrue(is_valid, f"unexpected home collisions: {collisions}")
         finally:
             env.close()
 

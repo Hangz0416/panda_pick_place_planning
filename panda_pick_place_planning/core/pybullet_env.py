@@ -310,6 +310,10 @@ class PyBulletPandaEnv:
             ARM_JOINT_INDICES,
             self.joint_limits,
             world_bodies,
+            allowed_world_contacts={
+                self.plane_id: {-1, 0},
+                self.table_id: {-1, 0},
+            },
         )
 
     def _replace_target_marker(self, target_position: Sequence[float]) -> None:
