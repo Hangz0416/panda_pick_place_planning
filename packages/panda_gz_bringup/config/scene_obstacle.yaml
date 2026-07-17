@@ -1,0 +1,5 @@
+episode_reset_manager:
+  ros__parameters:
+    scene: obstacle
+    default_object_position: [0.595, 0.22, 0.025]
+    default_target_position: [0.595, -0.225, 0.025]

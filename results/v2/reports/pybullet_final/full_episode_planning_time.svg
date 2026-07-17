@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="590" viewBox="0 0 1500 590" role="img" aria-labelledby="chart-title">
+<title id="chart-title">Panda V2 PyBullet 200-episode benchmark — Full episode planning time</title>
+<style>
+text { font-family: Inter, "Noto Sans", "DejaVu Sans", sans-serif; fill: #263238; }
+.chart-title { font-size: 24px; font-weight: 700; }
+.chart-subtitle { font-size: 13px; fill: #52606D; }
+.legend-label, .tick-label { font-size: 12px; }
+.axis-label { font-size: 13px; font-weight: 600; }
+.group-label { font-size: 12px; font-weight: 600; }
+.value-label, .na-label { font-size: 11px; }
+.na-label, .empty-label { fill: #6B7785; font-style: italic; }
+.segment-label { fill: #FFFFFF; font-size: 11px; font-weight: 700; }
+.footer { font-size: 11px; fill: #6B7785; }
+</style>
+<rect width="1500" height="590" fill="#FFFFFF"/>
+<text class="chart-title" x="32" y="38">Panda V2 PyBullet 200-episode benchmark — Full episode planning time</text>
+<text class="chart-subtitle" x="32" y="64">Top-level planning metric scope is preserved from each source; missing statistics are N/A.</text>
+<line x1="32" y1="72" x2="1468" y2="72" stroke="#D9E1E8"/>
+<rect x="417.0" y="75" width="13" height="13" rx="2" fill="#0072B2"/>
+<text class="legend-label" x="437.0" y="86">Mean</text>
+<rect x="731.3" y="75" width="13" height="13" rx="2" fill="#E69F00"/>
+<text class="legend-label" x="751.3" y="86">Median</text>
+<rect x="1045.7" y="75" width="13" height="13" rx="2" fill="#009E73"/>
+<text class="legend-label" x="1065.7" y="86">P95</text>
+<line x1="417.00" y1="145" x2="417.00" y2="485" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="417.00" y="507" text-anchor="middle">0</text>
+<line x1="605.60" y1="145" x2="605.60" y2="485" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="605.60" y="507" text-anchor="middle">20</text>
+<line x1="794.20" y1="145" x2="794.20" y2="485" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="794.20" y="507" text-anchor="middle">40</text>
+<line x1="982.80" y1="145" x2="982.80" y2="485" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="982.80" y="507" text-anchor="middle">60</text>
+<line x1="1171.40" y1="145" x2="1171.40" y2="485" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1171.40" y="507" text-anchor="middle">80</text>
+<line x1="1360.00" y1="145" x2="1360.00" y2="485" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1360.00" y="507" text-anchor="middle">100</text>
+<line x1="417" y1="485" x2="1360" y2="485" stroke="#52606D"/>
+<text class="axis-label" x="888.50" y="533" text-anchor="middle">planning time (ms)</text>
+<text class="group-label" x="403" y="176.5" text-anchor="end">pybullet_v2 · pybullet/pybullet · clear · linear</text>
+<rect x="417" y="145" width="16.50" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="440.50" y="157" text-anchor="start" fill="#263238">1.75 ms</text>
+<rect x="417" y="166" width="16.30" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="440.30" y="178" text-anchor="start" fill="#263238">1.73 ms</text>
+<rect x="417" y="187" width="19.91" height="16" rx="3" fill="#009E73"/>
+<text class="value-label" x="443.91" y="199" text-anchor="start" fill="#263238">2.11 ms</text>
+<text class="group-label" x="403" y="261.5" text-anchor="end">pybullet_v2 · pybullet/pybullet · clear · rrt_connect</text>
+<rect x="417" y="230" width="18.13" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="442.13" y="242" text-anchor="start" fill="#263238">1.92 ms</text>
+<rect x="417" y="251" width="17.89" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="441.89" y="263" text-anchor="start" fill="#263238">1.9 ms</text>
+<rect x="417" y="272" width="21.95" height="16" rx="3" fill="#009E73"/>
+<text class="value-label" x="445.95" y="284" text-anchor="start" fill="#263238">2.33 ms</text>
+<text class="group-label" x="403" y="346.5" text-anchor="end">pybullet_v2 · pybullet/pybullet · obstacle · linear</text>
+<rect x="417" y="315" width="5.28" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="429.28" y="327" text-anchor="start" fill="#263238">0.56 ms</text>
+<rect x="417" y="336" width="5.07" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="429.07" y="348" text-anchor="start" fill="#263238">0.538 ms</text>
+<rect x="417" y="357" width="6.24" height="16" rx="3" fill="#009E73"/>
+<text class="value-label" x="430.24" y="369" text-anchor="start" fill="#263238">0.662 ms</text>
+<text class="group-label" x="403" y="431.5" text-anchor="end">pybullet_v2 · pybullet/pybullet · obstacle · rrt_connect</text>
+<rect x="417" y="400" width="312.67" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="736.67" y="412" text-anchor="start" fill="#263238">33.2 ms</text>
+<rect x="417" y="421" width="252.14" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="676.14" y="433" text-anchor="start" fill="#263238">26.7 ms</text>
+<rect x="417" y="442" width="642.66" height="16" rx="3" fill="#009E73"/>
+<text class="value-label" x="1066.66" y="454" text-anchor="start" fill="#263238">68.2 ms</text>
+<text class="footer" x="1468" y="572" text-anchor="end">Recorded data only · N/A = not reported or not applicable</text>
+</svg>

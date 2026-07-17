@@ -1,0 +1,200 @@
+{
+  "schema_version": 2,
+  "total_episodes": 200,
+  "groups": {
+    "clear/linear": {
+      "episodes": 50,
+      "top_level_motion_metric_scope": "critical_transfer_motion",
+      "planning_success_rate": 1.0,
+      "execution_success_rate": 1.0,
+      "task_success_rate": 1.0,
+      "collision_episode_rate": 0.0,
+      "avg_planning_time_sec": 0.00175,
+      "avg_top_level_planning_time_sec": 0.00175,
+      "median_planning_time_sec": 0.001729,
+      "p95_planning_time_sec": 0.002112,
+      "avg_execution_time_sec": 0.085929,
+      "avg_path_length_rad": 0.778358,
+      "avg_top_level_path_length_rad": 0.778358,
+      "median_path_length_rad": 0.78501,
+      "avg_final_xy_error_m": 9.9e-05,
+      "avg_final_z_error_m": 1.1e-05,
+      "avg_final_object_speed_mps": 0.0,
+      "avg_trajectory_points": 18.8,
+      "avg_max_joint_tracking_error_rad": null,
+      "failure_counts": {
+        "success": 50
+      }
+    },
+    "clear/rrt_connect": {
+      "episodes": 50,
+      "top_level_motion_metric_scope": "critical_transfer_motion",
+      "planning_success_rate": 1.0,
+      "execution_success_rate": 1.0,
+      "task_success_rate": 1.0,
+      "collision_episode_rate": 0.0,
+      "avg_planning_time_sec": 0.001922,
+      "avg_top_level_planning_time_sec": 0.001922,
+      "median_planning_time_sec": 0.001897,
+      "p95_planning_time_sec": 0.002328,
+      "avg_execution_time_sec": 0.079812,
+      "avg_path_length_rad": 0.778358,
+      "avg_top_level_path_length_rad": 0.778358,
+      "median_path_length_rad": 0.78501,
+      "avg_final_xy_error_m": 0.000114,
+      "avg_final_z_error_m": 1.1e-05,
+      "avg_final_object_speed_mps": 0.0,
+      "avg_trajectory_points": 2,
+      "avg_max_joint_tracking_error_rad": null,
+      "failure_counts": {
+        "success": 50
+      }
+    },
+    "obstacle/linear": {
+      "episodes": 50,
+      "top_level_motion_metric_scope": "critical_transfer_motion",
+      "planning_success_rate": 0.0,
+      "execution_success_rate": 0.0,
+      "task_success_rate": 0.0,
+      "collision_episode_rate": 0.0,
+      "avg_planning_time_sec": 0.00056,
+      "avg_top_level_planning_time_sec": 0.00056,
+      "median_planning_time_sec": 0.000538,
+      "p95_planning_time_sec": 0.000662,
+      "avg_execution_time_sec": 0.052244,
+      "avg_path_length_rad": 0.0,
+      "avg_top_level_path_length_rad": 0.0,
+      "median_path_length_rad": 0.0,
+      "avg_final_xy_error_m": 0.445907,
+      "avg_final_z_error_m": 0.151112,
+      "avg_final_object_speed_mps": 0.0,
+      "avg_trajectory_points": 0,
+      "avg_max_joint_tracking_error_rad": null,
+      "failure_counts": {
+        "planning_collision": 50
+      }
+    },
+    "obstacle/rrt_connect": {
+      "episodes": 50,
+      "top_level_motion_metric_scope": "critical_transfer_motion",
+      "planning_success_rate": 1.0,
+      "execution_success_rate": 1.0,
+      "task_success_rate": 1.0,
+      "collision_episode_rate": 0.0,
+      "avg_planning_time_sec": 0.033157,
+      "avg_top_level_planning_time_sec": 0.033157,
+      "median_planning_time_sec": 0.026738,
+      "p95_planning_time_sec": 0.068151,
+      "avg_execution_time_sec": 0.093104,
+      "avg_path_length_rad": 1.312717,
+      "avg_top_level_path_length_rad": 1.312717,
+      "median_path_length_rad": 1.173649,
+      "avg_final_xy_error_m": 8.3e-05,
+      "avg_final_z_error_m": 1.2e-05,
+      "avg_final_object_speed_mps": 0.0,
+      "avg_trajectory_points": 3.18,
+      "avg_max_joint_tracking_error_rad": null,
+      "failure_counts": {
+        "success": 50
+      }
+    }
+  },
+  "backend_groups": {
+    "pybullet/pybullet/clear/linear": {
+      "episodes": 50,
+      "top_level_motion_metric_scope": "critical_transfer_motion",
+      "planning_success_rate": 1.0,
+      "execution_success_rate": 1.0,
+      "task_success_rate": 1.0,
+      "collision_episode_rate": 0.0,
+      "avg_planning_time_sec": 0.00175,
+      "avg_top_level_planning_time_sec": 0.00175,
+      "median_planning_time_sec": 0.001729,
+      "p95_planning_time_sec": 0.002112,
+      "avg_execution_time_sec": 0.085929,
+      "avg_path_length_rad": 0.778358,
+      "avg_top_level_path_length_rad": 0.778358,
+      "median_path_length_rad": 0.78501,
+      "avg_final_xy_error_m": 9.9e-05,
+      "avg_final_z_error_m": 1.1e-05,
+      "avg_final_object_speed_mps": 0.0,
+      "avg_trajectory_points": 18.8,
+      "avg_max_joint_tracking_error_rad": null,
+      "failure_counts": {
+        "success": 50
+      }
+    },
+    "pybullet/pybullet/clear/rrt_connect": {
+      "episodes": 50,
+      "top_level_motion_metric_scope": "critical_transfer_motion",
+      "planning_success_rate": 1.0,
+      "execution_success_rate": 1.0,
+      "task_success_rate": 1.0,
+      "collision_episode_rate": 0.0,
+      "avg_planning_time_sec": 0.001922,
+      "avg_top_level_planning_time_sec": 0.001922,
+      "median_planning_time_sec": 0.001897,
+      "p95_planning_time_sec": 0.002328,
+      "avg_execution_time_sec": 0.079812,
+      "avg_path_length_rad": 0.778358,
+      "avg_top_level_path_length_rad": 0.778358,
+      "median_path_length_rad": 0.78501,
+      "avg_final_xy_error_m": 0.000114,
+      "avg_final_z_error_m": 1.1e-05,
+      "avg_final_object_speed_mps": 0.0,
+      "avg_trajectory_points": 2,
+      "avg_max_joint_tracking_error_rad": null,
+      "failure_counts": {
+        "success": 50
+      }
+    },
+    "pybullet/pybullet/obstacle/linear": {
+      "episodes": 50,
+      "top_level_motion_metric_scope": "critical_transfer_motion",
+      "planning_success_rate": 0.0,
+      "execution_success_rate": 0.0,
+      "task_success_rate": 0.0,
+      "collision_episode_rate": 0.0,
+      "avg_planning_time_sec": 0.00056,
+      "avg_top_level_planning_time_sec": 0.00056,
+      "median_planning_time_sec": 0.000538,
+      "p95_planning_time_sec": 0.000662,
+      "avg_execution_time_sec": 0.052244,
+      "avg_path_length_rad": 0.0,
+      "avg_top_level_path_length_rad": 0.0,
+      "median_path_length_rad": 0.0,
+      "avg_final_xy_error_m": 0.445907,
+      "avg_final_z_error_m": 0.151112,
+      "avg_final_object_speed_mps": 0.0,
+      "avg_trajectory_points": 0,
+      "avg_max_joint_tracking_error_rad": null,
+      "failure_counts": {
+        "planning_collision": 50
+      }
+    },
+    "pybullet/pybullet/obstacle/rrt_connect": {
+      "episodes": 50,
+      "top_level_motion_metric_scope": "critical_transfer_motion",
+      "planning_success_rate": 1.0,
+      "execution_success_rate": 1.0,
+      "task_success_rate": 1.0,
+      "collision_episode_rate": 0.0,
+      "avg_planning_time_sec": 0.033157,
+      "avg_top_level_planning_time_sec": 0.033157,
+      "median_planning_time_sec": 0.026738,
+      "p95_planning_time_sec": 0.068151,
+      "avg_execution_time_sec": 0.093104,
+      "avg_path_length_rad": 1.312717,
+      "avg_top_level_path_length_rad": 1.312717,
+      "median_path_length_rad": 1.173649,
+      "avg_final_xy_error_m": 8.3e-05,
+      "avg_final_z_error_m": 1.2e-05,
+      "avg_final_object_speed_mps": 0.0,
+      "avg_trajectory_points": 3.18,
+      "avg_max_joint_tracking_error_rad": null,
+      "failure_counts": {
+        "success": 50
+      }
+    }
+  }
+}

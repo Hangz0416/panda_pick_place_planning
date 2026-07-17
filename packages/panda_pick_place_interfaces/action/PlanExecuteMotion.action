@@ -1,0 +1,22 @@
+uint8 TARGET_TYPE_NAMED=1
+uint8 TARGET_TYPE_POSE=2
+
+uint8 target_type
+string named_target
+geometry_msgs/PoseStamped pose_target
+string end_effector_link
+string planner_id
+float64 allowed_planning_time_sec
+float64 max_velocity_scaling_factor
+float64 max_acceleration_scaling_factor
+bool execute
+---
+bool success
+int32 moveit_error_code
+string failure_type
+float64 planning_time_sec
+float64 path_length_rad
+uint32 trajectory_points
+float64 execution_time_sec
+---
+string phase

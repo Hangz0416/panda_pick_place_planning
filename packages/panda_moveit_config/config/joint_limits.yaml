@@ -1,0 +1,13 @@
+default_velocity_scaling_factor: 0.2
+default_acceleration_scaling_factor: 0.2
+default_robot_padding: 0.01
+joint_limits:
+  panda_joint1: {has_velocity_limits: true, max_velocity: 2.175, has_acceleration_limits: true, max_acceleration: 2.0}
+  panda_joint2: {has_velocity_limits: true, max_velocity: 2.175, has_acceleration_limits: true, max_acceleration: 2.0}
+  panda_joint3: {has_velocity_limits: true, max_velocity: 2.175, has_acceleration_limits: true, max_acceleration: 2.0}
+  panda_joint4: {has_velocity_limits: true, max_velocity: 2.175, has_acceleration_limits: true, max_acceleration: 2.0}
+  panda_joint5: {has_velocity_limits: true, max_velocity: 2.61, has_acceleration_limits: true, max_acceleration: 2.0}
+  panda_joint6: {has_velocity_limits: true, max_velocity: 2.61, has_acceleration_limits: true, max_acceleration: 2.0}
+  panda_joint7: {has_velocity_limits: true, max_velocity: 2.61, has_acceleration_limits: true, max_acceleration: 2.0}
+  panda_finger_joint1: {has_velocity_limits: true, max_velocity: 0.2, has_acceleration_limits: true, max_acceleration: 0.5}
+  panda_finger_joint2: {has_velocity_limits: true, max_velocity: 0.2, has_acceleration_limits: true, max_acceleration: 0.5}

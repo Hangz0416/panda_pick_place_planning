@@ -1,0 +1,52 @@
+std_msgs/Header header
+uint64 episode_id
+uint64 task_seed
+string backend
+string simulator
+string planner_id
+uint64 planner_seed
+string scene
+string grasp_mode
+
+bool planning_success
+bool execution_success
+bool task_success
+bool attached
+bool released
+bool planning_collision
+bool execution_collision
+
+float64 planning_time_sec
+float64 execution_time_sec
+uint32 explored_nodes
+uint32 path_waypoints
+float64 path_length_rad
+uint32 trajectory_points
+uint64 execution_sim_steps
+float64 max_joint_tracking_error_rad
+float64 final_xy_error_m
+float64 final_z_error_m
+float64 final_object_speed_mps
+uint32 collision_count
+
+string failed_state
+string failure_type
+string sync_error
+geometry_msgs/Point object_initial_position
+geometry_msgs/Point object_final_position
+geometry_msgs/Point target_position
+
+int8 BOOLEAN_UNKNOWN=-1
+int8 BOOLEAN_FALSE=0
+int8 BOOLEAN_TRUE=1
+
+int8 physical_left_finger_contact
+int8 physical_right_finger_contact
+int8 physical_bilateral_contact
+int8 physical_slip
+float64 physical_translation_drift_m
+float64 physical_rotation_drift_rad
+float64 physical_release_stable_time_sec
+string[] last_collision_pair
+
+StageMetric[] stage_metrics

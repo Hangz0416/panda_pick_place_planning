@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>panda_moveit_bridge</name>
+  <version>0.2.0</version>
+  <description>MoveIt 2 action and planning-scene bridge for the Panda pick-and-place backend.</description>
+  <maintainer email="3136412152@qq.com">Han Guangzhi</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>moveit_core</depend>
+  <depend>moveit_msgs</depend>
+  <depend>moveit_ros_planning_interface</depend>
+  <depend>panda_pick_place_interfaces</depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_action</depend>
+  <depend>trajectory_msgs</depend>
+
+  <exec_depend>controller_manager_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>shape_msgs</exec_depend>
+
+  <test_depend>ament_cmake_pytest</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

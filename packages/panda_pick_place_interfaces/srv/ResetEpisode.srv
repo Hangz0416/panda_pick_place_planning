@@ -1,0 +1,14 @@
+std_msgs/Header header
+uint64 episode_id
+uint64 task_seed
+string scene
+string grasp_mode
+geometry_msgs/Point object_position
+geometry_msgs/Point target_position
+---
+bool success
+uint16 status_code
+string failure_type
+string message
+geometry_msgs/Point applied_object_position
+geometry_msgs/Point applied_target_position

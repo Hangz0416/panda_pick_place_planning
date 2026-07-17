@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="930" viewBox="0 0 1500 930" role="img" aria-labelledby="chart-title">
+<title id="chart-title">Panda PyBullet V1 versus V2 shared-task regression — Full episode success rates</title>
+<style>
+text { font-family: Inter, "Noto Sans", "DejaVu Sans", sans-serif; fill: #263238; }
+.chart-title { font-size: 24px; font-weight: 700; }
+.chart-subtitle { font-size: 13px; fill: #52606D; }
+.legend-label, .tick-label { font-size: 12px; }
+.axis-label { font-size: 13px; font-weight: 600; }
+.group-label { font-size: 12px; font-weight: 600; }
+.value-label, .na-label { font-size: 11px; }
+.na-label, .empty-label { fill: #6B7785; font-style: italic; }
+.segment-label { fill: #FFFFFF; font-size: 11px; font-weight: 700; }
+.footer { font-size: 11px; fill: #6B7785; }
+</style>
+<rect width="1500" height="930" fill="#FFFFFF"/>
+<text class="chart-title" x="32" y="38">Panda PyBullet V1 versus V2 shared-task regression — Full episode success rates</text>
+<text class="chart-subtitle" x="32" y="64">N/A means the source did not report that outcome.</text>
+<line x1="32" y1="72" x2="1468" y2="72" stroke="#D9E1E8"/>
+<rect x="354.0" y="75" width="13" height="13" rx="2" fill="#0072B2"/>
+<text class="legend-label" x="374.0" y="86">Planning success</text>
+<rect x="689.3" y="75" width="13" height="13" rx="2" fill="#E69F00"/>
+<text class="legend-label" x="709.3" y="86">Execution success</text>
+<rect x="1024.7" y="75" width="13" height="13" rx="2" fill="#009E73"/>
+<text class="legend-label" x="1044.7" y="86">Task success</text>
+<line x1="354.00" y1="145" x2="354.00" y2="825" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="354.00" y="847" text-anchor="middle">0%</text>
+<line x1="555.20" y1="145" x2="555.20" y2="825" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="555.20" y="847" text-anchor="middle">20%</text>
+<line x1="756.40" y1="145" x2="756.40" y2="825" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="756.40" y="847" text-anchor="middle">40%</text>
+<line x1="957.60" y1="145" x2="957.60" y2="825" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="957.60" y="847" text-anchor="middle">60%</text>
+<line x1="1158.80" y1="145" x2="1158.80" y2="825" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1158.80" y="847" text-anchor="middle">80%</text>
+<line x1="1360.00" y1="145" x2="1360.00" y2="825" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1360.00" y="847" text-anchor="middle">100%</text>
+<line x1="354" y1="825" x2="1360" y2="825" stroke="#52606D"/>
+<text class="axis-label" x="857.00" y="873" text-anchor="middle">success rate</text>
+<text class="group-label" x="340" y="176.5" text-anchor="end">v1 · pybullet/pybullet · clear · linear</text>
+<rect x="354" y="145" width="1006.00" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="1354.00" y="157" text-anchor="end" fill="#FFFFFF">100.0%</text>
+<line x1="357" y1="174.0" x2="379" y2="174.0" stroke="#9AA4AE" stroke-width="3"/>
+<text class="na-label" x="387" y="178">N/A</text>
+<rect x="354" y="187" width="1006.00" height="16" rx="3" fill="#009E73"/>
+<text class="value-label" x="1354.00" y="199" text-anchor="end" fill="#FFFFFF">100.0%</text>
+<text class="group-label" x="340" y="261.5" text-anchor="end">v1 · pybullet/pybullet · clear · rrt_connect</text>
+<rect x="354" y="230" width="1006.00" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="1354.00" y="242" text-anchor="end" fill="#FFFFFF">100.0%</text>
+<line x1="357" y1="259.0" x2="379" y2="259.0" stroke="#9AA4AE" stroke-width="3"/>
+<text class="na-label" x="387" y="263">N/A</text>
+<rect x="354" y="272" width="1006.00" height="16" rx="3" fill="#009E73"/>
+<text class="value-label" x="1354.00" y="284" text-anchor="end" fill="#FFFFFF">100.0%</text>
+<text class="group-label" x="340" y="346.5" text-anchor="end">v1 · pybullet/pybullet · obstacle · linear</text>
+<rect x="354" y="315" width="0.00" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="361.00" y="327" text-anchor="start" fill="#263238">0.0%</text>
+<line x1="357" y1="344.0" x2="379" y2="344.0" stroke="#9AA4AE" stroke-width="3"/>
+<text class="na-label" x="387" y="348">N/A</text>
+<rect x="354" y="357" width="0.00" height="16" rx="3" fill="#009E73"/>
+<text class="value-label" x="361.00" y="369" text-anchor="start" fill="#263238">0.0%</text>
+<text class="group-label" x="340" y="431.5" text-anchor="end">v1 · pybullet/pybullet · obstacle · rrt_connect</text>
+<rect x="354" y="400" width="1006.00" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="1354.00" y="412" text-anchor="end" fill="#FFFFFF">100.0%</text>
+<line x1="357" y1="429.0" x2="379" y2="429.0" stroke="#9AA4AE" stroke-width="3"/>
+<text class="na-label" x="387" y="433">N/A</text>
+<rect x="354" y="442" width="1006.00" height="16" rx="3" fill="#009E73"/>
+<text class="value-label" x="1354.00" y="454" text-anchor="end" fill="#FFFFFF">100.0%</text>
+<text class="group-label" x="340" y="516.5" text-anchor="end">v2 · pybullet/pybullet · clear · linear</text>
+<rect x="354" y="485" width="1006.00" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="1354.00" y="497" text-anchor="end" fill="#FFFFFF">100.0%</text>
+<rect x="354" y="506" width="1006.00" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="1354.00" y="518" text-anchor="end" fill="#FFFFFF">100.0%</text>
+<rect x="354" y="527" width="1006.00" height="16" rx="3" fill="#009E73"/>
+<text class="value-label" x="1354.00" y="539" text-anchor="end" fill="#FFFFFF">100.0%</text>
+<text class="group-label" x="340" y="601.5" text-anchor="end">v2 · pybullet/pybullet · clear · rrt_connect</text>
+<rect x="354" y="570" width="1006.00" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="1354.00" y="582" text-anchor="end" fill="#FFFFFF">100.0%</text>
+<rect x="354" y="591" width="1006.00" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="1354.00" y="603" text-anchor="end" fill="#FFFFFF">100.0%</text>
+<rect x="354" y="612" width="1006.00" height="16" rx="3" fill="#009E73"/>
+<text class="value-label" x="1354.00" y="624" text-anchor="end" fill="#FFFFFF">100.0%</text>
+<text class="group-label" x="340" y="686.5" text-anchor="end">v2 · pybullet/pybullet · obstacle · linear</text>
+<rect x="354" y="655" width="0.00" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="361.00" y="667" text-anchor="start" fill="#263238">0.0%</text>
+<rect x="354" y="676" width="0.00" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="361.00" y="688" text-anchor="start" fill="#263238">0.0%</text>
+<rect x="354" y="697" width="0.00" height="16" rx="3" fill="#009E73"/>
+<text class="value-label" x="361.00" y="709" text-anchor="start" fill="#263238">0.0%</text>
+<text class="group-label" x="340" y="771.5" text-anchor="end">v2 · pybullet/pybullet · obstacle · rrt_connect</text>
+<rect x="354" y="740" width="1006.00" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="1354.00" y="752" text-anchor="end" fill="#FFFFFF">100.0%</text>
+<rect x="354" y="761" width="1006.00" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="1354.00" y="773" text-anchor="end" fill="#FFFFFF">100.0%</text>
+<rect x="354" y="782" width="1006.00" height="16" rx="3" fill="#009E73"/>
+<text class="value-label" x="1354.00" y="794" text-anchor="end" fill="#FFFFFF">100.0%</text>
+<text class="footer" x="1468" y="912" text-anchor="end">Recorded data only · N/A = not reported or not applicable</text>
+</svg>

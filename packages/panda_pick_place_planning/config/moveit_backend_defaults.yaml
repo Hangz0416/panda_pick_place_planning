@@ -1,0 +1,15 @@
+manipulation:
+  ros__parameters:
+    backend: moveit
+    use_gazebo: false
+    moveit_execute: false
+    moveit_command_gripper: false
+    moveit_planner_id: RRTConnectkConfigDefault
+    moveit_planning_time_sec: 3.0
+    moveit_velocity_scaling: 0.2
+    moveit_acceleration_scaling: 0.2
+
+# For Gazebo assisted execution override the three booleans together:
+#   use_gazebo: true
+#   moveit_execute: true
+#   moveit_command_gripper: true

@@ -1,0 +1,181 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:macro name="panda_mock_ros2_control" params="initial_positions_file">
+    <xacro:property
+      name="initial_positions"
+      value="${xacro.load_yaml(initial_positions_file)['initial_positions']}" />
+    <ros2_control name="PandaMockSystem" type="system">
+      <hardware>
+        <plugin>mock_components/GenericSystem</plugin>
+      </hardware>
+      <xacro:macro name="arm_joint_interfaces" params="joint_name">
+        <joint name="${joint_name}">
+          <command_interface name="position" />
+          <state_interface name="position">
+            <param name="initial_value">${initial_positions[joint_name]}</param>
+          </state_interface>
+          <state_interface name="velocity" />
+        </joint>
+      </xacro:macro>
+      <xacro:arm_joint_interfaces joint_name="panda_joint1" />
+      <xacro:arm_joint_interfaces joint_name="panda_joint2" />
+      <xacro:arm_joint_interfaces joint_name="panda_joint3" />
+      <xacro:arm_joint_interfaces joint_name="panda_joint4" />
+      <xacro:arm_joint_interfaces joint_name="panda_joint5" />
+      <xacro:arm_joint_interfaces joint_name="panda_joint6" />
+      <xacro:arm_joint_interfaces joint_name="panda_joint7" />
+      <joint name="panda_finger_joint1">
+        <command_interface name="position" />
+        <state_interface name="position">
+          <param name="initial_value">0.04</param>
+        </state_interface>
+        <state_interface name="velocity" />
+      </joint>
+      <joint name="panda_finger_joint2">
+        <param name="mimic">panda_finger_joint1</param>
+        <param name="multiplier">1.0</param>
+        <command_interface name="position" />
+        <state_interface name="position">
+          <param name="initial_value">0.04</param>
+        </state_interface>
+        <state_interface name="velocity" />
+      </joint>
+    </ros2_control>
+  </xacro:macro>
+
+  <xacro:macro
+    name="panda_gz_ros2_control"
+    params="initial_positions_file controllers_file assisted_grasp">
+    <xacro:property
+      name="initial_positions"
+      value="${xacro.load_yaml(initial_positions_file)['initial_positions']}" />
+    <ros2_control name="GazeboSimSystem" type="system">
+      <hardware>
+        <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+      </hardware>
+      <xacro:macro name="gz_arm_joint" params="joint_name lower upper">
+        <joint name="${joint_name}">
+          <command_interface name="position">
+            <param name="min">${lower}</param>
+            <param name="max">${upper}</param>
+          </command_interface>
+          <state_interface name="position">
+            <param name="initial_value">${initial_positions[joint_name]}</param>
+          </state_interface>
+          <state_interface name="velocity" />
+          <state_interface name="effort" />
+        </joint>
+      </xacro:macro>
+      <xacro:gz_arm_joint joint_name="panda_joint1" lower="-2.8973" upper="2.8973" />
+      <xacro:gz_arm_joint joint_name="panda_joint2" lower="-1.7628" upper="1.7628" />
+      <xacro:gz_arm_joint joint_name="panda_joint3" lower="-2.8973" upper="2.8973" />
+      <xacro:gz_arm_joint joint_name="panda_joint4" lower="-3.0718" upper="-0.0698" />
+      <xacro:gz_arm_joint joint_name="panda_joint5" lower="-2.8973" upper="2.8973" />
+      <xacro:gz_arm_joint joint_name="panda_joint6" lower="-0.0175" upper="3.7525" />
+      <xacro:gz_arm_joint joint_name="panda_joint7" lower="-2.8973" upper="2.8973" />
+      <joint name="panda_finger_joint1">
+        <command_interface name="position">
+          <param name="min">0.0</param>
+          <param name="max">0.04</param>
+        </command_interface>
+        <state_interface name="position">
+          <param name="initial_value">0.04</param>
+        </state_interface>
+        <state_interface name="velocity" />
+        <state_interface name="effort" />
+      </joint>
+      <joint name="panda_finger_joint2">
+        <param name="mimic">panda_finger_joint1</param>
+        <param name="multiplier">1.0</param>
+        <command_interface name="position">
+          <param name="min">0.0</param>
+          <param name="max">0.04</param>
+        </command_interface>
+        <state_interface name="position">
+          <param name="initial_value">0.04</param>
+        </state_interface>
+        <state_interface name="velocity" />
+        <state_interface name="effort" />
+      </joint>
+    </ros2_control>
+
+    <gazebo>
+      <self_collide>true</self_collide>
+      <plugin
+        filename="gz_ros2_control-system"
+        name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+        <robot_param>robot_description</robot_param>
+        <robot_param_node>robot_state_publisher</robot_param_node>
+        <parameters>${controllers_file}</parameters>
+        <controller_manager_name>controller_manager</controller_manager_name>
+      </plugin>
+    </gazebo>
+
+    <!-- libsdformat normally reduces fixed URDF joints.  DetachableJoint and
+         the hand contact sensor address panda_hand by name at runtime, so the
+         physical hand link must survive URDF -> SDF conversion. -->
+    <gazebo reference="panda_hand_joint">
+      <preserveFixedJoint>true</preserveFixedJoint>
+    </gazebo>
+
+    <!-- Fortress keeps ignition-gazebo plugin filenames; this is modern
+         Gazebo Sim and never gazebo_ros2_control / Gazebo Classic. -->
+    <xacro:if value="${assisted_grasp}">
+      <gazebo>
+        <plugin
+          filename="libignition-gazebo-detachable-joint-system.so"
+          name="ignition::gazebo::systems::DetachableJoint">
+          <parent_link>panda_hand</parent_link>
+          <child_model>cube</child_model>
+          <child_link>cube_link</child_link>
+          <detach_topic>/panda/detachable_joint/detach</detach_topic>
+          <attach_topic>/panda/detachable_joint/attach</attach_topic>
+          <output_topic>/panda/detachable_joint/state</output_topic>
+        </plugin>
+      </gazebo>
+    </xacro:if>
+    <gazebo reference="panda_leftfinger"><mu1>1.2</mu1><mu2>1.2</mu2></gazebo>
+    <gazebo reference="panda_rightfinger"><mu1>1.2</mu1><mu2>1.2</mu2></gazebo>
+
+    <!-- Contact sensors publish scoped collision pairs.  All arm sensors may
+         share one Transport topic because each message retains both collision
+         entity names. Link 8 has no collision geometry in the shared model. -->
+    <xacro:macro name="panda_contact_sensor" params="link_name collision_name">
+      <gazebo reference="${link_name}">
+        <sensor name="${link_name}_contact_sensor" type="contact">
+          <always_on>true</always_on>
+          <update_rate>100</update_rate>
+          <topic>/panda/robot_contacts</topic>
+          <contact>
+            <collision>${collision_name}</collision>
+          </contact>
+        </sensor>
+      </gazebo>
+    </xacro:macro>
+    <!-- libsdformat names each unnamed upstream URDF collision
+         <link-name>_collision. Keep the expected generated name explicit so a
+         resource-model naming change fails the static asset contract. -->
+    <xacro:panda_contact_sensor
+      link_name="panda_link0" collision_name="panda_link0_collision" />
+    <xacro:panda_contact_sensor
+      link_name="panda_link1" collision_name="panda_link1_collision" />
+    <xacro:panda_contact_sensor
+      link_name="panda_link2" collision_name="panda_link2_collision" />
+    <xacro:panda_contact_sensor
+      link_name="panda_link3" collision_name="panda_link3_collision" />
+    <xacro:panda_contact_sensor
+      link_name="panda_link4" collision_name="panda_link4_collision" />
+    <xacro:panda_contact_sensor
+      link_name="panda_link5" collision_name="panda_link5_collision" />
+    <xacro:panda_contact_sensor
+      link_name="panda_link6" collision_name="panda_link6_collision" />
+    <xacro:panda_contact_sensor
+      link_name="panda_link7" collision_name="panda_link7_collision" />
+    <xacro:panda_contact_sensor
+      link_name="panda_hand" collision_name="panda_hand_collision" />
+    <xacro:panda_contact_sensor
+      link_name="panda_leftfinger" collision_name="panda_leftfinger_collision" />
+    <xacro:panda_contact_sensor
+      link_name="panda_rightfinger" collision_name="panda_rightfinger_collision" />
+  </xacro:macro>
+</robot>

@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="panda">
+  <xacro:arg name="hardware_type" default="mock" />
+  <xacro:arg
+    name="initial_positions_file"
+    default="$(find panda_moveit_config)/config/initial_positions.yaml" />
+  <xacro:arg name="controllers_file" default="" />
+  <xacro:arg name="assisted_grasp" default="true" />
+
+  <!-- This is the only Panda robot_description entry point for mock and Gazebo. -->
+  <xacro:include filename="$(find moveit_resources_panda_description)/urdf/panda.urdf" />
+  <xacro:include filename="$(find panda_moveit_config)/config/panda.ros2_control.xacro" />
+
+  <!-- PyBullet's Panda model exposes link 11 as a tool target 105 mm in
+       front of panda_hand.  Keep the same collision-free frame here so task
+       poses have identical meaning in both backends; objects still attach to
+       the physical panda_hand link. -->
+  <link name="panda_grasptarget" />
+  <joint name="panda_grasptarget_hand" type="fixed">
+    <parent link="panda_hand" />
+    <child link="panda_grasptarget" />
+    <origin xyz="0 0 0.105" rpy="0 0 0" />
+  </joint>
+
+  <!-- A real fixed root gives both backends exactly one world -> panda_link0 TF
+       and anchors the Gazebo arm. No static TF publisher or SRDF virtual joint
+       should duplicate this transform. -->
+  <link name="world" />
+  <joint name="world_to_panda_link0" type="fixed">
+    <parent link="world" />
+    <child link="panda_link0" />
+    <origin xyz="0 0 0" rpy="0 0 0" />
+  </joint>
+
+  <xacro:property name="selected_hardware" value="$(arg hardware_type)" />
+  <xacro:if value="${selected_hardware == 'mock'}">
+    <xacro:panda_mock_ros2_control
+      initial_positions_file="$(arg initial_positions_file)" />
+  </xacro:if>
+  <xacro:if value="${selected_hardware == 'gz'}">
+    <xacro:panda_gz_ros2_control
+      initial_positions_file="$(arg initial_positions_file)"
+      controllers_file="$(arg controllers_file)"
+      assisted_grasp="$(arg assisted_grasp)" />
+  </xacro:if>
+</robot>

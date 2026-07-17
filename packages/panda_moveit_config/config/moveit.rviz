@@ -1,0 +1,23 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+    - Class: moveit_rviz_plugin/MotionPlanning
+      Name: MotionPlanning
+      Enabled: true
+      Planning Group: panda_arm
+      Planning Scene Topic: /monitored_planning_scene
+      Robot Description: robot_description
+  Enabled: true
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: world
+  Name: root
+Window Geometry:
+  Height: 900
+  Width: 1400

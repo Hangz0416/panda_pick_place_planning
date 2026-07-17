@@ -1,0 +1,10 @@
+moveit_setup_assistant_config:
+  urdf:
+    package: panda_moveit_config
+    relative_path: config/panda.urdf.xacro
+  srdf:
+    relative_path: config/panda.srdf
+  package_settings:
+    author_name: Han Guangzhi
+    author_email: 3136412152@qq.com
+    generated_timestamp: 2026-07-17T00:00:00.000000

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "date": "2026-07-17",
+  "environment": {
+    "os": "Ubuntu 22.04",
+    "python": "3.10.12",
+    "simulator": "PyBullet DIRECT",
+    "cpu": "Intel Core i5-14600KF"
+  },
+  "task_seed": 42,
+  "artifacts": {
+    "pybullet_clear_linear_seed42.jsonl": {
+      "sha256": "2ada79b3fec81dbd5eaf8e9c2a4afc2532b9900a0ee967c8f1323db29f28c614",
+      "scene": "clear",
+      "planner": "linear",
+      "task_success": true
+    },
+    "pybullet_obstacle_rrt_connect_seed42.jsonl": {
+      "sha256": "fb6bd14deb560c4c41c9e67cd4d1a64a77f6b891609a8ed4e7458a4a5de1ed06",
+      "scene": "obstacle",
+      "planner": "rrt_connect",
+      "task_success": true
+    }
+  }
+}

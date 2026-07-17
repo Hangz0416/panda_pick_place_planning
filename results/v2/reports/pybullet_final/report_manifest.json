@@ -1,0 +1,206 @@
+{
+  "charts": [
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "rates",
+      "path": "full_episode_success_rates.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "planning_time",
+      "path": "full_episode_planning_time.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "path_length",
+      "path": "full_episode_path_length.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "failures",
+      "path": "full_episode_failure_counts.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "place_error",
+      "path": "full_episode_place_error.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "tracking_error",
+      "path": "full_episode_tracking_error.svg"
+    }
+  ],
+  "evaluation_modes": [
+    "full_episode"
+  ],
+  "generated_at_utc": "2026-07-17T03:59:51.871071+00:00",
+  "groups": [
+    {
+      "dataset": "pybullet_v2",
+      "display_label": "pybullet_v2 · pybullet/pybullet · clear · linear",
+      "episodes": 50,
+      "evaluation_mode": "full_episode",
+      "execution_success_rate": 1.0,
+      "failure_counts": {},
+      "final_xy_error_mean_m": 9.944669033525616e-05,
+      "final_z_error_mean_m": 1.0960376182834047e-05,
+      "group_key": "pybullet/pybullet/clear/linear/assisted",
+      "metric_origins": {
+        "path_length": "reported_planning_success_episode_values",
+        "placement_error": "reported",
+        "planning_time": "reported_episode_values",
+        "tracking_error": "unavailable"
+      },
+      "metric_sample_counts": {
+        "execution_success_rate": 50,
+        "final_xy_error": 50,
+        "final_z_error": 50,
+        "path_length": 50,
+        "planning_success_rate": 50,
+        "planning_time": 50,
+        "task_success_rate": 50,
+        "tracking_error": 0
+      },
+      "path_length_mean_rad": 0.7783581444643101,
+      "path_length_median_rad": 0.7850100725650686,
+      "planning_success_rate": 1.0,
+      "planning_time_mean_sec": 0.0017498318800062407,
+      "planning_time_median_sec": 0.0017286829970544204,
+      "planning_time_p95_sec": 0.002111696300198673,
+      "task_success_rate": 1.0,
+      "tracking_error_mean_rad": null
+    },
+    {
+      "dataset": "pybullet_v2",
+      "display_label": "pybullet_v2 · pybullet/pybullet · clear · rrt_connect",
+      "episodes": 50,
+      "evaluation_mode": "full_episode",
+      "execution_success_rate": 1.0,
+      "failure_counts": {},
+      "final_xy_error_mean_m": 0.00011421045487269826,
+      "final_z_error_mean_m": 1.0855877452940337e-05,
+      "group_key": "pybullet/pybullet/clear/rrt_connect/assisted",
+      "metric_origins": {
+        "path_length": "reported_planning_success_episode_values",
+        "placement_error": "reported",
+        "planning_time": "reported_episode_values",
+        "tracking_error": "unavailable"
+      },
+      "metric_sample_counts": {
+        "execution_success_rate": 50,
+        "final_xy_error": 50,
+        "final_z_error": 50,
+        "path_length": 50,
+        "planning_success_rate": 50,
+        "planning_time": 50,
+        "task_success_rate": 50,
+        "tracking_error": 0
+      },
+      "path_length_mean_rad": 0.7783581444800481,
+      "path_length_median_rad": 0.7850100725650518,
+      "planning_success_rate": 1.0,
+      "planning_time_mean_sec": 0.0019223692403465976,
+      "planning_time_median_sec": 0.001896667501569027,
+      "planning_time_p95_sec": 0.0023277652991964713,
+      "task_success_rate": 1.0,
+      "tracking_error_mean_rad": null
+    },
+    {
+      "dataset": "pybullet_v2",
+      "display_label": "pybullet_v2 · pybullet/pybullet · obstacle · linear",
+      "episodes": 50,
+      "evaluation_mode": "full_episode",
+      "execution_success_rate": 0.0,
+      "failure_counts": {
+        "planning_collision": 50
+      },
+      "final_xy_error_mean_m": 0.4459072690779133,
+      "final_z_error_mean_m": 0.15111187514082858,
+      "group_key": "pybullet/pybullet/obstacle/linear/assisted",
+      "metric_origins": {
+        "path_length": "reported_planning_success_episode_values",
+        "placement_error": "reported",
+        "planning_time": "reported_episode_values",
+        "tracking_error": "unavailable"
+      },
+      "metric_sample_counts": {
+        "execution_success_rate": 50,
+        "final_xy_error": 50,
+        "final_z_error": 50,
+        "path_length": 0,
+        "planning_success_rate": 50,
+        "planning_time": 50,
+        "task_success_rate": 50,
+        "tracking_error": 0
+      },
+      "path_length_mean_rad": null,
+      "path_length_median_rad": null,
+      "planning_success_rate": 0.0,
+      "planning_time_mean_sec": 0.0005601863202173262,
+      "planning_time_median_sec": 0.0005381254995882045,
+      "planning_time_p95_sec": 0.0006620859028771519,
+      "task_success_rate": 0.0,
+      "tracking_error_mean_rad": null
+    },
+    {
+      "dataset": "pybullet_v2",
+      "display_label": "pybullet_v2 · pybullet/pybullet · obstacle · rrt_connect",
+      "episodes": 50,
+      "evaluation_mode": "full_episode",
+      "execution_success_rate": 1.0,
+      "failure_counts": {},
+      "final_xy_error_mean_m": 8.32619672069011e-05,
+      "final_z_error_mean_m": 1.153510798481798e-05,
+      "group_key": "pybullet/pybullet/obstacle/rrt_connect/assisted",
+      "metric_origins": {
+        "path_length": "reported_planning_success_episode_values",
+        "placement_error": "reported",
+        "planning_time": "reported_episode_values",
+        "tracking_error": "unavailable"
+      },
+      "metric_sample_counts": {
+        "execution_success_rate": 50,
+        "final_xy_error": 50,
+        "final_z_error": 50,
+        "path_length": 50,
+        "planning_success_rate": 50,
+        "planning_time": 50,
+        "task_success_rate": 50,
+        "tracking_error": 0
+      },
+      "path_length_mean_rad": 1.3127168527701378,
+      "path_length_median_rad": 1.1736494104333737,
+      "planning_success_rate": 1.0,
+      "planning_time_mean_sec": 0.033156982659420464,
+      "planning_time_median_sec": 0.026737766995211132,
+      "planning_time_p95_sec": 0.06815053134669141,
+      "task_success_rate": 1.0,
+      "tracking_error_mean_rad": null
+    }
+  ],
+  "paired_coverage": null,
+  "report_schema_version": 1,
+  "semantic_notes": {
+    "full_episode": "Planning, execution, and task rates are shown when reported; missing metrics remain null/N/A.",
+    "path_length": "Mean and median use planning-success rows with a reported top-level joint path length.",
+    "placement_error": "Uses reported final errors, or derives absolute XY/Z error from recorded final and target positions in raw full-episode JSONL.",
+    "planning_only": "Only planning_success is a success-rate outcome; execution and task success are not applicable because no trajectory or grasp ran."
+  },
+  "sources": [
+    {
+      "batch_status": null,
+      "episode_count": 200,
+      "evaluation_modes": [
+        "full_episode"
+      ],
+      "label": "pybullet_v2",
+      "path": "results/v2/pybullet_shared_geometry_200_final/benchmark_results.jsonl",
+      "sha256": "793d774ce354a40de51fd0de0c47418da6fdf727cba7af379c196b2a729ad5c9",
+      "source_kind": "episode_jsonl",
+      "warnings": []
+    }
+  ],
+  "title": "Panda V2 PyBullet 200-episode benchmark",
+  "warnings": []
+}

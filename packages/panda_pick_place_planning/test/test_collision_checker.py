@@ -1,0 +1,189 @@
+import unittest
+
+from panda_pick_place_planning.core.collision_checker import (
+    PandaCollisionChecker,
+)
+
+
+def joint_info(parent_link, joint_type=0):
+    info = [0] * 17
+    info[2] = joint_type
+    info[16] = parent_link
+    return tuple(info)
+
+
+def contact(first_link, second_link):
+    values = [0] * 5
+    values[3] = first_link
+    values[4] = second_link
+    return tuple(values)
+
+
+class FakeBullet:
+    JOINT_FIXED = 4
+
+    def __init__(self):
+        self.states = {joint_index: 0.0 for joint_index in range(12)}
+        self.base_poses = {4: ((0.1, 0.2, 0.3), (0.0, 0.0, 0.0, 1.0))}
+        self.contacts = {
+            (1, 1): [
+                contact(0, 1),
+                contact(6, 8),
+                contact(8, 10),
+                contact(1, 4),
+            ],
+            (1, 2): [contact(-1, -1), contact(0, -1)],
+            (1, 3): [contact(3, -1)],
+        }
+
+    def getNumJoints(self, robot_id, physicsClientId):
+        return 12
+
+    def getJointInfo(self, robot_id, joint_index, physicsClientId):
+        joint_type = self.JOINT_FIXED if joint_index in {7, 8} else 0
+        return joint_info(joint_index - 1, joint_type)
+
+    def getContactPoints(self, bodyA, bodyB, physicsClientId):
+        return self.contacts.get((bodyA, bodyB), [])
+
+    def getClosestPoints(self, bodyA, bodyB, distance, physicsClientId):
+        return self.contacts.get((bodyA, bodyB, "closest"), [])
+
+    def getJointState(self, robot_id, joint_index, physicsClientId):
+        return (self.states[joint_index], 0.0, 0.0, 0.0)
+
+    def resetJointState(
+        self,
+        robot_id,
+        joint_index,
+        value,
+        physicsClientId,
+    ):
+        self.states[joint_index] = value
+
+    def performCollisionDetection(self, physicsClientId):
+        return None
+
+    def getBasePositionAndOrientation(self, body_id, physicsClientId):
+        return self.base_poses[body_id]
+
+    def resetBasePositionAndOrientation(
+        self,
+        body_id,
+        position,
+        orientation,
+        physicsClientId,
+    ):
+        self.base_poses[body_id] = (tuple(position), tuple(orientation))
+
+    def getLinkState(
+        self,
+        robot_id,
+        link_index,
+        computeForwardKinematics,
+        physicsClientId,
+    ):
+        return (None, None, None, None, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0))
+
+    def multiplyTransforms(
+        self,
+        parent_position,
+        parent_orientation,
+        child_position,
+        child_orientation,
+    ):
+        return tuple(child_position), tuple(child_orientation)
+
+
+class PandaCollisionCheckerTest(unittest.TestCase):
+    def test_filters_expected_contacts_and_keeps_real_collisions(self):
+        checker = PandaCollisionChecker(
+            bullet=FakeBullet(),
+            physics_client_id=0,
+            robot_id=1,
+            arm_joint_indices=[0, 1],
+            joint_limits=[(-1.0, 1.0), (-1.0, 1.0)],
+            world_body_ids=[2, 3],
+            allowed_world_contacts={2: {-1, 0}},
+        )
+
+        self.assertEqual(
+            checker.current_collisions(),
+            [
+                ("self", 1, 1, 4),
+                ("world", 3, 3, -1),
+            ],
+        )
+        self.assertFalse(checker.is_valid([0.0, 0.0]))
+
+    def test_accepts_only_expected_home_contacts(self):
+        bullet = FakeBullet()
+        bullet.contacts[(1, 1)] = [
+            contact(0, 1),
+            contact(6, 8),
+            contact(8, 10),
+        ]
+        bullet.contacts[(1, 3)] = []
+        checker = PandaCollisionChecker(
+            bullet=bullet,
+            physics_client_id=0,
+            robot_id=1,
+            arm_joint_indices=[0, 1],
+            joint_limits=[(-1.0, 1.0), (-1.0, 1.0)],
+            world_body_ids=[2, 3],
+            allowed_world_contacts={2: {-1, 0}},
+        )
+
+        self.assertTrue(checker.is_valid([0.0, 0.0]))
+
+    def test_rejects_world_clearance_violation_without_contact(self):
+        bullet = FakeBullet()
+        bullet.contacts[(1, 1)] = []
+        bullet.contacts[(1, 2)] = []
+        bullet.contacts[(1, 3)] = []
+        bullet.contacts[(1, 3, "closest")] = [contact(4, -1)]
+        checker = PandaCollisionChecker(
+            bullet=bullet,
+            physics_client_id=0,
+            robot_id=1,
+            arm_joint_indices=[0, 1],
+            joint_limits=[(-1.0, 1.0), (-1.0, 1.0)],
+            world_body_ids=[2, 3],
+            world_clearance_margins={3: 0.01},
+        )
+
+        self.assertFalse(checker.is_valid([0.0, 0.0]))
+
+    def test_rejects_predicted_carried_object_collision_and_restores_pose(self):
+        bullet = FakeBullet()
+        bullet.contacts[(1, 1)] = []
+        bullet.contacts[(1, 2)] = []
+        bullet.contacts[(1, 3)] = []
+        bullet.contacts[(4, 3)] = [contact(-1, -1)]
+        checker = PandaCollisionChecker(
+            bullet=bullet,
+            physics_client_id=0,
+            robot_id=1,
+            arm_joint_indices=[0, 1],
+            joint_limits=[(-1.0, 1.0), (-1.0, 1.0)],
+            world_body_ids=[2, 3],
+        )
+        original_pose = bullet.base_poses[4]
+        checker.attach_carried_body(
+            body_id=4,
+            parent_link=11,
+            relative_position=(0.5, 0.0, 0.1),
+            relative_orientation=(0.0, 0.0, 0.0, 1.0),
+            world_body_ids=[2, 3],
+        )
+
+        self.assertFalse(checker.is_valid([0.0, 0.0]))
+        self.assertEqual(checker.last_validation_failure, "carried_object_collision")
+        self.assertEqual(bullet.base_poses[4], original_pose)
+
+        checker.detach_carried_body()
+        self.assertTrue(checker.is_valid([0.0, 0.0]))
+
+
+if __name__ == "__main__":
+    unittest.main()

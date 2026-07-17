@@ -1,0 +1,22 @@
+uint8 COMMAND_QUERY=0
+uint8 COMMAND_RESET=1
+
+uint8 command
+uint64 episode_id
+---
+bool success
+uint16 status_code
+string failure_type
+string message
+uint64 episode_id
+bool grasped
+bool holding_object
+bool released
+bool left_finger_contact
+bool right_finger_contact
+bool slipping
+float64 max_relative_translation_drift_m
+float64 max_relative_rotation_drift_rad
+float64 object_linear_speed_mps
+float64 release_stable_time_sec
+geometry_msgs/Pose object_pose

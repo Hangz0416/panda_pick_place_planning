@@ -1,0 +1,11 @@
+std_msgs/Header header
+uint64 episode_id
+uint64 task_seed
+string backend
+string simulator
+string planner_id
+uint64 planner_seed
+string scene
+string grasp_mode
+geometry_msgs/Point object_position
+geometry_msgs/Point target_position

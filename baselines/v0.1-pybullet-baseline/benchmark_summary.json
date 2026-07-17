@@ -1,0 +1,49 @@
+{
+  "total_episodes": 200,
+  "groups": {
+    "clear/linear": {
+      "episodes": 50,
+      "planning_success_rate": 1.0,
+      "task_success_rate": 1.0,
+      "collision_episode_rate": 0.0,
+      "avg_planning_time_sec": 0.001679,
+      "avg_path_length_rad": 0.778358,
+      "failure_counts": {
+        "success": 50
+      }
+    },
+    "clear/rrt_connect": {
+      "episodes": 50,
+      "planning_success_rate": 1.0,
+      "task_success_rate": 1.0,
+      "collision_episode_rate": 0.0,
+      "avg_planning_time_sec": 0.001757,
+      "avg_path_length_rad": 0.778358,
+      "failure_counts": {
+        "success": 50
+      }
+    },
+    "obstacle/linear": {
+      "episodes": 50,
+      "planning_success_rate": 0.0,
+      "task_success_rate": 0.0,
+      "collision_episode_rate": 0.0,
+      "avg_planning_time_sec": 0.000505,
+      "avg_path_length_rad": 0.0,
+      "failure_counts": {
+        "planning_collision": 50
+      }
+    },
+    "obstacle/rrt_connect": {
+      "episodes": 50,
+      "planning_success_rate": 1.0,
+      "task_success_rate": 1.0,
+      "collision_episode_rate": 0.0,
+      "avg_planning_time_sec": 0.026197,
+      "avg_path_length_rad": 1.199255,
+      "failure_counts": {
+        "success": 50
+      }
+    }
+  }
+}

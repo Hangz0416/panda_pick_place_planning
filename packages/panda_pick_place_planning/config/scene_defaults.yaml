@@ -1,0 +1,22 @@
+home_joints: [0.0, -0.65, 0.0, -2.2, 0.0, 1.55, 0.78]
+table_size: [1.5, 1.0, 0.05]
+table_position: [0.5, 0.0, -0.025]
+cube_half_extent: 0.025
+cube_mass: 0.05
+target_radius: 0.09
+hover_height: 0.24
+grasp_height: 0.075
+place_height: 0.09
+obstacle_position: [0.54, 0.0, 0.14]
+obstacle_half_extents: [0.055, 0.05, 0.14]
+simulation_hz: 240
+motor_steps_per_waypoint: 6
+settle_steps: 240
+open_gripper_width: 0.04
+closed_gripper_width: 0.0
+obstacle_clearance_margin: 0.01
+carried_object_clearance_margin: 0.01
+carried_table_penetration_tolerance: 0.002
+success_xy_tolerance_m: 0.04
+success_z_tolerance_m: 0.015
+success_max_linear_velocity_mps: 0.05

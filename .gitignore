@@ -5,5 +5,21 @@ __pycache__/
 build/
 install/
 log/
-results/
-docs/
+# Runtime outputs are ignored by default.  Keep only the curated, reproducible
+# evidence sets that are part of the repository deliverable.
+results/*
+!results/v2/
+results/v2/*
+!results/v2/pybullet_shared_geometry_200_final/
+!results/v2/pybullet_shared_geometry_200_final/**
+!results/v2/demos/
+!results/v2/demos/**
+!results/v2/reports/
+results/v2/reports/*
+!results/v2/reports/pybullet_final/
+!results/v2/reports/pybullet_final/**
+!results/v2/reports/v1_v2_pybullet_compare/
+!results/v2/reports/v1_v2_pybullet_compare/**
+
+docs/*
+!docs/resume_and_interview.md

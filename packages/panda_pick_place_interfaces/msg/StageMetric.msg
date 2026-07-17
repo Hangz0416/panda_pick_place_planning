@@ -1,0 +1,20 @@
+string name
+string evaluation_mode
+
+bool planning_success_known
+bool planning_success
+bool execution_success_known
+bool execution_success
+
+float64 planning_time_sec
+float64 execution_time_sec
+float64 path_length_rad
+bool path_waypoints_known
+uint32 path_waypoints
+bool trajectory_points_known
+uint32 trajectory_points
+
+string failure_type
+bool moveit_error_code_known
+int32 moveit_error_code
+float64 max_joint_tracking_error_rad

@@ -1,0 +1,20 @@
+{
+  "baseline": "v0.1-pybullet-baseline",
+  "date": "2026-07-17",
+  "episodes": 200,
+  "seed": 42,
+  "scenes": ["clear", "obstacle"],
+  "planners": ["linear", "rrt_connect"],
+  "runtime": {
+    "os": "Ubuntu 22.04",
+    "python": "3.10.12",
+    "simulator": "PyBullet DIRECT",
+    "cpu": "Intel Core i5-14600KF"
+  },
+  "artifacts": {
+    "benchmark_results.jsonl": "sha256:6bc9e5cd3aa463dac8b657bd9686e1db6fd3d3aaa64aea7b08ea185ce2bbe5ab",
+    "benchmark_results.csv": "sha256:be4ddfef3e537571045f4a5c4da97c9aea56e38e222ff5bdad8cfcdaf6d55536",
+    "benchmark_summary.json": "sha256:9f9dd96140f2834eb4476776dcd1853ae9b0dc7fba3deaa54af07d6564456022"
+  },
+  "local_artifact_directory": "results/final_benchmark"
+}

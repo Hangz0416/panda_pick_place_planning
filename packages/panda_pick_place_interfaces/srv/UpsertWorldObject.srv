@@ -1,0 +1,7 @@
+moveit_msgs/CollisionObject collision_object
+# Explicit mounting contacts only (for example table <-> panda_link0).  Empty means that all
+# collisions with this world object remain checked.
+string[] allowed_collision_links
+---
+bool success
+string message

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="506" viewBox="0 0 1500 506" role="img" aria-labelledby="chart-title">
+<title id="chart-title">Panda V2 PyBullet 200-episode benchmark — Full episode placement error</title>
+<style>
+text { font-family: Inter, "Noto Sans", "DejaVu Sans", sans-serif; fill: #263238; }
+.chart-title { font-size: 24px; font-weight: 700; }
+.chart-subtitle { font-size: 13px; fill: #52606D; }
+.legend-label, .tick-label { font-size: 12px; }
+.axis-label { font-size: 13px; font-weight: 600; }
+.group-label { font-size: 12px; font-weight: 600; }
+.value-label, .na-label { font-size: 11px; }
+.na-label, .empty-label { fill: #6B7785; font-style: italic; }
+.segment-label { fill: #FFFFFF; font-size: 11px; font-weight: 700; }
+.footer { font-size: 11px; fill: #6B7785; }
+</style>
+<rect width="1500" height="506" fill="#FFFFFF"/>
+<text class="chart-title" x="32" y="38">Panda V2 PyBullet 200-episode benchmark — Full episode placement error</text>
+<text class="chart-subtitle" x="32" y="64">Absolute final center error; raw legacy rows may be derived from recorded final/target poses.</text>
+<line x1="32" y1="72" x2="1468" y2="72" stroke="#D9E1E8"/>
+<rect x="417.0" y="75" width="13" height="13" rx="2" fill="#0072B2"/>
+<text class="legend-label" x="437.0" y="86">XY error</text>
+<rect x="888.5" y="75" width="13" height="13" rx="2" fill="#E69F00"/>
+<text class="legend-label" x="908.5" y="86">Z error</text>
+<line x1="417.00" y1="145" x2="417.00" y2="401" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="417.00" y="423" text-anchor="middle">0</text>
+<line x1="605.60" y1="145" x2="605.60" y2="401" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="605.60" y="423" text-anchor="middle">100</text>
+<line x1="794.20" y1="145" x2="794.20" y2="401" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="794.20" y="423" text-anchor="middle">200</text>
+<line x1="982.80" y1="145" x2="982.80" y2="401" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="982.80" y="423" text-anchor="middle">300</text>
+<line x1="1171.40" y1="145" x2="1171.40" y2="401" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1171.40" y="423" text-anchor="middle">400</text>
+<line x1="1360.00" y1="145" x2="1360.00" y2="401" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1360.00" y="423" text-anchor="middle">500</text>
+<line x1="417" y1="401" x2="1360" y2="401" stroke="#52606D"/>
+<text class="axis-label" x="888.50" y="449" text-anchor="middle">mean absolute error (mm)</text>
+<text class="group-label" x="403" y="166.0" text-anchor="end">pybullet_v2 · pybullet/pybullet · clear · linear</text>
+<rect x="417" y="145" width="0.19" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="424.19" y="157" text-anchor="start" fill="#263238">0.0994 mm</text>
+<rect x="417" y="166" width="0.02" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="424.02" y="178" text-anchor="start" fill="#263238">0.011 mm</text>
+<text class="group-label" x="403" y="230.0" text-anchor="end">pybullet_v2 · pybullet/pybullet · clear · rrt_connect</text>
+<rect x="417" y="209" width="0.22" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="424.22" y="221" text-anchor="start" fill="#263238">0.114 mm</text>
+<rect x="417" y="230" width="0.02" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="424.02" y="242" text-anchor="start" fill="#263238">0.0109 mm</text>
+<text class="group-label" x="403" y="294.0" text-anchor="end">pybullet_v2 · pybullet/pybullet · obstacle · linear</text>
+<rect x="417" y="273" width="840.98" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="1251.98" y="285" text-anchor="end" fill="#FFFFFF">446 mm</text>
+<rect x="417" y="294" width="285.00" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="709.00" y="306" text-anchor="start" fill="#263238">151 mm</text>
+<text class="group-label" x="403" y="358.0" text-anchor="end">pybullet_v2 · pybullet/pybullet · obstacle · rrt_connect</text>
+<rect x="417" y="337" width="0.16" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="424.16" y="349" text-anchor="start" fill="#263238">0.0833 mm</text>
+<rect x="417" y="358" width="0.02" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="424.02" y="370" text-anchor="start" fill="#263238">0.0115 mm</text>
+<text class="footer" x="1468" y="488" text-anchor="end">Recorded data only · N/A = not reported or not applicable</text>
+</svg>

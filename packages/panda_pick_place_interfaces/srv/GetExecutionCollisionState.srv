@@ -1,0 +1,19 @@
+uint8 COMMAND_QUERY=0
+uint8 COMMAND_RESET=1
+
+uint8 command
+uint64 episode_id
+geometry_msgs/Point object_initial_position
+geometry_msgs/Point target_position
+---
+bool success
+uint16 status_code
+string failure_type
+string message
+uint64 episode_id
+bool available
+bool invalid_collision
+uint32 collision_count
+string last_failure_type
+string last_collision1
+string last_collision2

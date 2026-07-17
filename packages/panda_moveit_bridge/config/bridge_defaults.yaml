@@ -1,0 +1,16 @@
+panda_moveit_bridge:
+  ros__parameters:
+    planning_group: panda_arm
+    action_name: plan_execute_motion
+    default_planner_id: RRTConnectkConfigDefault
+    default_planning_time_sec: 3.0
+    default_velocity_scaling_factor: 0.2
+    default_acceleration_scaling_factor: 0.2
+    default_end_effector_link: panda_grasptarget
+    default_attach_link: panda_hand
+    default_touch_links:
+      - panda_hand
+      - panda_leftfinger
+      - panda_rightfinger
+    scene_sync_timeout_sec: 1.0
+    move_group_server_wait_sec: 10.0

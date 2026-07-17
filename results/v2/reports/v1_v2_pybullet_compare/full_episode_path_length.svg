@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="762" viewBox="0 0 1500 762" role="img" aria-labelledby="chart-title">
+<title id="chart-title">Panda PyBullet V1 versus V2 shared-task regression — Full episode joint-path length</title>
+<style>
+text { font-family: Inter, "Noto Sans", "DejaVu Sans", sans-serif; fill: #263238; }
+.chart-title { font-size: 24px; font-weight: 700; }
+.chart-subtitle { font-size: 13px; fill: #52606D; }
+.legend-label, .tick-label { font-size: 12px; }
+.axis-label { font-size: 13px; font-weight: 600; }
+.group-label { font-size: 12px; font-weight: 600; }
+.value-label, .na-label { font-size: 11px; }
+.na-label, .empty-label { fill: #6B7785; font-style: italic; }
+.segment-label { fill: #FFFFFF; font-size: 11px; font-weight: 700; }
+.footer { font-size: 11px; fill: #6B7785; }
+</style>
+<rect width="1500" height="762" fill="#FFFFFF"/>
+<text class="chart-title" x="32" y="38">Panda PyBullet V1 versus V2 shared-task regression — Full episode joint-path length</text>
+<text class="chart-subtitle" x="32" y="64">Successful plans with a reported top-level joint-path metric; missing statistics are N/A.</text>
+<line x1="32" y1="72" x2="1468" y2="72" stroke="#D9E1E8"/>
+<rect x="354.0" y="75" width="13" height="13" rx="2" fill="#0072B2"/>
+<text class="legend-label" x="374.0" y="86">Mean</text>
+<rect x="857.0" y="75" width="13" height="13" rx="2" fill="#E69F00"/>
+<text class="legend-label" x="877.0" y="86">Median</text>
+<line x1="354.00" y1="145" x2="354.00" y2="657" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="354.00" y="679" text-anchor="middle">0</text>
+<line x1="555.20" y1="145" x2="555.20" y2="657" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="555.20" y="679" text-anchor="middle">0.4</text>
+<line x1="756.40" y1="145" x2="756.40" y2="657" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="756.40" y="679" text-anchor="middle">0.8</text>
+<line x1="957.60" y1="145" x2="957.60" y2="657" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="957.60" y="679" text-anchor="middle">1.2</text>
+<line x1="1158.80" y1="145" x2="1158.80" y2="657" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1158.80" y="679" text-anchor="middle">1.6</text>
+<line x1="1360.00" y1="145" x2="1360.00" y2="657" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1360.00" y="679" text-anchor="middle">2</text>
+<line x1="354" y1="657" x2="1360" y2="657" stroke="#52606D"/>
+<text class="axis-label" x="857.00" y="705" text-anchor="middle">joint path length (rad)</text>
+<text class="group-label" x="340" y="166.0" text-anchor="end">v1 · pybullet/pybullet · clear · linear</text>
+<rect x="354" y="145" width="391.51" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="752.51" y="157" text-anchor="start" fill="#263238">0.7784 rad</text>
+<rect x="354" y="166" width="394.86" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="755.86" y="178" text-anchor="start" fill="#263238">0.785 rad</text>
+<text class="group-label" x="340" y="230.0" text-anchor="end">v1 · pybullet/pybullet · clear · rrt_connect</text>
+<rect x="354" y="209" width="391.51" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="752.51" y="221" text-anchor="start" fill="#263238">0.7784 rad</text>
+<rect x="354" y="230" width="394.86" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="755.86" y="242" text-anchor="start" fill="#263238">0.785 rad</text>
+<text class="group-label" x="340" y="294.0" text-anchor="end">v1 · pybullet/pybullet · obstacle · linear</text>
+<line x1="357" y1="281.0" x2="379" y2="281.0" stroke="#9AA4AE" stroke-width="3"/>
+<text class="na-label" x="387" y="285">N/A</text>
+<line x1="357" y1="302.0" x2="379" y2="302.0" stroke="#9AA4AE" stroke-width="3"/>
+<text class="na-label" x="387" y="306">N/A</text>
+<text class="group-label" x="340" y="358.0" text-anchor="end">v1 · pybullet/pybullet · obstacle · rrt_connect</text>
+<rect x="354" y="337" width="603.23" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="964.23" y="349" text-anchor="start" fill="#263238">1.199 rad</text>
+<rect x="354" y="358" width="571.12" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="932.12" y="370" text-anchor="start" fill="#263238">1.135 rad</text>
+<text class="group-label" x="340" y="422.0" text-anchor="end">v2 · pybullet/pybullet · clear · linear</text>
+<rect x="354" y="401" width="391.51" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="752.51" y="413" text-anchor="start" fill="#263238">0.7784 rad</text>
+<rect x="354" y="422" width="394.86" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="755.86" y="434" text-anchor="start" fill="#263238">0.785 rad</text>
+<text class="group-label" x="340" y="486.0" text-anchor="end">v2 · pybullet/pybullet · clear · rrt_connect</text>
+<rect x="354" y="465" width="391.51" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="752.51" y="477" text-anchor="start" fill="#263238">0.7784 rad</text>
+<rect x="354" y="486" width="394.86" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="755.86" y="498" text-anchor="start" fill="#263238">0.785 rad</text>
+<text class="group-label" x="340" y="550.0" text-anchor="end">v2 · pybullet/pybullet · obstacle · linear</text>
+<line x1="357" y1="537.0" x2="379" y2="537.0" stroke="#9AA4AE" stroke-width="3"/>
+<text class="na-label" x="387" y="541">N/A</text>
+<line x1="357" y1="558.0" x2="379" y2="558.0" stroke="#9AA4AE" stroke-width="3"/>
+<text class="na-label" x="387" y="562">N/A</text>
+<text class="group-label" x="340" y="614.0" text-anchor="end">v2 · pybullet/pybullet · obstacle · rrt_connect</text>
+<rect x="354" y="593" width="660.30" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="1021.30" y="605" text-anchor="start" fill="#263238">1.313 rad</text>
+<rect x="354" y="614" width="590.35" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="951.35" y="626" text-anchor="start" fill="#263238">1.174 rad</text>
+<text class="footer" x="1468" y="744" text-anchor="end">Recorded data only · N/A = not reported or not applicable</text>
+</svg>
