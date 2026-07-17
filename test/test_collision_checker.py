@@ -5,8 +5,9 @@ from panda_pick_place_planning.core.collision_checker import (
 )
 
 
-def joint_info(parent_link):
+def joint_info(parent_link, joint_type=0):
     info = [0] * 17
+    info[2] = joint_type
     info[16] = parent_link
     return tuple(info)
 
@@ -19,11 +20,14 @@ def contact(first_link, second_link):
 
 
 class FakeBullet:
+    JOINT_FIXED = 4
+
     def __init__(self):
         self.states = {joint_index: 0.0 for joint_index in range(12)}
         self.contacts = {
             (1, 1): [
                 contact(0, 1),
+                contact(6, 8),
                 contact(8, 10),
                 contact(1, 4),
             ],
@@ -35,7 +39,8 @@ class FakeBullet:
         return 12
 
     def getJointInfo(self, robot_id, joint_index, physicsClientId):
-        return joint_info(joint_index - 1)
+        joint_type = self.JOINT_FIXED if joint_index in {7, 8} else 0
+        return joint_info(joint_index - 1, joint_type)
 
     def getContactPoints(self, bodyA, bodyB, physicsClientId):
         return self.contacts.get((bodyA, bodyB), [])
@@ -79,7 +84,11 @@ class PandaCollisionCheckerTest(unittest.TestCase):
 
     def test_accepts_only_expected_home_contacts(self):
         bullet = FakeBullet()
-        bullet.contacts[(1, 1)] = [contact(0, 1), contact(8, 10)]
+        bullet.contacts[(1, 1)] = [
+            contact(0, 1),
+            contact(6, 8),
+            contact(8, 10),
+        ]
         bullet.contacts[(1, 3)] = []
         checker = PandaCollisionChecker(
             bullet=bullet,

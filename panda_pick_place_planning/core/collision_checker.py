@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from itertools import combinations
 from typing import Sequence
 
 from panda_pick_place_planning.core.planners.base import within_joint_limits
@@ -24,6 +25,7 @@ class PandaCollisionChecker:
         self.world_body_ids = list(world_body_ids)
         self.allowed_world_contacts = allowed_world_contacts or {}
         self.allowed_self_pairs = self._adjacent_link_pairs()
+        self.allowed_self_pairs.update(self._rigid_link_pairs())
         hand_links = {7, 8, 9, 10, 11}
         self.allowed_self_pairs.update(
             frozenset((first_link, second_link))
@@ -107,4 +109,39 @@ class PandaCollisionChecker:
             )
             parent_link = int(info[16])
             pairs.add(frozenset((parent_link, child_link)))
+        return pairs
+
+    def _rigid_link_pairs(self) -> set[frozenset[int]]:
+        fixed_graph: dict[int, set[int]] = {}
+        joint_count = self.bullet.getNumJoints(
+            self.robot_id,
+            physicsClientId=self.physics_client_id,
+        )
+        for child_link in range(joint_count):
+            info = self.bullet.getJointInfo(
+                self.robot_id,
+                child_link,
+                physicsClientId=self.physics_client_id,
+            )
+            if info[2] != self.bullet.JOINT_FIXED:
+                continue
+            parent_link = int(info[16])
+            fixed_graph.setdefault(parent_link, set()).add(child_link)
+            fixed_graph.setdefault(child_link, set()).add(parent_link)
+
+        pairs: set[frozenset[int]] = set()
+        visited: set[int] = set()
+        for start_link in fixed_graph:
+            if start_link in visited:
+                continue
+            component: set[int] = set()
+            pending = [start_link]
+            while pending:
+                link = pending.pop()
+                if link in component:
+                    continue
+                component.add(link)
+                pending.extend(fixed_graph[link] - component)
+            visited.update(component)
+            pairs.update(frozenset(pair) for pair in combinations(component, 2))
         return pairs
