@@ -26,8 +26,8 @@ class SceneConfig:
     hover_height: float = 0.24
     grasp_height: float = 0.075
     place_height: float = 0.09
-    obstacle_position: tuple[float, float, float] = (0.54, 0.0, 0.16)
-    obstacle_half_extents: tuple[float, float, float] = (0.055, 0.075, 0.16)
+    obstacle_position: tuple[float, float, float] = (0.54, 0.0, 0.14)
+    obstacle_half_extents: tuple[float, float, float] = (0.055, 0.05, 0.14)
     simulation_hz: int = 240
     motor_steps_per_waypoint: int = 6
     settle_steps: int = 240
@@ -314,6 +314,11 @@ class PyBulletPandaEnv:
                 self.plane_id: {-1, 0},
                 self.table_id: {-1, 0},
             },
+            world_clearance_margins=(
+                {self.obstacle_id: 0.01}
+                if self.obstacle_id is not None
+                else {}
+            ),
         )
 
     def _replace_target_marker(self, target_position: Sequence[float]) -> None:
@@ -387,6 +392,19 @@ class PyBulletPandaEnv:
                 float(value),
                 physicsClientId=self.physics_client_id,
             )
+        # resetJointState only changes the instantaneous state.  Position
+        # controllers keep their target from the previous episode unless it is
+        # explicitly replaced, so the settling steps in reset() would otherwise
+        # pull the robot away from the home configuration.
+        self.bullet.setJointMotorControlArray(
+            self.robot_id,
+            ARM_JOINT_INDICES,
+            self.bullet.POSITION_CONTROL,
+            targetPositions=list(joints),
+            forces=[87.0] * len(ARM_JOINT_INDICES),
+            positionGains=[0.08] * len(ARM_JOINT_INDICES),
+            physicsClientId=self.physics_client_id,
+        )
 
     def _reset_gripper(self, value: float) -> None:
         for joint_index in FINGER_JOINT_INDICES:
@@ -396,6 +414,14 @@ class PyBulletPandaEnv:
                 value,
                 physicsClientId=self.physics_client_id,
             )
+        self.bullet.setJointMotorControlArray(
+            self.robot_id,
+            FINGER_JOINT_INDICES,
+            self.bullet.POSITION_CONTROL,
+            targetPositions=[value] * len(FINGER_JOINT_INDICES),
+            forces=[30.0] * len(FINGER_JOINT_INDICES),
+            physicsClientId=self.physics_client_id,
+        )
 
     def _require_connected(self) -> None:
         if self.physics_client_id is None or self.bullet is None:

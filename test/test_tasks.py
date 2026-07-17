@@ -28,6 +28,8 @@ class TaskGenerationTest(unittest.TestCase):
         task = generate_task(0, 12, "linear", "obstacle")
 
         self.assertLess(task.object_position[1] * task.target_position[1], 0.0)
+        self.assertGreater(task.object_position[1], 0.0)
+        self.assertLess(task.target_position[1], 0.0)
 
 
 if __name__ == "__main__":

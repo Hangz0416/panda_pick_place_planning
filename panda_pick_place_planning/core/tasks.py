@@ -13,15 +13,19 @@ def generate_task(
     planner_seed: int | None = None,
 ) -> TaskSpec:
     rng = random.Random(task_seed)
-    x_position = rng.uniform(0.52, 0.62)
     if scene == "obstacle":
-        start_y = rng.uniform(-0.23, -0.18)
-        target_y = rng.uniform(0.18, 0.23)
+        # Keep the grasp on the home side of the barrier.  Randomly swapping
+        # sides makes the initial home-to-pre-grasp motion cross the obstacle,
+        # which confounds the transfer-planner comparison.
+        x_position = rng.uniform(0.58, 0.61)
+        start_y = rng.uniform(0.21, 0.23)
+        target_y = rng.uniform(-0.23, -0.22)
     else:
+        x_position = rng.uniform(0.52, 0.62)
         start_y = rng.uniform(-0.22, -0.12)
         target_y = rng.uniform(0.12, 0.22)
-    if rng.random() < 0.5:
-        start_y, target_y = target_y, start_y
+        if rng.random() < 0.5:
+            start_y, target_y = target_y, start_y
 
     return TaskSpec(
         episode_id=episode_id,

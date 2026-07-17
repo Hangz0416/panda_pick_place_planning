@@ -12,14 +12,21 @@ def main() -> None:
     parser.add_argument("--planner", choices=["linear", "rrt_connect"], default="rrt_connect")
     parser.add_argument("--scene", choices=["clear", "obstacle"], default="obstacle")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--gui",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="启用 PyBullet GUI；在服务器或 CI 中使用 --no-gui。",
+    )
     args = parser.parse_args()
 
     task = generate_task(0, args.seed, args.planner, args.scene)
-    env = PyBulletPandaEnv(use_gui=True)
+    env = PyBulletPandaEnv(use_gui=args.gui)
     try:
         result = PickPlaceRunner(env).run(task)
         print(result.to_json())
-        input("演示结束，按 Enter 关闭 PyBullet...")
+        if args.gui:
+            input("演示结束，按 Enter 关闭 PyBullet...")
     finally:
         env.close()
 

@@ -16,6 +16,7 @@ class PandaCollisionChecker:
         joint_limits: Sequence[tuple[float, float]],
         world_body_ids: Sequence[int],
         allowed_world_contacts: dict[int, set[int]] | None = None,
+        world_clearance_margins: dict[int, float] | None = None,
     ) -> None:
         self.bullet = bullet
         self.physics_client_id = physics_client_id
@@ -24,6 +25,7 @@ class PandaCollisionChecker:
         self.joint_limits = list(joint_limits)
         self.world_body_ids = list(world_body_ids)
         self.allowed_world_contacts = allowed_world_contacts or {}
+        self.world_clearance_margins = world_clearance_margins or {}
         self.allowed_self_pairs = self._adjacent_link_pairs()
         self.allowed_self_pairs.update(self._rigid_link_pairs())
         hand_links = {7, 8, 9, 10, 11}
@@ -41,9 +43,10 @@ class PandaCollisionChecker:
         self._reset_joints(joints)
         self.bullet.performCollisionDetection(physicsClientId=self.physics_client_id)
         collisions = self.current_collisions()
+        clearance_violations = self._world_clearance_violations()
         self._reset_joints(previous)
         self.bullet.performCollisionDetection(physicsClientId=self.physics_client_id)
-        return not collisions
+        return not collisions and not clearance_violations
 
     def current_collision_count(self) -> int:
         return len(self.current_collisions())
@@ -85,6 +88,23 @@ class PandaCollisionChecker:
             )
             for joint_index in self.arm_joint_indices
         ]
+
+    def _world_clearance_violations(self) -> list[tuple[int, int]]:
+        violations: set[tuple[int, int]] = set()
+        for body_id, margin in self.world_clearance_margins.items():
+            if margin <= 0.0:
+                continue
+            for point in self.bullet.getClosestPoints(
+                bodyA=self.robot_id,
+                bodyB=body_id,
+                distance=margin,
+                physicsClientId=self.physics_client_id,
+            ):
+                robot_link = int(point[3])
+                if robot_link in self.allowed_world_contacts.get(body_id, set()):
+                    continue
+                violations.add((body_id, robot_link))
+        return sorted(violations)
 
     def _reset_joints(self, joints: Sequence[float]) -> None:
         for joint_index, value in zip(self.arm_joint_indices, joints):

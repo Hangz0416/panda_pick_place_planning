@@ -16,6 +16,7 @@ setup(
         (f"share/{PACKAGE_NAME}/launch", glob("launch/*.launch.py")),
     ],
     install_requires=["setuptools", "pybullet>=3.2.6,<4"],
+    tests_require=["pytest"],
     zip_safe=True,
     maintainer="韩广志",
     maintainer_email="3136412152@qq.com",

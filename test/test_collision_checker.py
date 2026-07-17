@@ -45,6 +45,9 @@ class FakeBullet:
     def getContactPoints(self, bodyA, bodyB, physicsClientId):
         return self.contacts.get((bodyA, bodyB), [])
 
+    def getClosestPoints(self, bodyA, bodyB, distance, physicsClientId):
+        return self.contacts.get((bodyA, bodyB, "closest"), [])
+
     def getJointState(self, robot_id, joint_index, physicsClientId):
         return (self.states[joint_index], 0.0, 0.0, 0.0)
 
@@ -101,6 +104,24 @@ class PandaCollisionCheckerTest(unittest.TestCase):
         )
 
         self.assertTrue(checker.is_valid([0.0, 0.0]))
+
+    def test_rejects_world_clearance_violation_without_contact(self):
+        bullet = FakeBullet()
+        bullet.contacts[(1, 1)] = []
+        bullet.contacts[(1, 2)] = []
+        bullet.contacts[(1, 3)] = []
+        bullet.contacts[(1, 3, "closest")] = [contact(4, -1)]
+        checker = PandaCollisionChecker(
+            bullet=bullet,
+            physics_client_id=0,
+            robot_id=1,
+            arm_joint_indices=[0, 1],
+            joint_limits=[(-1.0, 1.0), (-1.0, 1.0)],
+            world_body_ids=[2, 3],
+            world_clearance_margins={3: 0.01},
+        )
+
+        self.assertFalse(checker.is_valid([0.0, 0.0]))
 
 
 if __name__ == "__main__":
