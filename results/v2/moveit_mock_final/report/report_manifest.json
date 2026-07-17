@@ -1,0 +1,124 @@
+{
+  "charts": [
+    {
+      "evaluation_mode": "planning_only",
+      "metric": "rates",
+      "path": "planning_only_success_rates.svg"
+    },
+    {
+      "evaluation_mode": "planning_only",
+      "metric": "planning_time",
+      "path": "planning_only_planning_time.svg"
+    },
+    {
+      "evaluation_mode": "planning_only",
+      "metric": "path_length",
+      "path": "planning_only_path_length.svg"
+    },
+    {
+      "evaluation_mode": "planning_only",
+      "metric": "failures",
+      "path": "planning_only_failure_counts.svg"
+    }
+  ],
+  "evaluation_modes": [
+    "planning_only"
+  ],
+  "generated_at_utc": "2026-07-17T06:19:20.447995+00:00",
+  "groups": [
+    {
+      "dataset": "moveit-mock",
+      "display_label": "moveit-mock · moveit/moveit_mock · clear · RRTConnectkConfigDefault",
+      "episodes": 50,
+      "evaluation_mode": "planning_only",
+      "execution_success_rate": null,
+      "failure_counts": {},
+      "final_xy_error_mean_m": null,
+      "final_z_error_mean_m": null,
+      "group_key": "moveit/moveit_mock/clear/RRTConnectkConfigDefault/assisted",
+      "metric_origins": {
+        "path_length": "reported_planning_success_episode_values",
+        "placement_error": "not_applicable",
+        "planning_time": "reported_episode_values",
+        "tracking_error": "unavailable"
+      },
+      "metric_sample_counts": {
+        "execution_success_rate": 0,
+        "final_xy_error": 0,
+        "final_z_error": 0,
+        "path_length": 50,
+        "planning_success_rate": 50,
+        "planning_time": 50,
+        "task_success_rate": 0,
+        "tracking_error": 0
+      },
+      "path_length_mean_rad": 7.8689032589446795,
+      "path_length_median_rad": 7.93436699224554,
+      "planning_success_rate": 1.0,
+      "planning_time_mean_sec": 0.12008755174,
+      "planning_time_median_sec": 0.1209188875,
+      "planning_time_p95_sec": 0.1317070221,
+      "task_success_rate": null,
+      "tracking_error_mean_rad": null
+    },
+    {
+      "dataset": "moveit-mock",
+      "display_label": "moveit-mock · moveit/moveit_mock · obstacle · RRTConnectkConfigDefault",
+      "episodes": 50,
+      "evaluation_mode": "planning_only",
+      "execution_success_rate": null,
+      "failure_counts": {},
+      "final_xy_error_mean_m": null,
+      "final_z_error_mean_m": null,
+      "group_key": "moveit/moveit_mock/obstacle/RRTConnectkConfigDefault/assisted",
+      "metric_origins": {
+        "path_length": "reported_planning_success_episode_values",
+        "placement_error": "not_applicable",
+        "planning_time": "reported_episode_values",
+        "tracking_error": "unavailable"
+      },
+      "metric_sample_counts": {
+        "execution_success_rate": 0,
+        "final_xy_error": 0,
+        "final_z_error": 0,
+        "path_length": 50,
+        "planning_success_rate": 50,
+        "planning_time": 50,
+        "task_success_rate": 0,
+        "tracking_error": 0
+      },
+      "path_length_mean_rad": 8.149983804737591,
+      "path_length_median_rad": 8.051169191303902,
+      "planning_success_rate": 1.0,
+      "planning_time_mean_sec": 0.12121050797999999,
+      "planning_time_median_sec": 0.1206695295,
+      "planning_time_p95_sec": 0.13384299659999999,
+      "task_success_rate": null,
+      "tracking_error_mean_rad": null
+    }
+  ],
+  "paired_coverage": null,
+  "report_schema_version": 1,
+  "semantic_notes": {
+    "full_episode": "Planning, execution, and task rates are shown when reported; missing metrics remain null/N/A.",
+    "path_length": "Mean and median use planning-success rows with a reported top-level joint path length.",
+    "placement_error": "Uses reported final errors, or derives absolute XY/Z error from recorded final and target positions in raw full-episode JSONL.",
+    "planning_only": "Only planning_success is a success-rate outcome; execution and task success are not applicable because no trajectory or grasp ran."
+  },
+  "sources": [
+    {
+      "batch_status": null,
+      "episode_count": 100,
+      "evaluation_modes": [
+        "planning_only"
+      ],
+      "label": "moveit-mock",
+      "path": "results/v2/moveit_mock_final/episodes.jsonl",
+      "sha256": "21057e54d0e44ecf47d43d1d03137e83599c6189e0b79b0ac636175242e6f638",
+      "source_kind": "episode_jsonl",
+      "warnings": []
+    }
+  ],
+  "title": "Panda V2 MoveIt mock planning-only final",
+  "warnings": []
+}

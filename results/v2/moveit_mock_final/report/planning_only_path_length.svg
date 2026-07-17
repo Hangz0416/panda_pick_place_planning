@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="378" viewBox="0 0 1500 378" role="img" aria-labelledby="chart-title">
+<title id="chart-title">Panda V2 MoveIt mock planning-only final — Planning-only joint-path length</title>
+<style>
+text { font-family: Inter, "Noto Sans", "DejaVu Sans", sans-serif; fill: #263238; }
+.chart-title { font-size: 24px; font-weight: 700; }
+.chart-subtitle { font-size: 13px; fill: #52606D; }
+.legend-label, .tick-label { font-size: 12px; }
+.axis-label { font-size: 13px; font-weight: 600; }
+.group-label { font-size: 12px; font-weight: 600; }
+.value-label, .na-label { font-size: 11px; }
+.na-label, .empty-label { fill: #6B7785; font-style: italic; }
+.segment-label { fill: #FFFFFF; font-size: 11px; font-weight: 700; }
+.footer { font-size: 11px; fill: #6B7785; }
+</style>
+<rect width="1500" height="378" fill="#FFFFFF"/>
+<text class="chart-title" x="32" y="38">Panda V2 MoveIt mock planning-only final — Planning-only joint-path length</text>
+<text class="chart-subtitle" x="32" y="64">Successful plans with a reported top-level joint-path metric; missing statistics are N/A.</text>
+<line x1="32" y1="72" x2="1468" y2="72" stroke="#D9E1E8"/>
+<rect x="515.0" y="75" width="13" height="13" rx="2" fill="#0072B2"/>
+<text class="legend-label" x="535.0" y="86">Mean</text>
+<rect x="937.5" y="75" width="13" height="13" rx="2" fill="#E69F00"/>
+<text class="legend-label" x="957.5" y="86">Median</text>
+<line x1="515.00" y1="145" x2="515.00" y2="273" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="515.00" y="295" text-anchor="middle">0</text>
+<line x1="684.00" y1="145" x2="684.00" y2="273" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="684.00" y="295" text-anchor="middle">2</text>
+<line x1="853.00" y1="145" x2="853.00" y2="273" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="853.00" y="295" text-anchor="middle">4</text>
+<line x1="1022.00" y1="145" x2="1022.00" y2="273" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1022.00" y="295" text-anchor="middle">6</text>
+<line x1="1191.00" y1="145" x2="1191.00" y2="273" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1191.00" y="295" text-anchor="middle">8</text>
+<line x1="1360.00" y1="145" x2="1360.00" y2="273" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1360.00" y="295" text-anchor="middle">10</text>
+<line x1="515" y1="273" x2="1360" y2="273" stroke="#52606D"/>
+<text class="axis-label" x="937.50" y="321" text-anchor="middle">joint path length (rad)</text>
+<text class="group-label" x="501" y="166.0" text-anchor="end">moveit-mock · moveit/moveit_mock · clear · RRTConnectkConfigDefault</text>
+<rect x="515" y="145" width="664.92" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="1186.92" y="157" text-anchor="start" fill="#263238">7.869 rad</text>
+<rect x="515" y="166" width="670.45" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="1192.45" y="178" text-anchor="start" fill="#263238">7.934 rad</text>
+<text class="group-label" x="501" y="230.0" text-anchor="end">moveit-mock · moveit/moveit_mock · obstacle · RRTConnectkConfigDefault</text>
+<rect x="515" y="209" width="688.67" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="1210.67" y="221" text-anchor="start" fill="#263238">8.15 rad</text>
+<rect x="515" y="230" width="680.32" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="1202.32" y="242" text-anchor="start" fill="#263238">8.051 rad</text>
+<text class="footer" x="1468" y="360" text-anchor="end">Recorded data only · N/A = not reported or not applicable</text>
+</svg>

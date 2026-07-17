@@ -247,7 +247,7 @@ def runtime_error_result(
         path_length = sum(
             math.dist(first, second)
             for first, second in zip(path, path[1:])
-        )
+        ) + 0.0
     collision_count = int(getattr(backend, "collision_count", 0))
     invalid_collision = bool(
         getattr(backend, "invalid_collision_detected", collision_count > 0)

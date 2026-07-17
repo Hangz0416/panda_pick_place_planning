@@ -56,6 +56,7 @@ public:
       parameter<double>("default_velocity_scaling_factor", 0.2);
     default_acceleration_scaling_factor_ =
       parameter<double>("default_acceleration_scaling_factor", 0.2);
+    max_planning_attempts_ = parameter<int>("max_planning_attempts", 3);
     default_end_effector_link_ =
       parameter<std::string>("default_end_effector_link", "panda_grasptarget");
     default_attach_link_ = parameter<std::string>("default_attach_link", "panda_hand");
@@ -203,9 +204,44 @@ private:
 
       publish_feedback(goal_handle, "planning");
       moveit::planning_interface::MoveGroupInterface::Plan plan;
-      const auto planning_code = move_group_->plan(plan);
+      moveit::core::MoveItErrorCode planning_code(
+        moveit_msgs::msg::MoveItErrorCodes::PLANNING_FAILED);
+      const double planning_budget_sec =
+        goal->allowed_planning_time_sec == 0.0 ? default_planning_time_sec_ :
+                                                goal->allowed_planning_time_sec;
+      const auto planning_started = std::chrono::steady_clock::now();
+      double accumulated_planning_time_sec = 0.0;
+      const int planning_attempts = std::max(1, max_planning_attempts_);
+      for (int attempt = 1; attempt <= planning_attempts; ++attempt) {
+        const double elapsed_sec = std::chrono::duration<double>(
+          std::chrono::steady_clock::now() - planning_started).count();
+        const double remaining_sec = planning_budget_sec - elapsed_sec;
+        if (remaining_sec <= 0.0) {
+          planning_code = moveit::core::MoveItErrorCode(
+            moveit_msgs::msg::MoveItErrorCodes::TIMED_OUT);
+          break;
+        }
+        move_group_->setPlanningTime(remaining_sec);
+        plan = moveit::planning_interface::MoveGroupInterface::Plan();
+        const auto attempt_started = std::chrono::steady_clock::now();
+        planning_code = move_group_->plan(plan);
+        // MoveGroupInterface does not always copy planning_time_ into Plan when
+        // MoveIt rejects a candidate during final trajectory validation.  Use
+        // wall time per attempt so rejected attempts are not silently omitted.
+        accumulated_planning_time_sec += std::chrono::duration<double>(
+          std::chrono::steady_clock::now() - attempt_started).count();
+        if (planning_code || !retryable_planning_failure(planning_code.val) ||
+          attempt == planning_attempts)
+        {
+          break;
+        }
+        RCLCPP_WARN(
+          node_->get_logger(),
+          "Planning attempt %d/%d returned retryable MoveIt error %d; retrying within %.3f s total budget",
+          attempt, planning_attempts, planning_code.val, planning_budget_sec);
+      }
       result->moveit_error_code = planning_code.val;
-      result->planning_time_sec = plan.planning_time_;
+      result->planning_time_sec = accumulated_planning_time_sec;
       result->trajectory_points =
         static_cast<std::uint32_t>(plan.trajectory_.joint_trajectory.points.size());
       result->path_length_rad = path_length(plan.trajectory_.joint_trajectory.points);
@@ -361,6 +397,16 @@ private:
     }
   }
 
+  static bool retryable_planning_failure(int code)
+  {
+    using Codes = moveit_msgs::msg::MoveItErrorCodes;
+    // OMPL is stochastic, and MoveIt's final trajectory validation can reject a
+    // candidate after planning (for example when a shortcut grazes an obstacle).
+    // Retry only these transient planner outcomes. Invalid goals, collisions at
+    // the start/goal, missing IK and scene errors remain immediate failures.
+    return code == Codes::PLANNING_FAILED || code == Codes::INVALID_MOTION_PLAN;
+  }
+
   static void publish_feedback(const std::shared_ptr<GoalHandleMotion>& goal_handle, const std::string& phase)
   {
     auto feedback = std::make_shared<Motion::Feedback>();
@@ -426,14 +472,25 @@ private:
     object.id = request->object_id;
     object.header.frame_id = move_group_->getPlanningFrame();
     object.operation = moveit_msgs::msg::CollisionObject::REMOVE;
-    response->success = planning_scene_->applyCollisionObject(object);
-    if (response->success) {
-      response->success = wait_for_world_state(request->object_id, false);
+    const bool currently_present =
+      planning_scene_->getObjects({ request->object_id }).count(request->object_id) > 0U;
+    if (currently_present) {
+      response->success = planning_scene_->applyCollisionObject(object);
+      if (response->success) {
+        response->success = wait_for_world_state(request->object_id, false);
+      }
+    } else {
+      // Episode reset and rollback paths must be idempotent. An object that is
+      // already absent satisfies the requested world state; the ACM cleanup
+      // below still runs so stale collision permissions cannot leak forward.
+      response->success = true;
     }
     if (response->success) {
       response->success = update_allowed_collisions(request->object_id, {}, true);
     }
-    response->message = response->success ? "world object removed and synchronized" :
+    response->message = response->success ?
+      (currently_present ? "world object removed and synchronized" :
+      "world object already absent and ACM synchronized") :
       "planning scene rejected or did not synchronize removal";
   }
 
@@ -657,6 +714,7 @@ private:
   double default_velocity_scaling_factor_;
   double default_acceleration_scaling_factor_;
   double scene_sync_timeout_sec_;
+  int max_planning_attempts_;
 };
 
 }  // namespace panda_moveit_bridge

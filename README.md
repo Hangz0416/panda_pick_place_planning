@@ -17,17 +17,16 @@ Fortress bringup。
   clear 的 Linear/RRT-Connect 与 obstacle 的 RRT-Connect 均 50/50 成功，obstacle Linear
   对 50/50 条受阻直线路径返回 `planning_collision`，全部 200 episode 的执行碰撞数为 0。
   seed 42 的 clear 和 obstacle 单次 Demo 也均成功。
-- **当前可构建的四包已成功 build。** `panda_pick_place_interfaces`、
-  `panda_pick_place_planning`、`panda_moveit_bridge`、`panda_moveit_config` 的最终 colcon
-  测试为 77/77；Gazebo 静态/纯逻辑测试为 44/44，flake8 覆盖 67 个 Python 文件并通过。
-- **MoveIt 运行证据只作为审计前历史 smoke。** 最终审计修复前，增强版 clear/obstacle
-  bridge smoke 通过，planning-only 快检为 5 clear + 5 obstacle、10/10。审计后本轮无法
-  再启动 DDS，因此最终代码的正式 5+5 与 50+50 均为 **NOT FINAL VERIFIED**；旧结果不能
-  充当正式评测。历史运行在 SIGINT 退出 `move_group` 时还出现过 Humble class_loader
-  teardown warning/segfault；功能请求前未触发，但仍需在最终运行审计中复查。
-- **Gazebo runtime 仍为 NOT VERIFIED。** 本机准确缺少 `ignition-msgs8`、`ros_gz` 和
-  `gz_ros2_control`，所以 Gazebo 包未完成运行时 build；完整 episode、50+50、physics 和
-  视频均没有可引用结果。配置和 44/44 静态/纯逻辑测试不能冒充仿真闭环。
+- **全部 5 个 ROS2 包已 clean build 并通过测试。** `rosdep check` 无未满足依赖；独立
+  `/tmp` build/install/log 目录中的 `colcon test-result` 为 165 tests、0 errors、0 failures、
+  0 skipped，包含真实 Xacro→SDF 检查和 PyBullet 冒烟测试。
+- **MoveIt mock 最终规划回归已完成。** 最终代码的 clear/obstacle bridge smoke、5+5 快检
+  均通过；固定 seed 42 的 50 clear + 50 obstacle 为 100/100 规划成功、0 PlanningScene
+  同步错误。该组严格是 planning-only：`task_success=false`、`failure_type=not_executed`，
+  不把未执行的轨迹描述成抓取成功。
+- **Gazebo runtime 仍为 NOT VERIFIED。** Fortress、ros_gz 与 gz_ros2_control 依赖现已安装，
+  Gazebo 包也已进入完整 build/test；但控制器 runtime、10 次 reset、assisted 完整 episode、
+  50+50 和视频尚未验收，因此当前没有可引用的 Gazebo 成功率。
 
 ## 系统架构
 
@@ -147,6 +146,8 @@ MoveIt 配置与 Gazebo 共用 `packages/panda_moveit_config/config/panda.urdf.x
 C++ bridge 串行化 MoveGroupInterface 与 PlanningScene 修改，支持 named/pose target、可选
 execute、世界碰撞物增删、Allowed Collision Matrix 更新及物体 attach/detach。attach 后会等待
 PlanningScene 同步；若同步失败会请求 detach 回滚，避免 Gazebo 与 MoveIt 各自认为不同状态。
+OMPL 的随机 `PLANNING_FAILED` 或 MoveIt 最终路径校验返回的 `INVALID_MOTION_PLAN` 最多重规划
+3 次，所有尝试共享原 3 秒预算并累计规划耗时；目标碰撞、IK 失败和场景错误不会被重试掩盖。
 
 ### 4. Gazebo Fortress bringup
 
@@ -177,9 +178,10 @@ DetachableJoint ABI，不使用 Gazebo Classic 或 gazebo_ros2_control。
 - physics：不使用 DetachableJoint；物理 monitor 已实现左右指持续接触、抓取后相对位姿、
   平移/旋转漂移、滑落、释放与稳定时间的类型化观测，MoveItBackend 也不会伪造 attach。
 
-physics 当前仍然 **fail-closed**：共享 Panda 描述缺少经过审计、可用于可信动力学的质量/惯量
-模型，默认 `physics_model_validated:=false` 会直接拒绝 physics 启动和成功上报。这里的阻塞点
-是动力学模型与运行验证，不是“接触/滑移逻辑尚未实现”。
+共享 Panda 描述现已包含 Franka 上游公开的辨识惯量，并通过质量为正、惯性矩阵正定和
+Xacro→SDF frame/joint 检查；来源 commit 与许可证记录在 `THIRD_PARTY_NOTICES.md`。上游明确
+说明这些不是官方 Panda 惯量，因此它们只用于 assisted 控制器运行，
+`physics_model_validated:=false` 仍保持 fail-closed，不能据此宣称物理抓取可信。
 
 ## 真实的 PyBullet V2 固定种子结果
 
@@ -211,6 +213,26 @@ V1/V2 原始结果还做了 `(scene, task_seed)` 配对校验：两侧 coverage 
 耗时或路径长度数值相同。最终 V2 原始结果/汇总与单版本报告分别位于
 `results/v2/pybullet_shared_geometry_200_final/` 和 `results/v2/reports/pybullet_final/`。
 
+## MoveIt mock 最终 planning-only 结果
+
+运行环境与包版本记录在 `results/v2/moveit_mock_final/environment.json`。固定 seed 42，
+RRTConnectkConfigDefault、3 秒总规划预算、速度/加速度缩放 0.2；每个 episode 从 mock 当前
+home 状态独立规划 home、pre-grasp、transfer 和 place 请求，不执行轨迹、夹爪或物体运动。
+
+| 场景 | 规划成功率 | 规划耗时均值 / 中位数 / P95 | 平均关节路径长度 | 平均轨迹点 |
+| --- | ---: | ---: | ---: | ---: |
+| clear | 50/50 (100%) | 120.088 / 120.919 / 131.707 ms | 7.868903 rad | 152.04 |
+| obstacle | 50/50 (100%) | 121.211 / 120.670 / 133.843 ms | 8.149984 rad | 164.70 |
+
+两组共 100/100 规划成功、0 PlanningScene 同步错误。表中规划耗时采用 Action 墙钟时间；
+若有限重规划触发，会把同一 3 秒预算内的所有尝试计入，而不是只统计最终成功路径。第一次
+未加入该机制的正式运行真实得到 99/100，失败 episode 和汇总保存在
+`results/v2/moveit_mock_failed_attempt_20260717_99_of_100/`，没有被覆盖或删除。
+
+这不是抓取成功率：全部 100 条都保持 `task_success=false`、`execution_success=false`、
+`failure_type=not_executed`，跟踪误差、XY/Z 放置误差和物体速度均为 `null`。原始 JSONL、
+summary、环境快照、SVG 与 SHA256 manifest 位于 `results/v2/moveit_mock_final/`。
+
 ## V2 验证矩阵
 
 | 验证项 | 当前状态 | 可引用证据 |
@@ -219,16 +241,16 @@ V1/V2 原始结果还做了 `(scene, task_seed)` 配对校验：两侧 coverage 
 | PyBullet V2 seed 42 Demo | VERIFIED | clear、obstacle 均真实成功 |
 | PyBullet V2 200 episode | VERIFIED | 上表四组真实结果；0 collision episode |
 | V1/V2 raw paired audit | VERIFIED | coverage 100/100、paired=true、missing 为空、分类无漂移 |
-| interfaces/planning/bridge/config build | VERIFIED | 最终四包 build 成功 |
-| 最终 colcon 测试 | VERIFIED | 77/77；0 errors、0 failures、0 skipped |
-| Gazebo 静态/纯逻辑测试 | VERIFIED | 44/44；不是 Gazebo runtime |
-| Python flake8 | VERIFIED | 67 files |
-| 审计前 MoveIt enhanced smoke | HISTORICAL PASS | clear/obstacle bridge smoke；不是最终代码验收 |
-| 审计前 MoveIt planning-only 快检 | HISTORICAL PASS | 5 clear + 5 obstacle，10/10；不可替代最终复验 |
-| 审计后 MoveIt 正式 5+5 / 50+50 | NOT FINAL VERIFIED | 本轮 DDS 无法重新启动，不能引用旧数据充数 |
-| Gazebo 包 build/runtime | BLOCKED / NOT VERIFIED | 缺 `ignition-msgs8`、`ros_gz`、`gz_ros2_control` |
+| 全部 5 包 clean build | VERIFIED | 独立 build/install/log 目录，`rosdep check` 通过 |
+| 最终 colcon 测试 | VERIFIED | 165 tests；0 errors、0 failures、0 skipped |
+| Xacro→SDF 模型审计 | VERIFIED | 7 arm、2 finger、hand/grasptarget；质量/惯量检查通过 |
+| 最终 MoveIt enhanced smoke | VERIFIED | clear/obstacle、控制器、ACM、attach/detach 均通过 |
+| 最终 MoveIt planning-only 快检 | VERIFIED | 5 clear + 5 obstacle，10/10 |
+| 最终 MoveIt 50+50 | VERIFIED | 100/100 planning；0 scene sync error；不宣称 task success |
+| Gazebo 包 build | VERIFIED | Fortress/ros_gz/gz_ros2_control 依赖已安装并进入 5 包 build |
+| Gazebo runtime | NOT VERIFIED | 控制器、reset 与完整 episode 尚无 runtime 证据 |
 | Gazebo reset、assisted 50+50 | NOT VERIFIED | 无 runtime EpisodeResult，不提供成功率 |
-| physics 与视频 | NOT VERIFIED | 惯量模型未审计，默认 fail-closed；未录制视频 |
+| physics 与视频 | OUT OF SCOPE | 辨识惯量只验收到 assisted；physics 保持 fail-closed；未录制视频 |
 
 ## 环境与依赖
 
@@ -256,10 +278,10 @@ sudo apt install -y \
   libignition-msgs8-dev libignition-transport11-dev
 ~~~
 
-当前工作机的 rosdep 检查明确报告 Gazebo 构建链缺少 `ignition-msgs8`、`ros_gz` 与
-`gz_ros2_control`。上面的命令显式列出 `libignition-msgs8-dev`、
-`libignition-transport11-dev`、`ros-gz-interfaces/bridge/sim` 和
-`gz-ros2-control`；因此当前“最终四包 build 成功”不包含 `panda_gz_bringup`。
+当前工作机已经安装 `libignition-msgs8-dev`、`libignition-transport11-dev`、
+`ros-gz-interfaces/bridge/sim` 和 `gz-ros2-control`；具体 dpkg 版本保存在最终
+`environment.json`。`rosdep check --from-paths packages --ignore-src --rosdistro humble` 报告
+全部系统依赖满足。
 
 也可以让 rosdep 从 5 个 package 的 package.xml 补齐其余依赖：
 
@@ -287,14 +309,12 @@ colcon build --symlink-install --base-paths src/panda_pick_place_planning/packag
 source install/setup.bash
 ~~~
 
-复现本轮最终四包 build（不要求尚未安装的 Gazebo 依赖）：
+复现本轮 5 包 clean build：
 
 ~~~bash
 cd ~/ros2_ws
 source /opt/ros/humble/setup.bash
-colcon build --symlink-install --base-paths src/panda_pick_place_planning/packages \
-  --packages-select panda_pick_place_interfaces panda_pick_place_planning \
-  panda_moveit_bridge panda_moveit_config
+colcon build --symlink-install --base-paths src/panda_pick_place_planning/packages
 source install/setup.bash
 ~~~
 
@@ -328,19 +348,19 @@ source ~/ros2_ws/install/setup.bash
 python3 -m pytest test -q
 ~~~
 
-当前可构建四包的 colcon 测试：
+全部 5 包的 colcon 测试：
 
 ~~~bash
 cd ~/ros2_ws
 source /opt/ros/humble/setup.bash
 source install/setup.bash
-colcon test --packages-select panda_pick_place_interfaces panda_pick_place_planning panda_moveit_bridge panda_moveit_config --return-code-on-test-failure
+colcon test --return-code-on-test-failure
 colcon test-result --verbose
 ~~~
 
-最终结果为 77/77（0 errors、0 failures、0 skipped）。Gazebo 包因系统依赖未满足未进入上述
-build；其源码资产、launch 合约、
-reset、抓取和碰撞分类器的静态/纯逻辑测试为 44/44。flake8 共检查 67 个 Python 文件。
+最终 clean build 结果为 165 tests（0 errors、0 failures、0 skipped），5 个包均进入 build/test。
+这仍不等于 Gazebo runtime 已验收；runtime 必须继续通过 readiness、controller、reset 和
+完整 episode 门槛。
 
 进入批量评测前，必须先保证对应依赖、build 和 test 全部通过，再为每组跑 5 次快速检查。
 
@@ -404,10 +424,7 @@ ros2 control list_controllers
 ros2 action send_goal --feedback /plan_execute_motion panda_pick_place_interfaces/action/PlanExecuteMotion "{target_type: 1, named_target: home, end_effector_link: panda_grasptarget, planner_id: RRTConnectkConfigDefault, allowed_planning_time_sec: 3.0, max_velocity_scaling_factor: 0.2, max_acceleration_scaling_factor: 0.2, execute: false}"
 ~~~
 
-审计修复前，增强版 clear/obstacle smoke 和 5+5 planning-only（10/10）曾通过。之后代码又
-加入严格 reset/readback、物理状态 latch、typed stage metrics 等审计修复；本轮 DDS 无法
-重新启动，所以这些历史结果只能证明当时的链路，不是最终代码的正式 5+5/50+50 结果。
-下面命令仍需在 DDS 恢复后重跑：
+最终 clear/obstacle bridge smoke、5+5 与 50+50 已通过。单个 planning-only 请求可用：
 
 ~~~bash
 ros2 launch panda_pick_place_planning demo.launch.py backend:=moveit planner:=rrt_connect scene:=clear seed:=42 use_gui:=false use_gazebo:=false moveit_execute:=false moveit_command_gripper:=false
@@ -415,7 +432,7 @@ ros2 launch panda_pick_place_planning demo.launch.py backend:=moveit planner:=rr
 
 ## 运行 Gazebo Fortress
 
-补齐 `ignition-msgs8`、`ros_gz` 与 `gz_ros2_control` 后，可先运行独立 bringup：
+依赖和 5 包 build/test 已通过后，可先运行独立 bringup：
 
 ~~~bash
 source /opt/ros/humble/setup.bash
@@ -440,9 +457,9 @@ ros2 control list_controllers
 ros2 service list | grep panda_gz
 ~~~
 
-**截至当前版本，这些 Gazebo 命令尚未在本机成功启动验证。** 单入口、typed reset、typed
-collision query 和 readiness gate 已经实现且通过静态测试，但依赖缺失使 runtime、控制器、
-reset 和完整 episode 都没有最终证据。不能把 launch 文件存在写成 Gazebo 已跑通。
+**截至当前版本，这些 Gazebo runtime 命令尚未完成验收。** 单入口、typed reset、typed
+collision query、120 秒 readiness timeout 与 batch wrapper 已实现并通过代码测试，但控制器、
+连续 reset 和完整 episode 仍需真实运行。不能把 build/launch 文件存在写成 Gazebo 已跑通。
 
 ## 成功判据与指标
 
@@ -489,12 +506,13 @@ EpisodeResult V2 记录：
 
 ## 下一步验收顺序
 
-1. 恢复 DDS 后，先对最终审计代码重跑 MoveIt enhanced smoke、正式 5+5，再决定是否跑 50+50。
-2. 安装缺失的 `ignition-msgs8`、`ros_gz`、`gz_ros2_control`，完成 Gazebo 包 build。
-3. 使用已有 combined launch 验证 `/clock`、readiness gate、三个 active controller 和连续 10 次 reset。
-4. 跑 clear + seed 42、obstacle + seed 42 的 assisted 完整闭环，检查 scene/entity/joint 同步。
-5. 每组先跑 5 次，再跑 50 clear + 50 obstacle；保存逐 episode、汇总与失败案例。
-6. 为共享 Panda 补充并审计可信质量/惯量模型；通过 runtime 验证后才允许
-   `physics_model_validated:=true`，再单独评测 physics。
+1. 启动 combined launch，验证 `/clock`、readiness gate、三个 active controller 和全部
+   reset/attach/detach/碰撞服务。
+2. 对同一 `(scene, seed=42)` 连续 reset 10 次，保存关节、夹爪、实体和速度误差。
+3. 跑 clear + seed 42、obstacle + seed 42 的 assisted 完整闭环，检查 scene/entity/joint 同步。
+4. 每组先跑 5 次；无 runtime_error、未知碰撞或 reset 失败后，再跑 50+50 正式评测。
+5. 保存逐 episode、汇总、失败案例、环境、SHA256/SVG 审计和两段 assisted 视频。
+
+本阶段不把 `physics_model_validated` 改为 true，也不评测 physics 抓取。
 
 只有上述运行证据完成后，才更新 V2 成功率、图表、视频和简历中的 Gazebo 表述。

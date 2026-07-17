@@ -1,0 +1,111 @@
+{
+  "schema_version": 2,
+  "total_episodes": 100,
+  "groups": {
+    "clear/rrt_connect": {
+      "episodes": 50,
+      "top_level_motion_metric_scope": "independent_planning_requests_total",
+      "planning_success_rate": 1.0,
+      "execution_success_rate": 0.0,
+      "task_success_rate": 0.0,
+      "collision_episode_rate": 0.0,
+      "avg_planning_time_sec": 0.085221,
+      "avg_top_level_planning_time_sec": 0.085221,
+      "median_planning_time_sec": 0.084328,
+      "p95_planning_time_sec": 0.094624,
+      "avg_execution_time_sec": 0.0,
+      "avg_path_length_rad": 7.29773,
+      "avg_top_level_path_length_rad": 7.29773,
+      "median_path_length_rad": 7.263177,
+      "avg_final_xy_error_m": null,
+      "avg_final_z_error_m": null,
+      "avg_final_object_speed_mps": null,
+      "avg_trajectory_points": 143.16,
+      "avg_max_joint_tracking_error_rad": null,
+      "failure_counts": {
+        "not_executed": 50
+      }
+    },
+    "obstacle/rrt_connect": {
+      "episodes": 50,
+      "top_level_motion_metric_scope": "independent_planning_requests_total",
+      "planning_success_rate": 0.98,
+      "execution_success_rate": 0.0,
+      "task_success_rate": 0.0,
+      "collision_episode_rate": 0.0,
+      "avg_planning_time_sec": 0.086934,
+      "avg_top_level_planning_time_sec": 0.086934,
+      "median_planning_time_sec": 0.085183,
+      "p95_planning_time_sec": 0.096385,
+      "avg_execution_time_sec": 0.0,
+      "avg_path_length_rad": 8.061356,
+      "avg_top_level_path_length_rad": 8.061356,
+      "median_path_length_rad": 7.821023,
+      "avg_final_xy_error_m": null,
+      "avg_final_z_error_m": null,
+      "avg_final_object_speed_mps": null,
+      "avg_trajectory_points": 162.12,
+      "avg_max_joint_tracking_error_rad": null,
+      "failure_counts": {
+        "not_executed": 49,
+        "invalid_motion_plan": 1
+      }
+    }
+  },
+  "backend_groups": {
+    "moveit/moveit_mock/clear/RRTConnectkConfigDefault": {
+      "episodes": 50,
+      "top_level_motion_metric_scope": "independent_planning_requests_total",
+      "planning_success_rate": 1.0,
+      "execution_success_rate": 0.0,
+      "task_success_rate": 0.0,
+      "collision_episode_rate": 0.0,
+      "avg_planning_time_sec": 0.085221,
+      "avg_top_level_planning_time_sec": 0.085221,
+      "median_planning_time_sec": 0.084328,
+      "p95_planning_time_sec": 0.094624,
+      "avg_execution_time_sec": 0.0,
+      "avg_path_length_rad": 7.29773,
+      "avg_top_level_path_length_rad": 7.29773,
+      "median_path_length_rad": 7.263177,
+      "avg_final_xy_error_m": null,
+      "avg_final_z_error_m": null,
+      "avg_final_object_speed_mps": null,
+      "avg_trajectory_points": 143.16,
+      "avg_max_joint_tracking_error_rad": null,
+      "failure_counts": {
+        "not_executed": 50
+      }
+    },
+    "moveit/moveit_mock/obstacle/RRTConnectkConfigDefault": {
+      "episodes": 50,
+      "top_level_motion_metric_scope": "independent_planning_requests_total",
+      "planning_success_rate": 0.98,
+      "execution_success_rate": 0.0,
+      "task_success_rate": 0.0,
+      "collision_episode_rate": 0.0,
+      "avg_planning_time_sec": 0.086934,
+      "avg_top_level_planning_time_sec": 0.086934,
+      "median_planning_time_sec": 0.085183,
+      "p95_planning_time_sec": 0.096385,
+      "avg_execution_time_sec": 0.0,
+      "avg_path_length_rad": 8.061356,
+      "avg_top_level_path_length_rad": 8.061356,
+      "median_path_length_rad": 7.821023,
+      "avg_final_xy_error_m": null,
+      "avg_final_z_error_m": null,
+      "avg_final_object_speed_mps": null,
+      "avg_trajectory_points": 162.12,
+      "avg_max_joint_tracking_error_rad": null,
+      "failure_counts": {
+        "not_executed": 49,
+        "invalid_motion_plan": 1
+      }
+    }
+  },
+  "batch_status": "complete",
+  "expected_episodes": 100,
+  "received_episodes": 100,
+  "evaluation_mode": "independent_planning_only",
+  "planning_regression_successes": 99
+}

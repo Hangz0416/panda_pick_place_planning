@@ -1,0 +1,98 @@
+[
+  {
+    "backend": "moveit",
+    "collision_count": 0,
+    "episode_id": 72,
+    "execution_collision": false,
+    "execution_sim_steps": 0,
+    "execution_success": false,
+    "execution_time_sec": 0.0,
+    "explored_nodes": 0,
+    "failure_state": "place_from_current",
+    "failure_type": "invalid_motion_plan",
+    "final_object_speed_mps": null,
+    "final_xy_error_m": null,
+    "final_z_error_m": null,
+    "grasp_mode": "assisted",
+    "last_collision_pair": [],
+    "max_joint_tracking_error_rad": null,
+    "object_attached": false,
+    "object_final_position": [
+      0.606432438764661,
+      0.2138138573413933,
+      0.025
+    ],
+    "object_initial_position": [
+      0.606432438764661,
+      0.2138138573413933,
+      0.025
+    ],
+    "object_released": false,
+    "path_length_rad": 4.604509550902567,
+    "path_waypoints": 97,
+    "physical_bilateral_contact": null,
+    "physical_left_finger_contact": null,
+    "physical_release_stable_time_sec": null,
+    "physical_right_finger_contact": null,
+    "physical_rotation_drift_rad": null,
+    "physical_slip": null,
+    "physical_translation_drift_m": null,
+    "planner": "rrt_connect",
+    "planner_id": "RRTConnectkConfigDefault",
+    "planner_seed": 150064,
+    "planning_collision": false,
+    "planning_scene_sync_success": true,
+    "planning_success": false,
+    "planning_time_sec": 0.090487279,
+    "scene": "obstacle",
+    "schema_version": 2,
+    "simulator": "moveit_mock",
+    "stage_metrics": {
+      "home_from_current": {
+        "evaluation_mode": "independent_planning_only",
+        "execution_time_sec": 0.0,
+        "moveit_error_code": 1,
+        "path_length_rad": 0.0,
+        "path_waypoints": 1,
+        "planning_success": true,
+        "planning_time_sec": 0.021080218
+      },
+      "place_from_current": {
+        "evaluation_mode": "independent_planning_only",
+        "execution_time_sec": 0.0,
+        "failure_type": "invalid_motion_plan",
+        "moveit_error_code": -2,
+        "path_length_rad": 0.0,
+        "path_waypoints": 0,
+        "planning_success": false,
+        "planning_time_sec": 0.02310972
+      },
+      "pre_grasp_from_current": {
+        "evaluation_mode": "independent_planning_only",
+        "execution_time_sec": 0.0,
+        "moveit_error_code": 1,
+        "path_length_rad": 2.9235693638953673,
+        "path_waypoints": 57,
+        "planning_success": true,
+        "planning_time_sec": 0.023187621
+      },
+      "transfer_from_current": {
+        "evaluation_mode": "independent_planning_only",
+        "execution_time_sec": 0.0,
+        "moveit_error_code": 1,
+        "path_length_rad": 1.6809401870071998,
+        "path_waypoints": 39,
+        "planning_success": true,
+        "planning_time_sec": 0.02310972
+      }
+    },
+    "target_position": [
+      0.606432438764661,
+      -0.22546008677549662,
+      0.025
+    ],
+    "task_seed": 100064,
+    "task_success": false,
+    "trajectory_points": 97
+  }
+]

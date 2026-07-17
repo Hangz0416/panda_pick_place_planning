@@ -94,3 +94,31 @@ def test_bridge_reads_back_the_exact_allowed_collision_matrix_state():
     assert "allowed_collisions_match(" in source
     assert "getAllEntryNames" in source
     assert "observed == expected" in source
+
+
+def test_world_object_removal_is_idempotent_but_still_cleans_acm():
+    source = (MODULE_PATH.parents[1] / "src" / "moveit_bridge_node.cpp").read_text()
+    remove_body = source.split("void remove_world_object(", 1)[1].split(
+        "void set_attached_object(", 1
+    )[0]
+    assert "currently_present" in remove_body
+    assert "world object already absent and ACM synchronized" in remove_body
+    assert "update_allowed_collisions(request->object_id, {}, true)" in remove_body
+
+
+def test_transient_planning_retries_share_one_budget_and_accumulate_time():
+    source = (MODULE_PATH.parents[1] / "src" / "moveit_bridge_node.cpp").read_text()
+    defaults = (MODULE_PATH.parents[1] / "config" / "bridge_defaults.yaml").read_text()
+    assert 'parameter<int>("max_planning_attempts", 3)' in source
+    assert "max_planning_attempts: 3" in defaults
+    assert "const double remaining_sec = planning_budget_sec - elapsed_sec" in source
+    assert "move_group_->setPlanningTime(remaining_sec)" in source
+    assert "std::chrono::steady_clock::now() - attempt_started" in source
+    assert "result->planning_time_sec = accumulated_planning_time_sec" in source
+    retry_body = source.split("static bool retryable_planning_failure(", 1)[1].split(
+        "static void publish_feedback(", 1
+    )[0]
+    assert "Codes::PLANNING_FAILED" in retry_body
+    assert "Codes::INVALID_MOTION_PLAN" in retry_body
+    assert "Codes::GOAL_IN_COLLISION" not in retry_body
+    assert "Codes::NO_IK_SOLUTION" not in retry_body

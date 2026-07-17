@@ -938,6 +938,7 @@ class MoveItBackendTest(unittest.TestCase):
 
         result = runtime_error_result(task(scene="clear"), backend)
 
+        self.assertIsInstance(result.path_length_rad, float)
         self.assertIsNone(result.final_xy_error_m)
         self.assertIsNone(result.final_z_error_m)
         self.assertIsNone(result.final_object_speed_mps)

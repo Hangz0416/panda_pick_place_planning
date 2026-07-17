@@ -14,6 +14,12 @@ results/v2/*
 !results/v2/pybullet_shared_geometry_200_final/**
 !results/v2/demos/
 !results/v2/demos/**
+!results/v2/moveit_mock_final/
+!results/v2/moveit_mock_final/**
+!results/v2/moveit_mock_failed_attempt_20260717_99_of_100/
+!results/v2/moveit_mock_failed_attempt_20260717_99_of_100/**
+!results/v2/gazebo_assisted_final/
+!results/v2/gazebo_assisted_final/**
 !results/v2/reports/
 results/v2/reports/*
 !results/v2/reports/pybullet_final/
@@ -23,3 +29,6 @@ results/v2/reports/*
 
 docs/*
 !docs/resume_and_interview.md
+!docs/media/
+!docs/media/gazebo_clear_assisted.mp4
+!docs/media/gazebo_obstacle_assisted.mp4
