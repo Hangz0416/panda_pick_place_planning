@@ -162,6 +162,38 @@ class ReportingTest(unittest.TestCase):
             self.assertIn("execution and task success are not applicable", success_svg)
             self.assertNotIn("Task success</text>", success_svg)
 
+    def test_rgbd_records_generate_perception_charts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            input_path = root / "synthetic_rgbd.jsonl"
+            record = synthetic_episode(0, 42, scene="obstacle")
+            record.update(
+                {
+                    "pose_source": "rgbd",
+                    "perception_success": True,
+                    "perception_latency_sec": 0.05,
+                    "object_position_error_m": 0.002,
+                    "target_position_error_m": 0.003,
+                    "obstacle_position_error_m": 0.004,
+                }
+            )
+            write_jsonl(input_path, [record])
+
+            manifest_path = generate_report(
+                [load_dataset(f"rgbd-test={input_path}")], root / "report"
+            )
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            chart_names = {chart["path"] for chart in manifest["charts"]}
+            expected = {
+                "full_episode_perception.svg",
+                "full_episode_perception_latency.svg",
+                "full_episode_perception_error.svg",
+            }
+            self.assertTrue(expected.issubset(chart_names))
+            self.assertEqual(manifest["groups"][0]["pose_source"], "rgbd")
+            for filename in expected:
+                ElementTree.parse(root / "report" / filename)
+
     def test_legacy_summary_preserves_unreported_statistics_as_none(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

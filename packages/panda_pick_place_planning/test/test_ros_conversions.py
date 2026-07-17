@@ -141,6 +141,13 @@ class RosConversionsTest(unittest.TestCase):
             execution_collision=True,
             planning_scene_sync_success=False,
             failure_state="transfer",
+            pose_source="rgbd",
+            perception_success=True,
+            perception_latency_sec=0.025,
+            object_position_error_m=0.004,
+            target_position_error_m=0.006,
+            obstacle_position_error_m=0.009,
+            minimum_perception_confidence=0.82,
             stage_metrics={
                 "transfer": {
                     "evaluation_mode": "full_episode",
@@ -173,6 +180,10 @@ class RosConversionsTest(unittest.TestCase):
         self.assertTrue(message.execution_collision)
         self.assertEqual(message.trajectory_points, 17)
         self.assertAlmostEqual(message.final_object_speed_mps, 0.07)
+        self.assertEqual(message.pose_source, "rgbd")
+        self.assertTrue(message.perception_success)
+        self.assertAlmostEqual(message.perception_latency_sec, 0.025)
+        self.assertAlmostEqual(message.object_position_error_m, 0.004)
         self.assertEqual(len(message.stage_metrics), 1)
         self.assertTrue(message.stage_metrics[0].planning_success_known)
         self.assertTrue(message.stage_metrics[0].planning_success)
@@ -194,6 +205,9 @@ class RosConversionsTest(unittest.TestCase):
         self.assertTrue(restored.execution_collision)
         self.assertEqual(restored.trajectory_points, 17)
         self.assertAlmostEqual(restored.final_object_speed_mps, 0.07)
+        self.assertEqual(restored.pose_source, "rgbd")
+        self.assertAlmostEqual(restored.target_position_error_m, 0.006)
+        self.assertAlmostEqual(restored.minimum_perception_confidence, 0.82)
         self.assertFalse(restored.planning_scene_sync_success)
         self.assertEqual(
             restored.stage_metrics["transfer"],

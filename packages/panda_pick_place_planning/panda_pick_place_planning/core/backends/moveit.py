@@ -20,7 +20,7 @@ from panda_pick_place_planning.core.backends.base import (
     BackendOperationError,
 )
 from panda_pick_place_planning.core.pybullet_env import SceneConfig
-from panda_pick_place_planning.core.schemas import PlanResult, TaskSpec
+from panda_pick_place_planning.core.schemas import PlanResult, SceneEstimate, TaskSpec
 
 
 @dataclass(frozen=True)
@@ -363,6 +363,43 @@ class MoveItBackend:
                 return failed
             self._support_collision_pending = False
         return report
+
+    def apply_scene_estimate(self, estimate: SceneEstimate, scene: str) -> bool:
+        """Replace reset truth in PlanningScene with the visual estimate."""
+        if not estimate.success or estimate.pose_source != "rgbd":
+            self.planning_scene_sync_success = False
+            return False
+        try:
+            cube = estimate.require("cube")
+            cube_size = (2.0 * self.scene_config.cube_half_extent,) * 3
+            allowed = self.config.touch_links
+            if self.config.use_gazebo:
+                allowed += ("table",)
+            self._upsert_box(
+                "cube",
+                cube.position,
+                cube_size,
+                allowed_collision_links=allowed,
+            )
+            if scene == "obstacle":
+                obstacle = estimate.require("obstacle")
+                obstacle_size = tuple(
+                    2.0 * value
+                    for value in self.scene_config.obstacle_half_extents
+                )
+                self._upsert_box("obstacle", obstacle.position, obstacle_size)
+            elif scene == "clear":
+                self._require_world_object_removed(
+                    "obstacle", "scene_estimate_sync_failed"
+                )
+            else:
+                raise ValueError(f"unsupported scene: {scene}")
+        except (BackendOperationError, ValueError):
+            self.planning_scene_sync_success = False
+            self.last_failure_type = "scene_estimate_sync_failed"
+            return False
+        self.planning_scene_sync_success = True
+        return True
 
     def move_home(self) -> BackendMotionReport:
         goal = self._new_motion_goal()

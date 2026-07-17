@@ -22,7 +22,12 @@ from panda_pick_place_planning.core.backends import (
 from panda_pick_place_planning.core.planning_regression import (
     PlanningRegressionRunner,
 )
-from panda_pick_place_planning.core.schemas import PlanResult, TaskSpec
+from panda_pick_place_planning.core.schemas import (
+    PlanResult,
+    SceneEstimate,
+    SceneObjectEstimate,
+    TaskSpec,
+)
 from panda_pick_place_planning.nodes.manipulation_node import runtime_error_result
 
 
@@ -271,6 +276,51 @@ def clients(
 
 
 class MoveItBackendTest(unittest.TestCase):
+    def test_visual_estimate_replaces_cube_and_obstacle_scene_poses(self):
+        fake_clients = clients()
+        backend = MoveItBackend(
+            object(),
+            MoveItBackendConfig(
+                execute_motion=False,
+                command_gripper=False,
+                verify_gazebo_reset_pose=False,
+                service_timeout_sec=0.05,
+            ),
+            clients=fake_clients,
+        )
+        backend.reset(task(scene="obstacle"))
+        estimate = SceneEstimate(
+            episode_id=1,
+            pose_source="rgbd",
+            success=True,
+            estimates={
+                "cube": SceneObjectEstimate("cube", (0.60, 0.21, 0.025)),
+                "target": SceneObjectEstimate("target", (0.58, -0.20, 0.025)),
+                "obstacle": SceneObjectEstimate("obstacle", (0.53, 0.01, 0.14)),
+            },
+        )
+
+        self.assertTrue(backend.apply_scene_estimate(estimate, "obstacle"))
+
+        cube_request = fake_clients.upsert.requests[-2]
+        obstacle_request = fake_clients.upsert.requests[-1]
+        cube_pose = cube_request.collision_object.primitive_poses[0]
+        obstacle_pose = obstacle_request.collision_object.primitive_poses[0]
+        self.assertEqual(cube_request.collision_object.id, "cube")
+        self.assertEqual(
+            (cube_pose.position.x, cube_pose.position.y, cube_pose.position.z),
+            (0.60, 0.21, 0.025),
+        )
+        self.assertEqual(obstacle_request.collision_object.id, "obstacle")
+        self.assertEqual(
+            (
+                obstacle_pose.position.x,
+                obstacle_pose.position.y,
+                obstacle_pose.position.z,
+            ),
+            (0.53, 0.01, 0.14),
+        )
+
     def test_runtime_serializes_backend_callbacks_separately_from_tasks(self):
         source = (
             Path(__file__).parents[1]

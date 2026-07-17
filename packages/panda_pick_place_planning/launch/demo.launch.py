@@ -28,6 +28,8 @@ def generate_launch_description() -> LaunchDescription:
         "moveit_collision_monitor_available"
     )
     output_path = LaunchConfiguration("output_path")
+    pose_source = LaunchConfiguration("pose_source")
+    perception_timeout = LaunchConfiguration("perception_timeout_sec")
 
     return LaunchDescription(
         [
@@ -40,6 +42,12 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("use_gazebo", default_value="false"),
             DeclareLaunchArgument("moveit_execute", default_value="false"),
             DeclareLaunchArgument("moveit_command_gripper", default_value="false"),
+            DeclareLaunchArgument(
+                "pose_source",
+                default_value="ground_truth",
+                choices=["ground_truth", "rgbd"],
+            ),
+            DeclareLaunchArgument("perception_timeout_sec", default_value="3.0"),
             DeclareLaunchArgument(
                 "moveit_collision_monitor_available",
                 default_value="false",
@@ -79,6 +87,10 @@ def generate_launch_description() -> LaunchDescription:
                         "moveit_collision_monitor_available": ParameterValue(
                             moveit_collision_monitor_available,
                             value_type=bool,
+                        ),
+                        "pose_source": pose_source,
+                        "perception_timeout_sec": ParameterValue(
+                            perception_timeout, value_type=float
                         ),
                         "use_sim_time": ParameterValue(use_gazebo, value_type=bool),
                     }

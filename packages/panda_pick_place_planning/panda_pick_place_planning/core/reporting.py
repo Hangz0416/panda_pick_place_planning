@@ -70,6 +70,17 @@ class ReportGroup:
     tracking_error_mean_rad: float | None
     final_xy_error_mean_m: float | None
     final_z_error_mean_m: float | None
+    pose_source: str
+    perception_success_rate: float | None
+    perception_latency_mean_sec: float | None
+    perception_latency_median_sec: float | None
+    perception_latency_p95_sec: float | None
+    object_position_error_mean_m: float | None
+    object_position_error_p95_m: float | None
+    target_position_error_mean_m: float | None
+    target_position_error_p95_m: float | None
+    obstacle_position_error_mean_m: float | None
+    obstacle_position_error_p95_m: float | None
     failure_counts: dict[str, int] = field(default_factory=dict)
     metric_sample_counts: dict[str, int | None] = field(default_factory=dict)
     metric_origins: dict[str, str] = field(default_factory=dict)
@@ -254,6 +265,29 @@ def generate_report(
                     ),
                 ]
             )
+            if any(group.perception_success_rate is not None for group in scoped):
+                chart_specs.extend(
+                    [
+                        (
+                            output_dir / "full_episode_perception.svg",
+                            "perception",
+                            f"{title} — Full episode RGB-D perception",
+                            scoped,
+                        ),
+                        (
+                            output_dir / "full_episode_perception_error.svg",
+                            "perception_error",
+                            f"{title} — Full episode RGB-D position error",
+                            scoped,
+                        ),
+                        (
+                            output_dir / "full_episode_perception_latency.svg",
+                            "perception_latency",
+                            f"{title} — Full episode RGB-D perception latency",
+                            scoped,
+                        ),
+                    ]
+                )
 
     manifest_path = output_dir / "report_manifest.json"
     targets = [path for path, _, _, _ in chart_specs] + [manifest_path]
@@ -313,6 +347,10 @@ def generate_report(
             "placement_error": (
                 "Uses reported final errors, or derives absolute XY/Z error from "
                 "recorded final and target positions in raw full-episode JSONL."
+            ),
+            "perception": (
+                "Detection rate, service latency, and position error are reported "
+                "only for rows that persist RGB-D perception observations."
             ),
         },
         "groups": [asdict(group) for group in groups],
@@ -399,6 +437,7 @@ def _dataset_from_records(
             record["scene"],
             record["planner_id"],
             record["grasp_mode"],
+            record["pose_source"],
         )
         grouped[key].append(record)
 
@@ -441,6 +480,7 @@ def _normalize_record(
         "scene": str(record["scene"]),
         "planner_id": str(record.get("planner_id") or record.get("planner", "unknown")),
         "grasp_mode": str(record.get("grasp_mode", "assisted")),
+        "pose_source": str(record.get("pose_source", "")),
         "planning_success": planning_success,
         "planning_time_sec": _record_number(record, "planning_time_sec", path, index),
         "path_length_rad": _record_number(record, "path_length_rad", path, index),
@@ -450,6 +490,21 @@ def _normalize_record(
             record, "max_joint_tracking_error_rad", path, index
         ),
         "failure_type": str(record.get("failure_type") or ""),
+        "perception_success": _record_bool(
+            record, "perception_success", path, index
+        ),
+        "perception_latency_sec": _record_number(
+            record, "perception_latency_sec", path, index
+        ),
+        "object_position_error_m": _record_number(
+            record, "object_position_error_m", path, index
+        ),
+        "target_position_error_m": _record_number(
+            record, "target_position_error_m", path, index
+        ),
+        "obstacle_position_error_m": _record_number(
+            record, "obstacle_position_error_m", path, index
+        ),
     }
     xy_error = _record_number(record, "final_xy_error_m", path, index)
     z_error = _record_number(record, "final_z_error_m", path, index)
@@ -534,7 +589,7 @@ def _summarize_records(
     key: tuple[str, ...],
     records: list[dict[str, Any]],
 ) -> ReportGroup:
-    mode, backend, simulator, scene, planner_id, grasp_mode = key
+    mode, backend, simulator, scene, planner_id, grasp_mode, pose_source = key
     planning_times = _reported(records, "planning_time_sec")
     path_lengths = [
         record["path_length_rad"]
@@ -544,6 +599,10 @@ def _summarize_records(
     tracking_errors = _reported(records, "tracking_error_rad")
     xy_errors = _reported(records, "xy_error_m")
     z_errors = _reported(records, "z_error_m")
+    perception_latencies = _reported(records, "perception_latency_sec")
+    object_errors = _reported(records, "object_position_error_m")
+    target_errors = _reported(records, "target_position_error_m")
+    obstacle_errors = _reported(records, "obstacle_position_error_m")
     failure_counts: Counter[str] = Counter()
     for record in records:
         if mode == PLANNING_ONLY:
@@ -559,10 +618,14 @@ def _summarize_records(
 
     origin_values = {record["place_error_origin"] for record in records}
     place_origin = origin_values.pop() if len(origin_values) == 1 else "mixed"
-    display = _display_label(dataset, backend, simulator, scene, planner_id, grasp_mode)
+    display = _display_label(
+        dataset, backend, simulator, scene, planner_id, grasp_mode, pose_source
+    )
     return ReportGroup(
         dataset=dataset,
-        group_key="/".join((backend, simulator, scene, planner_id, grasp_mode)),
+        group_key="/".join(
+            (backend, simulator, scene, planner_id, grasp_mode, pose_source)
+        ),
         display_label=display,
         evaluation_mode=mode,
         episodes=len(records),
@@ -581,6 +644,17 @@ def _summarize_records(
         tracking_error_mean_rad=_safe_mean(tracking_errors),
         final_xy_error_mean_m=_safe_mean(xy_errors),
         final_z_error_mean_m=_safe_mean(z_errors),
+        pose_source=pose_source,
+        perception_success_rate=_bool_rate(records, "perception_success"),
+        perception_latency_mean_sec=_safe_mean(perception_latencies),
+        perception_latency_median_sec=_safe_median(perception_latencies),
+        perception_latency_p95_sec=_percentile(perception_latencies, 0.95),
+        object_position_error_mean_m=_safe_mean(object_errors),
+        object_position_error_p95_m=_percentile(object_errors, 0.95),
+        target_position_error_mean_m=_safe_mean(target_errors),
+        target_position_error_p95_m=_percentile(target_errors, 0.95),
+        obstacle_position_error_mean_m=_safe_mean(obstacle_errors),
+        obstacle_position_error_p95_m=_percentile(obstacle_errors, 0.95),
         failure_counts=dict(sorted(failure_counts.items())),
         metric_sample_counts={
             "planning_success_rate": len(records),
@@ -595,6 +669,13 @@ def _summarize_records(
             "tracking_error": len(tracking_errors),
             "final_xy_error": len(xy_errors),
             "final_z_error": len(z_errors),
+            "perception_success_rate": sum(
+                record["perception_success"] is not None for record in records
+            ),
+            "perception_latency": len(perception_latencies),
+            "object_position_error": len(object_errors),
+            "target_position_error": len(target_errors),
+            "obstacle_position_error": len(obstacle_errors),
         },
         metric_origins={
             "planning_time": "reported_episode_values",
@@ -603,6 +684,9 @@ def _summarize_records(
                 "reported_episode_values" if tracking_errors else "unavailable"
             ),
             "placement_error": place_origin,
+            "perception": (
+                "reported_episode_values" if perception_latencies else "unavailable"
+            ),
         },
     )
 
@@ -629,7 +713,13 @@ def _dataset_from_summary(
                 dataset=label,
                 group_key=str(group_key),
                 display_label=_display_label(
-                    label, backend, simulator, scene, planner, ""
+                    label,
+                    backend,
+                    simulator,
+                    scene,
+                    planner,
+                    "",
+                    str(values.get("pose_source", "")),
                 ),
                 evaluation_mode=mode,
                 episodes=_summary_int(values.get("episodes"), "episodes", path),
@@ -704,6 +794,45 @@ def _dataset_from_summary(
                         path,
                     )
                 ),
+                pose_source=str(values.get("pose_source", "")),
+                perception_success_rate=_summary_number(
+                    values.get("perception_success_rate"),
+                    "perception_success_rate",
+                    path,
+                ),
+                perception_latency_mean_sec=_summary_number(
+                    values.get("avg_perception_latency_sec"),
+                    "avg_perception_latency_sec",
+                    path,
+                ),
+                perception_latency_median_sec=_summary_number(
+                    values.get("median_perception_latency_sec"),
+                    "median_perception_latency_sec",
+                    path,
+                ),
+                perception_latency_p95_sec=_summary_number(
+                    values.get("p95_perception_latency_sec"),
+                    "p95_perception_latency_sec",
+                    path,
+                ),
+                object_position_error_mean_m=_nested_summary_number(
+                    values, "object_position_error_m", "mean", path
+                ),
+                object_position_error_p95_m=_nested_summary_number(
+                    values, "object_position_error_m", "p95", path
+                ),
+                target_position_error_mean_m=_nested_summary_number(
+                    values, "target_position_error_m", "mean", path
+                ),
+                target_position_error_p95_m=_nested_summary_number(
+                    values, "target_position_error_m", "p95", path
+                ),
+                obstacle_position_error_mean_m=_nested_summary_number(
+                    values, "obstacle_position_error_m", "mean", path
+                ),
+                obstacle_position_error_p95_m=_nested_summary_number(
+                    values, "obstacle_position_error_m", "p95", path
+                ),
                 failure_counts=failure_counts,
                 metric_sample_counts={
                     "planning_success_rate": None,
@@ -714,12 +843,18 @@ def _dataset_from_summary(
                     "tracking_error": None,
                     "final_xy_error": None,
                     "final_z_error": None,
+                    "perception_success_rate": None,
+                    "perception_latency": None,
+                    "object_position_error": None,
+                    "target_position_error": None,
+                    "obstacle_position_error": None,
                 },
                 metric_origins={
                     "planning_time": "reported_aggregate",
                     "path_length": "reported_aggregate",
                     "tracking_error": "reported_aggregate_or_unavailable",
                     "placement_error": "reported_aggregate_or_unavailable",
+                    "perception": "reported_aggregate_or_unavailable",
                 },
             )
         )
@@ -829,6 +964,15 @@ def _first_summary_number(
     return None
 
 
+def _nested_summary_number(
+    values: dict[str, Any], group: str, name: str, path: Path
+) -> float | None:
+    nested = values.get(group)
+    if not isinstance(nested, dict):
+        return None
+    return _summary_number(nested.get(name), f"{group}.{name}", path)
+
+
 def _display_label(
     dataset: str,
     backend: str,
@@ -836,10 +980,13 @@ def _display_label(
     scene: str,
     planner: str,
     grasp_mode: str,
+    pose_source: str,
 ) -> str:
     parts = [dataset, f"{backend}/{simulator}", scene, planner]
     if grasp_mode and grasp_mode != "assisted":
         parts.append(grasp_mode)
+    if pose_source:
+        parts.append(pose_source)
     return " · ".join(parts)
 
 
@@ -983,6 +1130,65 @@ def _write_chart(
             values,
             axis_label="mean error (rad)",
             value_format=lambda value: f"{value:.4g} rad",
+        )
+        return
+
+    if chart_kind == "perception":
+        rate_values = [
+            [_scale_optional(group.perception_success_rate, 100.0)]
+            for group in groups
+        ]
+        _render_grouped_horizontal(
+            path,
+            title,
+            "Required-object detection rate for persisted RGB-D estimates.",
+            groups,
+            ["Detection success"],
+            rate_values,
+            axis_max=100.0,
+            axis_label="detection rate (%)",
+            value_format=lambda value: f"{value:.1f}%",
+            tick_format=lambda value: f"{value:.0f}%",
+        )
+        return
+
+    if chart_kind == "perception_latency":
+        _render_grouped_horizontal(
+            path,
+            title,
+            "EstimateScene service latency from request to completed estimate.",
+            groups,
+            ["Mean", "P95"],
+            [
+                [
+                    _scale_optional(group.perception_latency_mean_sec, 1000.0),
+                    _scale_optional(group.perception_latency_p95_sec, 1000.0),
+                ]
+                for group in groups
+            ],
+            axis_label="latency (ms)",
+            value_format=lambda value: f"{value:.3g} ms",
+        )
+        return
+
+    if chart_kind == "perception_error":
+        values = [
+            [
+                _scale_optional(group.object_position_error_p95_m, 1000.0),
+                _scale_optional(group.target_position_error_p95_m, 1000.0),
+                _scale_optional(group.obstacle_position_error_p95_m, 1000.0),
+            ]
+            for group in groups
+        ]
+        _render_grouped_horizontal(
+            path,
+            title,
+            "P95 world-frame center error; obstacle is N/A in clear scenes.",
+            groups,
+            ["Cube", "Target", "Obstacle"],
+            values,
+            axis_label="P95 position error (mm)",
+            value_format=lambda value: f"{value:.3g} mm",
         )
         return
 

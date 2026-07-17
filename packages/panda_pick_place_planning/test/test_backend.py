@@ -8,7 +8,12 @@ from panda_pick_place_planning.core.backends import (
 )
 from panda_pick_place_planning.core.pick_place_fsm import PickPlaceRunner
 from panda_pick_place_planning.core.pybullet_env import SceneConfig
-from panda_pick_place_planning.core.schemas import PlanResult, TaskSpec
+from panda_pick_place_planning.core.schemas import (
+    PlanResult,
+    SceneEstimate,
+    SceneObjectEstimate,
+    TaskSpec,
+)
 
 
 class FakeBackend:
@@ -25,6 +30,8 @@ class FakeBackend:
         self.attached = False
         self.released = False
         self.target_position = (0.6, 0.2, 0.025)
+        self.motion_targets = []
+        self.applied_estimate = None
 
     def reset(self, task):
         self.target_position = task.target_position
@@ -38,6 +45,7 @@ class FakeBackend:
         seed=0,
         timeout_sec=1.0,
     ):
+        self.motion_targets.append(tuple(position))
         self.simulation_steps += 3
         plan = PlanResult(
             True,
@@ -72,6 +80,10 @@ class FakeBackend:
 
     def downward_orientation(self):
         return (0.0, 1.0, 0.0, 0.0)
+
+    def apply_scene_estimate(self, estimate, scene):
+        self.applied_estimate = (estimate, scene)
+        return True
 
     def shutdown(self):
         return None
@@ -140,6 +152,82 @@ class BackendContractTest(unittest.TestCase):
         self.assertTrue(result.execution_success)
         self.assertEqual(result.failure_type, "collision_state_unavailable")
         self.assertEqual(result.simulator, "gazebo")
+
+    def test_rgbd_control_targets_do_not_leak_task_truth(self):
+        class OffsetVisualProvider:
+            pose_source = "rgbd"
+
+            @staticmethod
+            def estimate(task):
+                return SceneEstimate(
+                    episode_id=task.episode_id,
+                    pose_source="rgbd",
+                    success=True,
+                    latency_sec=0.02,
+                    estimates={
+                        "cube": SceneObjectEstimate(
+                            "cube", (0.52, -0.18, 0.025), 0.9, 200
+                        ),
+                        "target": SceneObjectEstimate(
+                            "target", (0.58, 0.18, 0.025), 0.8, 500
+                        ),
+                    },
+                )
+
+        backend = FakeBackend()
+        task = TaskSpec(
+            episode_id=1,
+            task_seed=2,
+            planner="rrt_connect",
+            planner_seed=3,
+            scene="clear",
+            object_position=(0.5, -0.2, 0.025),
+            target_position=(0.6, 0.2, 0.025),
+        )
+
+        result = PickPlaceRunner(backend, OffsetVisualProvider()).run(task)
+
+        self.assertEqual(backend.motion_targets[0][:2], (0.52, -0.18))
+        self.assertEqual(backend.motion_targets[3][:2], (0.58, 0.18))
+        self.assertEqual(backend.applied_estimate[1], "clear")
+        self.assertEqual(result.target_position, task.target_position)
+        self.assertAlmostEqual(result.object_position_error_m, 0.02 * 2 ** 0.5)
+        self.assertAlmostEqual(result.target_position_error_m, 0.02 * 2 ** 0.5)
+        self.assertEqual(result.minimum_perception_confidence, 0.8)
+        self.assertEqual(result.pose_source, "rgbd")
+
+    def test_perception_failure_stops_before_motion(self):
+        class FailedProvider:
+            pose_source = "rgbd"
+
+            @staticmethod
+            def estimate(task):
+                return SceneEstimate(
+                    episode_id=task.episode_id,
+                    pose_source="rgbd",
+                    success=False,
+                    failure_type="cube_not_detected",
+                    latency_sec=0.1,
+                )
+
+        backend = FakeBackend()
+        task = TaskSpec(
+            episode_id=1,
+            task_seed=2,
+            planner="rrt_connect",
+            planner_seed=3,
+            scene="clear",
+            object_position=(0.5, -0.2, 0.025),
+            target_position=(0.6, 0.2, 0.025),
+        )
+
+        result = PickPlaceRunner(backend, FailedProvider()).run(task)
+
+        self.assertFalse(result.task_success)
+        self.assertEqual(result.failure_state, "perception")
+        self.assertEqual(result.failure_type, "cube_not_detected")
+        self.assertFalse(result.perception_success)
+        self.assertEqual(backend.motion_targets, [])
 
 
 if __name__ == "__main__":

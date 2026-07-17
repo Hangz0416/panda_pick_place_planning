@@ -26,6 +26,12 @@ MOCK_NULL_METRICS = (
     "final_z_error_m",
     "final_object_speed_mps",
 )
+RGBD_SUCCESS_REQUIRED_METRICS = (
+    "perception_latency_sec",
+    "object_position_error_m",
+    "target_position_error_m",
+    "minimum_perception_confidence",
+)
 
 
 def _sha256(path: Path) -> str:
@@ -67,8 +73,9 @@ def audit_episode_semantics(records: list[dict], mode: str) -> None:
             raise ValueError(f"duplicate episode_id: {identifier}")
         identifiers.add(identifier)
         coverage.add((str(record.get("scene", "")), int(record.get("task_seed", -1))))
-        if int(record.get("schema_version", 0)) != 2:
-            raise ValueError(f"episode {index} is not schema v2")
+        schema_version = int(record.get("schema_version", 0))
+        if schema_version not in {2, 3}:
+            raise ValueError(f"episode {index} has unsupported schema version")
         if not bool(record.get("planning_scene_sync_success", False)):
             raise ValueError(f"episode {index} reports PlanningScene sync failure")
         if mode == "moveit_mock":
@@ -91,6 +98,28 @@ def audit_episode_semantics(records: list[dict], mode: str) -> None:
                     raise ValueError(f"episode {index} Gazebo metric {field} is null")
             if record.get("failure_type") == "runtime_error":
                 raise ValueError(f"episode {index} has unclassified runtime_error")
+            if record.get("pose_source") == "rgbd":
+                if record.get("perception_success") is None:
+                    raise ValueError(
+                        f"episode {index} RGB-D perception_success is null"
+                    )
+                if bool(record.get("task_success")):
+                    if not bool(record.get("perception_success")):
+                        raise ValueError(
+                            f"episode {index} succeeded after RGB-D perception failure"
+                        )
+                    for field in RGBD_SUCCESS_REQUIRED_METRICS:
+                        if record.get(field) is None:
+                            raise ValueError(
+                                f"episode {index} RGB-D metric {field} is null"
+                            )
+                    if (
+                        record.get("scene") == "obstacle"
+                        and record.get("obstacle_position_error_m") is None
+                    ):
+                        raise ValueError(
+                            f"episode {index} RGB-D obstacle error is null"
+                        )
     if len(coverage) != len(records):
         raise ValueError("duplicate (scene, task_seed) coverage")
 

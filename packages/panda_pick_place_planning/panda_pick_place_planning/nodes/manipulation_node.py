@@ -24,6 +24,10 @@ from panda_pick_place_planning.core.backends import (
     PyBulletBackend,
 )
 from panda_pick_place_planning.core.schemas import EpisodeResult, TaskSpec
+from panda_pick_place_planning.core.scene_pose_provider import (
+    GroundTruthPoseProvider,
+    RGBDScenePoseProvider,
+)
 from panda_pick_place_planning.core.pybullet_env import SceneConfig
 from panda_pick_place_planning.nodes.ros_conversions import episode_to_ros, task_from_ros
 
@@ -70,6 +74,8 @@ class ManipulationNode(Node):
         self.declare_parameter("moveit_planning_time_sec", 3.0)
         self.declare_parameter("moveit_velocity_scaling", 0.2)
         self.declare_parameter("moveit_acceleration_scaling", 0.2)
+        self.declare_parameter("pose_source", "ground_truth")
+        self.declare_parameter("perception_timeout_sec", 3.0)
         self.declare_parameter(
             "scene_config_path",
             str(default_scene_config_path()),
@@ -78,11 +84,13 @@ class ManipulationNode(Node):
             Path(str(self.get_parameter("scene_config_path").value)).expanduser()
         )
         self.backend_name = str(self.get_parameter("backend").value)
+        self.pose_source = str(self.get_parameter("pose_source").value)
         self.backend = self._create_backend()
+        self.pose_provider = self._create_pose_provider()
         self.runner = (
             PlanningRegressionRunner(self.backend)
             if bool(getattr(self.backend, "is_planning_only", False))
-            else PickPlaceRunner(self.backend)
+            else PickPlaceRunner(self.backend, self.pose_provider)
         )
         self.result_publisher = self.create_publisher(
             EpisodeResultMsg,
@@ -139,6 +147,7 @@ class ManipulationNode(Node):
                     getattr(getattr(self.runner, "state", None), "value", "")
                     or "runtime_boundary"
                 ),
+                pose_source=self.pose_source,
             )
         finally:
             self.task_lock.release()
@@ -191,6 +200,29 @@ class ManipulationNode(Node):
             )
         raise ValueError("backend must be 'pybullet' or 'moveit'")
 
+    def _create_pose_provider(self):
+        if self.pose_source == "ground_truth":
+            return GroundTruthPoseProvider(self.scene_config.obstacle_position)
+        if self.pose_source != "rgbd":
+            raise ValueError("pose_source must be 'ground_truth' or 'rgbd'")
+        if self.backend_name != "moveit" or not bool(
+            self.get_parameter("use_gazebo").value
+        ):
+            raise ValueError("pose_source:=rgbd requires the MoveIt Gazebo backend")
+        from panda_pick_place_interfaces.srv import EstimateScene
+
+        client = self.create_client(
+            EstimateScene,
+            "/panda_perception/estimate_scene",
+            callback_group=self.backend_callback_group,
+        )
+        return RGBDScenePoseProvider(
+            client,
+            timeout_sec=float(
+                self.get_parameter("perception_timeout_sec").value
+            ),
+        )
+
 
 def runtime_error_result(
     task: TaskSpec,
@@ -198,6 +230,7 @@ def runtime_error_result(
     *,
     failure_type: str = "runtime_error",
     failure_state: str = "runtime_boundary",
+    pose_source: str = "ground_truth",
 ) -> EpisodeResult:
     backend_name = str(getattr(backend, "backend_name", task.backend))
     simulator = str(getattr(backend, "simulator_name", backend_name))
@@ -321,6 +354,8 @@ def runtime_error_result(
         simulator=simulator,
         planner_id=str(getattr(backend, "planner_id", task.planner)),
         grasp_mode=task.grasp_mode,
+        pose_source=pose_source,
+        perception_success=False,
         execution_time_sec=(
             float(motion.execution_time_sec) if motion is not None else 0.0
         ),

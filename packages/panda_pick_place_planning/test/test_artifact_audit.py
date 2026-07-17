@@ -54,6 +54,32 @@ class ArtifactAuditTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "final_object_speed_mps is null"):
             audit_episode_semantics([record], "gazebo_assisted")
 
+    def test_rgbd_success_requires_perception_metrics(self):
+        record = mock_record()
+        record.update(
+            {
+                "schema_version": 3,
+                "simulator": "gazebo",
+                "grasp_mode": "assisted",
+                "pose_source": "rgbd",
+                "perception_success": True,
+                "task_success": True,
+                "execution_success": True,
+                "failure_type": "",
+                "execution_collision": False,
+                "max_joint_tracking_error_rad": 0.01,
+                "final_xy_error_m": 0.01,
+                "final_z_error_m": 0.001,
+                "final_object_speed_mps": 0.0,
+                "perception_latency_sec": None,
+                "object_position_error_m": 0.002,
+                "target_position_error_m": 0.003,
+                "minimum_perception_confidence": 0.9,
+            }
+        )
+        with self.assertRaisesRegex(ValueError, "perception_latency_sec is null"):
+            audit_episode_semantics([record], "gazebo_assisted")
+
     def test_report_svg_and_source_hash_are_checked(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

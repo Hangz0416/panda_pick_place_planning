@@ -67,7 +67,7 @@ def summarize_results(results: Iterable[EpisodeResult]) -> dict:
         for key, items in sorted(backend_grouped.items())
     }
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "total_episodes": len(rows),
         "groups": groups,
         "backend_groups": backend_groups,
@@ -120,6 +120,35 @@ def _summarize_group(items: list[EpisodeResult]) -> dict:
         "avg_max_joint_tracking_error_rad": _optional_mean(
             item.max_joint_tracking_error_rad for item in items
         ),
+        "pose_source": (
+            items[0].pose_source
+            if len({item.pose_source for item in items}) == 1
+            else "mixed"
+        ),
+        "perception_success_rate": _rate(
+            item.perception_success for item in items
+        ),
+        "avg_perception_latency_sec": _optional_mean(
+            item.perception_latency_sec for item in items
+        ),
+        "median_perception_latency_sec": _optional_median(
+            item.perception_latency_sec for item in items
+        ),
+        "p95_perception_latency_sec": _optional_percentile(
+            (item.perception_latency_sec for item in items), 0.95
+        ),
+        "object_position_error_m": _optional_distribution(
+            item.object_position_error_m for item in items
+        ),
+        "target_position_error_m": _optional_distribution(
+            item.target_position_error_m for item in items
+        ),
+        "obstacle_position_error_m": _optional_distribution(
+            item.obstacle_position_error_m for item in items
+        ),
+        "avg_minimum_perception_confidence": _optional_mean(
+            item.minimum_perception_confidence for item in items
+        ),
         "failure_counts": dict(
             Counter(item.failure_type or "success" for item in items)
         ),
@@ -165,6 +194,28 @@ def _mean(values: Iterable[float]) -> float:
 def _optional_mean(values: Iterable[float | None]) -> float | None:
     items = [value for value in values if value is not None]
     return round(mean(items), 6) if items else None
+
+
+def _optional_median(values: Iterable[float | None]) -> float | None:
+    items = [value for value in values if value is not None]
+    return round(median(items), 6) if items else None
+
+
+def _optional_percentile(
+    values: Iterable[float | None], probability: float
+) -> float | None:
+    items = [value for value in values if value is not None]
+    return _percentile(items, probability) if items else None
+
+
+def _optional_distribution(values: Iterable[float | None]) -> dict:
+    items = [value for value in values if value is not None]
+    return {
+        "samples": len(items),
+        "mean": round(mean(items), 6) if items else None,
+        "median": round(median(items), 6) if items else None,
+        "p95": _percentile(items, 0.95) if items else None,
+    }
 
 
 def _median(values: Iterable[float]) -> float:

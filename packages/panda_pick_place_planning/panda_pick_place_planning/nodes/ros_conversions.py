@@ -73,6 +73,7 @@ def episode_to_ros(result: EpisodeResult):
     message.planner_seed = result.planner_seed
     message.scene = result.scene
     message.grasp_mode = result.grasp_mode
+    message.pose_source = result.pose_source
     message.planning_success = result.planning_success
     message.execution_success = result.execution_success
     message.task_success = result.task_success
@@ -94,6 +95,22 @@ def episode_to_ros(result: EpisodeResult):
     message.final_z_error_m = _optional_float_to_ros(result.final_z_error_m)
     message.final_object_speed_mps = _optional_float_to_ros(
         result.final_object_speed_mps
+    )
+    message.perception_success = result.perception_success
+    message.perception_latency_sec = _optional_float_to_ros(
+        result.perception_latency_sec
+    )
+    message.object_position_error_m = _optional_float_to_ros(
+        result.object_position_error_m
+    )
+    message.target_position_error_m = _optional_float_to_ros(
+        result.target_position_error_m
+    )
+    message.obstacle_position_error_m = _optional_float_to_ros(
+        result.obstacle_position_error_m
+    )
+    message.minimum_perception_confidence = _optional_float_to_ros(
+        result.minimum_perception_confidence
     )
     message.collision_count = result.collision_count
     message.failed_state = result.failure_state
@@ -164,6 +181,23 @@ def episode_from_ros(message: Any) -> EpisodeResult:
         simulator=str(message.simulator),
         planner_id=planner_id,
         grasp_mode=str(message.grasp_mode),
+        pose_source=str(message.pose_source or "ground_truth"),
+        perception_success=bool(message.perception_success),
+        perception_latency_sec=_optional_float_from_ros(
+            message.perception_latency_sec
+        ),
+        object_position_error_m=_optional_float_from_ros(
+            message.object_position_error_m
+        ),
+        target_position_error_m=_optional_float_from_ros(
+            message.target_position_error_m
+        ),
+        obstacle_position_error_m=_optional_float_from_ros(
+            message.obstacle_position_error_m
+        ),
+        minimum_perception_confidence=_optional_float_from_ros(
+            message.minimum_perception_confidence
+        ),
         execution_time_sec=float(message.execution_time_sec),
         execution_success=bool(message.execution_success),
         trajectory_points=int(message.trajectory_points),

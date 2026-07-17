@@ -133,7 +133,14 @@ def capture_environment(repo: Path, simulator: str) -> dict:
             "robot_collision_padding_m": 0.010,
             "task_seed_base": 42,
             "grasp_mode": "assisted",
+            "pose_source": "rgbd",
             "physics_model_validated": False,
+            "camera": {
+                "resolution": [640, 480],
+                "update_rate_hz": 20.0,
+                "depth_noise_stddev_m": 0.002,
+                "optical_frame": "overhead_camera_optical_frame",
+            },
         },
         "inertial_source": {
             "repository": "https://github.com/frankarobotics/franka_ros",

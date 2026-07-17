@@ -10,6 +10,7 @@ SUPPORTED_PLANNERS = {"linear", "rrt_connect"}
 SUPPORTED_SCENES = {"clear", "obstacle"}
 SUPPORTED_BACKENDS = {"pybullet", "moveit"}
 SUPPORTED_GRASP_MODES = {"assisted", "physics"}
+SUPPORTED_POSE_SOURCES = {"ground_truth", "rgbd"}
 
 
 @dataclass(frozen=True)
@@ -76,6 +77,62 @@ class PlanResult:
 
 
 @dataclass(frozen=True)
+class SceneObjectEstimate:
+    """One world-frame object position returned by a pose provider."""
+
+    object_id: str
+    position: tuple[float, float, float]
+    confidence: float = 1.0
+    valid_pixel_count: int = 0
+    covariance: tuple[float, ...] = (0.0,) * 36
+
+    def __post_init__(self) -> None:
+        if not self.object_id:
+            raise ValueError("object_id must not be empty")
+        if len(self.position) != 3 or not all(
+            math.isfinite(float(value)) for value in self.position
+        ):
+            raise ValueError("position must contain three finite values")
+        if not 0.0 <= float(self.confidence) <= 1.0:
+            raise ValueError("confidence must be in [0, 1]")
+        if int(self.valid_pixel_count) < 0:
+            raise ValueError("valid_pixel_count must be non-negative")
+        if len(self.covariance) != 36:
+            raise ValueError("covariance must contain 36 values")
+
+
+@dataclass(frozen=True)
+class SceneEstimate:
+    """Scene localization result consumed by the manipulation state machine."""
+
+    episode_id: int
+    pose_source: str
+    success: bool
+    estimates: dict[str, SceneObjectEstimate] = field(default_factory=dict)
+    failure_type: str = ""
+    latency_sec: float = 0.0
+
+    def __post_init__(self) -> None:
+        if self.pose_source not in SUPPORTED_POSE_SOURCES:
+            raise ValueError(f"unsupported pose source: {self.pose_source}")
+        if self.success and self.failure_type:
+            raise ValueError("successful scene estimate cannot have a failure_type")
+        if not self.success and not self.failure_type:
+            raise ValueError("failed scene estimate requires a failure_type")
+        if not math.isfinite(float(self.latency_sec)) or self.latency_sec < 0.0:
+            raise ValueError("latency_sec must be finite and non-negative")
+        for key, estimate in self.estimates.items():
+            if key != estimate.object_id:
+                raise ValueError("estimate dictionary key must match object_id")
+
+    def require(self, object_id: str) -> SceneObjectEstimate:
+        try:
+            return self.estimates[object_id]
+        except KeyError as exc:
+            raise ValueError(f"missing required estimate: {object_id}") from exc
+
+
+@dataclass(frozen=True)
 class EpisodeResult:
     """One evaluation result.
 
@@ -102,11 +159,18 @@ class EpisodeResult:
     object_initial_position: tuple[float, float, float]
     object_final_position: tuple[float, float, float]
     target_position: tuple[float, float, float]
-    schema_version: int = 2
+    schema_version: int = 3
     backend: str = "pybullet"
     simulator: str = "pybullet"
     planner_id: str = ""
     grasp_mode: str = "assisted"
+    pose_source: str = "ground_truth"
+    perception_success: bool = True
+    perception_latency_sec: float | None = None
+    object_position_error_m: float | None = None
+    target_position_error_m: float | None = None
+    obstacle_position_error_m: float | None = None
+    minimum_perception_confidence: float | None = None
     execution_time_sec: float = 0.0
     execution_success: bool = False
     trajectory_points: int = 0
@@ -132,6 +196,21 @@ class EpisodeResult:
 
     def __post_init__(self) -> None:
         """Promote typed episode metrics already present in stage data."""
+
+        if self.pose_source not in SUPPORTED_POSE_SOURCES:
+            raise ValueError(f"unsupported pose source: {self.pose_source}")
+        for name in (
+            "perception_latency_sec",
+            "object_position_error_m",
+            "target_position_error_m",
+            "obstacle_position_error_m",
+        ):
+            value = getattr(self, name)
+            if value is not None and (not math.isfinite(value) or value < 0.0):
+                raise ValueError(f"{name} must be finite, non-negative, or null")
+        confidence = self.minimum_perception_confidence
+        if confidence is not None and not 0.0 <= confidence <= 1.0:
+            raise ValueError("minimum_perception_confidence must be in [0, 1]")
 
         stage_values = list(self.stage_metrics.values())
         contact_fields = {
@@ -238,6 +317,23 @@ class EpisodeResult:
             simulator=str(data.get("simulator", data.get("backend", "pybullet"))),
             planner_id=str(data.get("planner_id", data.get("planner", ""))),
             grasp_mode=str(data.get("grasp_mode", "assisted")),
+            pose_source=str(data.get("pose_source", "ground_truth")),
+            perception_success=bool(data.get("perception_success", True)),
+            perception_latency_sec=_optional_float(
+                data.get("perception_latency_sec")
+            ),
+            object_position_error_m=_optional_float(
+                data.get("object_position_error_m")
+            ),
+            target_position_error_m=_optional_float(
+                data.get("target_position_error_m")
+            ),
+            obstacle_position_error_m=_optional_float(
+                data.get("obstacle_position_error_m")
+            ),
+            minimum_perception_confidence=_optional_float(
+                data.get("minimum_perception_confidence")
+            ),
             execution_time_sec=float(data.get("execution_time_sec", 0.0)),
             execution_success=bool(
                 data.get("execution_success", data.get("task_success", False))

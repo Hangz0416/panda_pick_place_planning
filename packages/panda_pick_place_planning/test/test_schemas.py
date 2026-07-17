@@ -85,6 +85,9 @@ class TaskSpecTest(unittest.TestCase):
         self.assertIsNone(restored.final_xy_error_m)
         self.assertIsNone(restored.final_z_error_m)
         self.assertIsNone(restored.final_object_speed_mps)
+        self.assertEqual(restored.pose_source, "ground_truth")
+        self.assertTrue(restored.perception_success)
+        self.assertIsNone(restored.perception_latency_sec)
 
     def test_unavailable_metrics_serialize_as_json_null(self):
         result = EpisodeResult(
@@ -113,6 +116,44 @@ class TaskSpecTest(unittest.TestCase):
         self.assertIsNone(payload["final_xy_error_m"])
         self.assertIsNone(payload["final_z_error_m"])
         self.assertIsNone(payload["final_object_speed_mps"])
+        self.assertEqual(payload["schema_version"], 3)
+        self.assertIsNone(payload["perception_latency_sec"])
+
+    def test_schema_v3_preserves_visual_metrics(self):
+        payload = {
+            "episode_id": 1,
+            "task_seed": 2,
+            "planner": "rrt_connect",
+            "planner_seed": 3,
+            "scene": "obstacle",
+            "planning_success": True,
+            "planning_time_sec": 0.1,
+            "explored_nodes": 1,
+            "path_waypoints": 2,
+            "path_length_rad": 0.3,
+            "execution_sim_steps": 10,
+            "task_success": True,
+            "collision_count": 0,
+            "failure_type": "",
+            "object_initial_position": [0.5, 0.1, 0.025],
+            "object_final_position": [0.5, -0.1, 0.025],
+            "target_position": [0.5, -0.1, 0.025],
+            "schema_version": 3,
+            "pose_source": "rgbd",
+            "perception_success": True,
+            "perception_latency_sec": 0.025,
+            "object_position_error_m": 0.004,
+            "target_position_error_m": 0.006,
+            "obstacle_position_error_m": 0.009,
+            "minimum_perception_confidence": 0.82,
+        }
+
+        restored = EpisodeResult.from_dict(payload)
+
+        self.assertEqual(restored.pose_source, "rgbd")
+        self.assertAlmostEqual(restored.perception_latency_sec, 0.025)
+        self.assertAlmostEqual(restored.obstacle_position_error_m, 0.009)
+        self.assertAlmostEqual(restored.minimum_perception_confidence, 0.82)
 
     def test_promotes_physical_and_collision_metrics_from_stages(self):
         result = EpisodeResult(

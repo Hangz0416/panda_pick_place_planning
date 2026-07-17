@@ -12,10 +12,15 @@ from panda_pick_place_planning.core.backends import (
 from panda_pick_place_planning.core.planners.base import path_length
 from panda_pick_place_planning.core.pybullet_env import PyBulletPandaEnv
 from panda_pick_place_planning.core.schemas import EpisodeResult, PlanResult, TaskSpec
+from panda_pick_place_planning.core.scene_pose_provider import (
+    GroundTruthPoseProvider,
+    ScenePoseProvider,
+)
 
 
 class PickPlaceState(str, Enum):
     RESET = "reset"
+    PERCEPTION = "perception"
     PRE_GRASP = "pre_grasp"
     GRASP = "grasp"
     LIFT = "lift"
@@ -33,32 +38,107 @@ class PickPlaceRunner:
     is wrapped in ``PyBulletBackend`` rather than creating a second state machine.
     """
 
-    def __init__(self, backend: ManipulationBackend | PyBulletPandaEnv) -> None:
+    def __init__(
+        self,
+        backend: ManipulationBackend | PyBulletPandaEnv,
+        pose_provider: ScenePoseProvider | None = None,
+    ) -> None:
         if isinstance(backend, PyBulletPandaEnv):
             backend = PyBulletBackend(backend)
         if not isinstance(backend, ManipulationBackend):
             raise TypeError("backend does not implement ManipulationBackend")
         self.backend = backend
+        if pose_provider is None:
+            config = getattr(backend, "scene_config", None)
+            if config is None:
+                config = getattr(getattr(backend, "env", None), "config", None)
+            obstacle_position = getattr(config, "obstacle_position", (0.54, 0.0, 0.14))
+            pose_provider = GroundTruthPoseProvider(obstacle_position)
+        if not isinstance(pose_provider, ScenePoseProvider):
+            raise TypeError("pose_provider does not implement ScenePoseProvider")
+        self.pose_provider = pose_provider
         self.state = PickPlaceState.RESET
         self._object_was_attached = False
         self._object_was_released = False
         self._stage_metrics: dict[str, dict[str, Any]] = {}
+        self._scene_estimate = None
 
     def run(self, task: TaskSpec) -> EpisodeResult:
         self.state = PickPlaceState.RESET
         self._object_was_attached = False
         self._object_was_released = False
         self._stage_metrics = {}
+        self._scene_estimate = None
         self.backend.reset(task)
         episode_start_steps = self.backend.simulation_steps
         episode_start_collisions = self.backend.collision_count
         object_initial_position, _ = self.backend.object_state()
         orientation = self.backend.downward_orientation()
 
+        self.state = PickPlaceState.PERCEPTION
+        scene_estimate = self.pose_provider.estimate(task)
+        self._scene_estimate = scene_estimate
+        self._stage_metrics[self.state.value] = {
+            "perception_success": scene_estimate.success,
+            "perception_latency_sec": scene_estimate.latency_sec,
+            "pose_source": scene_estimate.pose_source,
+            "failure_type": scene_estimate.failure_type,
+            "minimum_confidence": self._minimum_confidence(),
+        }
+        if not scene_estimate.success:
+            return self._failure(
+                task,
+                object_initial_position,
+                scene_estimate.failure_type,
+                episode_start_steps,
+                episode_start_collisions,
+            )
+        try:
+            object_position = scene_estimate.require("cube").position
+            target_position = scene_estimate.require("target").position
+            if task.scene == "obstacle":
+                scene_estimate.require("obstacle")
+        except ValueError as exc:
+            missing_id = str(exc).rsplit(":", 1)[-1].strip()
+            failure_type = (
+                f"{missing_id}_not_detected"
+                if missing_id in {"cube", "target", "obstacle"}
+                else "low_confidence"
+            )
+            return self._failure(
+                task,
+                object_initial_position,
+                failure_type,
+                episode_start_steps,
+                episode_start_collisions,
+            )
+        if scene_estimate.pose_source == "rgbd":
+            apply_estimate = getattr(self.backend, "apply_scene_estimate", None)
+            if not callable(apply_estimate):
+                return self._failure(
+                    task,
+                    object_initial_position,
+                    "scene_estimate_sync_failed",
+                    episode_start_steps,
+                    episode_start_collisions,
+                )
+            try:
+                synced = apply_estimate(scene_estimate, task.scene)
+            except Exception:
+                synced = False
+            if synced is False:
+                return self._failure(
+                    task,
+                    object_initial_position,
+                    "scene_estimate_sync_failed",
+                    episode_start_steps,
+                    episode_start_collisions,
+                )
+
         self.state = PickPlaceState.PRE_GRASP
         pre_grasp = (
-            task.object_position[0],
-            task.object_position[1],
+            object_position[0],
+            object_position[1],
             self.backend.hover_height,
         )
         report = self._move_to_pose(pre_grasp, orientation)
@@ -73,8 +153,8 @@ class PickPlaceRunner:
 
         self.backend.set_gripper(self.backend.open_gripper_width)
         grasp_pose = (
-            task.object_position[0],
-            task.object_position[1],
+            object_position[0],
+            object_position[1],
             self.backend.grasp_height,
         )
         report = self._move_to_pose(grasp_pose, orientation)
@@ -109,8 +189,8 @@ class PickPlaceRunner:
 
         self.state = PickPlaceState.LIFT
         lift_pose = (
-            task.object_position[0],
-            task.object_position[1],
+            object_position[0],
+            object_position[1],
             self.backend.hover_height,
         )
         report = self._move_to_pose(lift_pose, orientation)
@@ -125,8 +205,8 @@ class PickPlaceRunner:
 
         self.state = PickPlaceState.TRANSFER
         pre_place = (
-            task.target_position[0],
-            task.target_position[1],
+            target_position[0],
+            target_position[1],
             self.backend.hover_height,
         )
         report = self._move_to_pose(
@@ -150,8 +230,8 @@ class PickPlaceRunner:
 
         self.state = PickPlaceState.PLACE
         place_pose = (
-            task.target_position[0],
-            task.target_position[1],
+            target_position[0],
+            target_position[1],
             self.backend.place_height,
         )
         report = self._move_to_pose(place_pose, orientation)
@@ -278,6 +358,7 @@ class PickPlaceRunner:
             ),
             failure_state="" if task_success else PickPlaceState.PLACE.value,
             stage_metrics=self._stage_metrics,
+            **self._perception_kwargs(task),
         )
 
     def _move_to_pose(
@@ -408,7 +489,49 @@ class PickPlaceRunner:
             ),
             failure_state=failure_state,
             stage_metrics=self._stage_metrics,
+            **self._perception_kwargs(task),
         )
+
+    def _minimum_confidence(self) -> float | None:
+        if self._scene_estimate is None or not self._scene_estimate.estimates:
+            return None
+        return min(
+            estimate.confidence
+            for estimate in self._scene_estimate.estimates.values()
+        )
+
+    def _perception_kwargs(self, task: TaskSpec) -> dict[str, Any]:
+        estimate = self._scene_estimate
+        if estimate is None:
+            return {
+                "pose_source": getattr(self.pose_provider, "pose_source", "ground_truth"),
+                "perception_success": False,
+            }
+
+        def error(object_id: str, truth) -> float | None:
+            value = estimate.estimates.get(object_id)
+            if value is None:
+                return None
+            return math.dist(value.position, truth)
+
+        config = getattr(self.backend, "scene_config", None)
+        if config is None:
+            config = getattr(getattr(self.backend, "env", None), "config", None)
+        obstacle_truth = getattr(config, "obstacle_position", None)
+        obstacle_error = (
+            error("obstacle", obstacle_truth)
+            if task.scene == "obstacle" and obstacle_truth is not None
+            else None
+        )
+        return {
+            "pose_source": estimate.pose_source,
+            "perception_success": estimate.success,
+            "perception_latency_sec": estimate.latency_sec,
+            "object_position_error_m": error("cube", task.object_position),
+            "target_position_error_m": error("target", task.target_position),
+            "obstacle_position_error_m": obstacle_error,
+            "minimum_perception_confidence": self._minimum_confidence(),
+        }
 
     @staticmethod
     def _path_length(report: BackendMotionReport) -> float:
