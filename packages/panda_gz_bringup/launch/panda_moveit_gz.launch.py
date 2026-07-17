@@ -18,6 +18,7 @@ from launch.events import Shutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from moveit_configs_utils import MoveItConfigsBuilder
 
 
@@ -37,6 +38,7 @@ def _launch_setup(context):
     use_rviz = LaunchConfiguration("use_rviz")
     start_application = LaunchConfiguration("start_application")
     output_path = LaunchConfiguration("output_path")
+    readiness_timeout = LaunchConfiguration("readiness_timeout_sec")
     physics_model_validated = LaunchConfiguration("physics_model_validated")
     grasp_mode_value = grasp_mode.perform(context)
     controllers = bringup_share / "config" / "controllers.yaml"
@@ -154,7 +156,12 @@ def _launch_setup(context):
         output="screen",
         parameters=[
             sim_time,
-            {"grasp_mode": grasp_mode},
+            {
+                "grasp_mode": grasp_mode,
+                "readiness_timeout_sec": ParameterValue(
+                    readiness_timeout, value_type=float
+                ),
+            },
         ],
         condition=IfCondition(start_application),
     )
@@ -217,6 +224,9 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument(
                 "output_path",
                 default_value="results/moveit_gazebo_episode_results.jsonl",
+            ),
+            DeclareLaunchArgument(
+                "readiness_timeout_sec", default_value="120.0"
             ),
             DeclareLaunchArgument(
                 "physics_model_validated",

@@ -49,7 +49,8 @@ class EpisodeResetManager(Node):
         super().__init__("episode_reset_manager")
         self._group = ReentrantCallbackGroup()
         self._operation_lock = threading.Lock()
-        self._joint_state_lock = threading.Lock()
+        self._joint_state_condition = threading.Condition()
+        self._joint_state_generation = 0
         self._joint_positions: dict[str, float] = {}
         self._joint_velocities: dict[str, float] = {}
         self._entity_state_condition = threading.Condition()
@@ -83,6 +84,8 @@ class EpisodeResetManager(Node):
         self.declare_parameter("joint_position_tolerance_rad", 0.025)
         self.declare_parameter("joint_velocity_tolerance_rad_s", 0.025)
         self.declare_parameter("gripper_position_tolerance_m", 0.003)
+        self.declare_parameter("joint_state_timeout_sec", 3.0)
+        self.declare_parameter("home_stable_sec", 0.20)
         self.declare_parameter("open_gripper_width_m", 0.04)
         self.declare_parameter("gripper_max_effort", 20.0)
         self.declare_parameter("entity_state_timeout_sec", 5.0)
@@ -220,9 +223,11 @@ class EpisodeResetManager(Node):
     def _on_joint_state(self, message: JointState) -> None:
         positions = dict(zip(message.name, message.position))
         velocities = dict(zip(message.name, message.velocity))
-        with self._joint_state_lock:
+        with self._joint_state_condition:
             self._joint_positions.update(positions)
             self._joint_velocities.update(velocities)
+            self._joint_state_generation += 1
+            self._joint_state_condition.notify_all()
 
     def _record_entity_pose(self, role: str, pose: Pose) -> None:
         with self._entity_state_condition:
@@ -331,14 +336,11 @@ class EpisodeResetManager(Node):
                     "detach service unavailable",
                 )
 
-            # Gazebo's model-only reset restores initial poses and clears model
-            # velocities without jumping /clock backwards.
-            if not self._control_world(
-                pause=True, reset_models=True, seed=spec.task_seed
-            ):
-                return self._fail(StatusCode.GZ_SERVICE_FAILED, "world reset failed")
-            if not self._control_world(pause=False):
-                return self._fail(StatusCode.GZ_SERVICE_FAILED, "world resume failed")
+            # Fortress explicitly does not support model-only reset or changing
+            # the physics seed at runtime.  Keep /clock monotonic and reset the
+            # controlled state explicitly instead: detach while physics is
+            # running, pause, place all task entities, resume, command the arm
+            # and hand, then prove convergence from fresh Gazebo readback.
             detached = self._wait_future(
                 self._detach_client.call_async(Trigger.Request()), timeout
             )
@@ -362,16 +364,17 @@ class EpisodeResetManager(Node):
                     StatusCode.HOME_FAILED,
                     "arm home or open-gripper command failed",
                 )
-            if not self._home_is_settled():
+            home_ok, home_detail = self._wait_for_home_settled()
+            if not home_ok:
                 return self._fail(
                     StatusCode.HOME_FAILED,
-                    "home position or zero-velocity tolerance not satisfied",
+                    home_detail,
                 )
 
-            # Model-only reset is the only Humble / Fortress service operation
-            # that clears model twist.  Do not teleport the cube a second time:
-            # require fresh Gazebo odometry to prove that its pose and both
-            # linear and angular velocity have converged to reset tolerances.
+            # SetEntityPose does not promise to clear twist.  Do not report a
+            # successful reset until fresh odometry proves that cube pose and
+            # both velocity channels remain within tolerance for the configured
+            # stable interval.
             state_ok, state_detail = self._wait_for_scene_readback(
                 spec, generations
             )
@@ -402,14 +405,9 @@ class EpisodeResetManager(Node):
                 self._control_world(pause=False)
             self._operation_lock.release()
 
-    def _control_world(
-        self, pause: bool, reset_models: bool = False, seed: int = 0
-    ) -> bool:
+    def _control_world(self, pause: bool) -> bool:
         request = ControlWorld.Request()
         request.world_control.pause = pause
-        request.world_control.reset.model_only = reset_models
-        if reset_models:
-            request.world_control.seed = int(seed) & 0xFFFFFFFF
         response = self._wait_future(
             self._control_client.call_async(request),
             float(self.get_parameter("service_timeout_sec").value),
@@ -687,7 +685,7 @@ class EpisodeResetManager(Node):
         )
         return bool(response is not None and response.success)
 
-    def _home_is_settled(self) -> bool:
+    def _wait_for_home_settled(self) -> tuple[bool, str]:
         home = tuple(float(v) for v in self.get_parameter("home_joints").value)
         position_tolerance = float(
             self.get_parameter("joint_position_tolerance_rad").value
@@ -701,24 +699,104 @@ class EpisodeResetManager(Node):
         gripper_tolerance = float(
             self.get_parameter("gripper_position_tolerance_m").value
         )
-        with self._joint_state_lock:
-            if not all(name in self._joint_positions for name in targets):
-                return False
-            errors = tuple(
-                abs(self._joint_positions[name] - target)
-                for name, target in targets.items()
-            )
-            speeds = tuple(
-                abs(self._joint_velocities.get(name, math.inf))
-                for name in targets
-            )
-        arm_errors = errors[: len(ARM_JOINTS)]
-        hand_errors = errors[len(ARM_JOINTS):]
-        return (
-            max(arm_errors) <= position_tolerance
-            and max(hand_errors) <= gripper_tolerance
-            and max(speeds) <= velocity_tolerance
-        )
+        timeout = float(self.get_parameter("joint_state_timeout_sec").value)
+        stable_required = float(self.get_parameter("home_stable_sec").value)
+        if min(
+            position_tolerance,
+            velocity_tolerance,
+            gripper_tolerance,
+            timeout,
+            stable_required,
+        ) < 0.0:
+            raise ValueError("home-state tolerances must be non-negative")
+
+        deadline = time.monotonic() + timeout
+        stable_since: float | None = None
+        stable_generation = -1
+        last_detail = "no fresh joint state received"
+        with self._joint_state_condition:
+            initial_generation = self._joint_state_generation
+            while True:
+                now = time.monotonic()
+                if now >= deadline:
+                    return False, f"home-state readback timed out: {last_detail}"
+
+                missing = [
+                    name
+                    for name in targets
+                    if name not in self._joint_positions
+                    or name not in self._joint_velocities
+                ]
+                fresh = self._joint_state_generation > initial_generation
+                if missing:
+                    max_arm_error = math.inf
+                    max_hand_error = math.inf
+                    max_speed = math.inf
+                else:
+                    arm_errors = tuple(
+                        abs(self._joint_positions[name] - targets[name])
+                        for name in ARM_JOINTS
+                    )
+                    hand_errors = tuple(
+                        abs(self._joint_positions[name] - targets[name])
+                        for name in HAND_JOINTS
+                    )
+                    speeds = tuple(
+                        abs(self._joint_velocities[name]) for name in targets
+                    )
+                    max_arm_error = max(arm_errors)
+                    max_hand_error = max(hand_errors)
+                    max_speed = max(speeds)
+
+                state_ok = (
+                    fresh
+                    and not missing
+                    and max_arm_error <= position_tolerance
+                    and max_hand_error <= gripper_tolerance
+                    and max_speed <= velocity_tolerance
+                )
+                if state_ok:
+                    if stable_since is None:
+                        stable_since = now
+                        stable_generation = self._joint_state_generation
+                    stable_elapsed = now - stable_since
+                    state_advanced = (
+                        self._joint_state_generation > stable_generation
+                    )
+                    if stable_elapsed >= stable_required and state_advanced:
+                        return (
+                            True,
+                            "fresh home position and zero-velocity readback verified",
+                        )
+                    last_detail = (
+                        f"stable for {stable_elapsed:.3f}/{stable_required:.3f}s; "
+                        f"joint state advanced={state_advanced}"
+                    )
+                else:
+                    stable_since = None
+                    stable_generation = -1
+                    parts = []
+                    if not fresh:
+                        parts.append("joint state is stale")
+                    if missing:
+                        parts.append("missing=" + ",".join(missing))
+                    if not missing:
+                        parts.append(
+                            f"arm_error={max_arm_error:.6f}rad/"
+                            f"{position_tolerance:.6f}rad"
+                        )
+                        parts.append(
+                            f"gripper_error={max_hand_error:.6f}m/"
+                            f"{gripper_tolerance:.6f}m"
+                        )
+                        parts.append(
+                            f"joint_speed={max_speed:.6f}rad/s/"
+                            f"{velocity_tolerance:.6f}rad/s"
+                        )
+                    last_detail = "; ".join(parts)
+                self._joint_state_condition.wait(
+                    timeout=min(0.05, max(0.0, deadline - now))
+                )
 
     @staticmethod
     def _wait_future(future, timeout_sec: float):
@@ -778,6 +856,8 @@ def main(args=None) -> None:
     executor.add_node(node)
     try:
         executor.spin()
+    except KeyboardInterrupt:
+        pass
     finally:
         executor.shutdown()
         node.destroy_node()

@@ -92,8 +92,10 @@ def test_bridge_reads_back_the_exact_allowed_collision_matrix_state():
     source = (MODULE_PATH.parents[1] / "src" / "moveit_bridge_node.cpp").read_text()
     assert "wait_for_allowed_collisions(" in source
     assert "allowed_collisions_match(" in source
+    assert "allowed_collision_links_for_object(" in source
     assert "getAllEntryNames" in source
     assert "observed == expected" in source
+    assert "temporary support collision allowed" in source
 
 
 def test_world_object_removal_is_idempotent_but_still_cleans_acm():
@@ -122,3 +124,13 @@ def test_transient_planning_retries_share_one_budget_and_accumulate_time():
     assert "Codes::INVALID_MOTION_PLAN" in retry_body
     assert "Codes::GOAL_IN_COLLISION" not in retry_body
     assert "Codes::NO_IK_SOLUTION" not in retry_body
+
+
+def test_pose_goal_uses_current_seeded_single_ik_target():
+    source = (MODULE_PATH.parents[1] / "src" / "moveit_bridge_node.cpp").read_text()
+    target_body = source.split("bool target_set = false;", 1)[1].split(
+        "publish_feedback(goal_handle, \"planning\")", 1
+    )[0]
+    assert "setJointValueTarget(pose_target, end_effector_link)" in target_body
+    assert "setPoseTarget(pose_target, end_effector_link)" not in target_body
+    assert 'result->failure_type = pose_target ? "no_ik_solution"' in target_body

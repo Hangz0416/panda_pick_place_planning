@@ -9,6 +9,7 @@ from panda_gz_bringup.model_validation import (
     DYNAMIC_LINKS,
     FINGER_JOINTS,
     audit_model,
+    compose_world_with_deferred_control,
     convert_urdf_to_sdf,
     validate_sdf,
     validate_urdf,
@@ -44,10 +45,25 @@ def _urdf() -> str:
 def _sdf() -> str:
     sdf = ET.Element("sdf", version="1.9")
     model = ET.SubElement(sdf, "model", name="panda")
-    for link_name in ("panda_hand", "panda_grasptarget"):
-        ET.SubElement(model, "link", name=link_name)
+    for link_name in DYNAMIC_LINKS:
+        link = ET.SubElement(model, "link", name=link_name)
+        sensor = ET.SubElement(
+            link,
+            "sensor",
+            name=f"{link_name}_contact_sensor",
+            type="contact",
+        )
+        contact = ET.SubElement(sensor, "contact")
+        ET.SubElement(contact, "topic").text = "/panda/robot_contacts"
+    ET.SubElement(model, "link", name="panda_grasptarget")
     for joint_name in ARM_JOINTS + FINGER_JOINTS:
         ET.SubElement(model, "joint", name=joint_name, type="revolute")
+    ET.SubElement(
+        model,
+        "plugin",
+        filename="gz_ros2_control-system",
+        name="gz_ros2_control::GazeboSimROS2ControlPlugin",
+    )
     return ET.tostring(sdf, encoding="unicode")
 
 
@@ -77,6 +93,49 @@ def test_missing_sdf_task_frame_fails_closed():
     model.remove(model.find("./link[@name='panda_grasptarget']"))
     with pytest.raises(ValueError, match="panda_grasptarget"):
         validate_sdf(ET.tostring(root, encoding="unicode"))
+
+
+def test_sensor_level_contact_topic_fails_closed():
+    root = ET.fromstring(_sdf())
+    sensor = root.find(".//sensor[@name='panda_link3_contact_sensor']")
+    contact = sensor.find("contact")
+    topic = contact.findtext("topic")
+    sensor.remove(contact)
+    ET.SubElement(sensor, "topic").text = topic
+    with pytest.raises(ValueError, match="type-specific topic"):
+        validate_sdf(ET.tostring(root, encoding="unicode"))
+
+
+def test_initial_world_keeps_contacts_and_defers_control_plugin(tmp_path):
+    base_world = tmp_path / "base.sdf"
+    base_world.write_text(
+        '<sdf version="1.8"><world name="test">'
+        '<plugin filename="libignition-gazebo-contact-system.so" '
+        'name="ignition::gazebo::systems::Contact" />'
+        "</world></sdf>"
+    )
+    output = compose_world_with_deferred_control(
+        base_world,
+        _sdf(),
+        output_directory=tmp_path / "generated",
+    )
+    root = ET.parse(output).getroot()
+    panda = root.find("./world/model[@name='panda']")
+    assert panda is not None
+    assert len(panda.findall(".//sensor[@type='contact']")) == len(
+        DYNAMIC_LINKS
+    )
+    assert panda.find(
+        "./plugin[@name='gz_ros2_control::GazeboSimROS2ControlPlugin']"
+    ) is None
+    assert root.find(
+        "./world/plugin[@name='ignition::gazebo::systems::Contact']"
+    ) is not None
+    assert compose_world_with_deferred_control(
+        base_world,
+        _sdf(),
+        output_directory=tmp_path / "generated",
+    ) == output
 
 
 def test_shared_gazebo_xacro_converts_to_valid_sdf():

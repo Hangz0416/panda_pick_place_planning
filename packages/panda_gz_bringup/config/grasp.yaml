@@ -10,9 +10,10 @@ assisted_grasp_manager:
     max_position_error_m: 0.020
     max_orientation_error_rad: 0.30
     max_hand_object_distance_m: 0.090
-    # Per-finger position used by MoveItBackend before assisted attach. Two
-    # 30 mm finger positions produce a 60 mm total opening around the 50 mm cube.
-    assisted_pre_attach_width_m: 0.030
+    # Per-finger command used before assisted attach. The hand is yawed 45 deg,
+    # so a 50 mm cube presents a 70.7 mm in-plane diagonal. Two 38 mm commands
+    # leave guarded clearance; the gate still checks measured joint positions.
+    assisted_pre_attach_width_m: 0.038
     per_finger_width_tolerance_m: 0.004
     command_timeout_sec: 2.0
 
@@ -51,6 +52,8 @@ episode_reset_manager:
     joint_position_tolerance_rad: 0.025
     joint_velocity_tolerance_rad_s: 0.025
     gripper_position_tolerance_m: 0.003
+    joint_state_timeout_sec: 3.0
+    home_stable_sec: 0.20
     open_gripper_width_m: 0.040
     gripper_max_effort: 20.0
     entity_state_timeout_sec: 5.0

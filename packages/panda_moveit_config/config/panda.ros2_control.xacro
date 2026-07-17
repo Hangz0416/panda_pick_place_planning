@@ -145,9 +145,13 @@
         <sensor name="${link_name}_contact_sensor" type="contact">
           <always_on>true</always_on>
           <update_rate>100</update_rate>
-          <topic>/panda/robot_contacts</topic>
           <contact>
             <collision>${collision_name}</collision>
+            <!-- Fortress reads the contact Transport topic from the
+                 type-specific <contact> block. A sensor-level <topic> is
+                 converted to __default_topic__ and silently produces a
+                 model-scoped topic instead. -->
+            <topic>/panda/robot_contacts</topic>
           </contact>
         </sensor>
       </gazebo>

@@ -41,6 +41,13 @@ panda_arm_controller:
       panda_joint6: {trajectory: 0.15, goal: 0.025}
       panda_joint7: {trajectory: 0.15, goal: 0.025}
 
+joint_state_broadcaster:
+  ros__parameters:
+    # Fortress gz_ros2_control exports the URDF mimic joint as
+    # panda_finger_joint2_mimic. Publish the raw state privately; the bringup
+    # canonicalizer verifies and maps it back before exposing /joint_states.
+    use_local_topics: true
+
 panda_hand_controller:
   ros__parameters:
     joint: panda_finger_joint1

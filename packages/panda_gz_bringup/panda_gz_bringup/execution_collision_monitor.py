@@ -129,7 +129,7 @@ class ExecutionCollisionMonitor(Node):
         mode = str(self.get_parameter("grasp_mode").value)
         return self._assisted_attached if mode == "assisted" else self._physics_holding
 
-    def _context(self) -> CollisionContext:
+    def _collision_context(self) -> CollisionContext:
         return CollisionContext(
             object_carried=self._object_carried(),
             object_position=self._object_position,
@@ -146,7 +146,7 @@ class ExecutionCollisionMonitor(Node):
     def _on_contacts(self, stream: str, message: Contacts) -> None:
         now = self._now_sec()
         with self._lock:
-            context = self._context()
+            context = self._collision_context()
             self._stream_last_seen[stream] = now
 
             for contact in message.contacts:
@@ -309,6 +309,8 @@ def main(args=None) -> None:
     executor.add_node(node)
     try:
         executor.spin()
+    except KeyboardInterrupt:
+        pass
     finally:
         executor.shutdown()
         node.destroy_node()

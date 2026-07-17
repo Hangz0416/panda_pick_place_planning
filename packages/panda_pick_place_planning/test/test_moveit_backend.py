@@ -161,8 +161,8 @@ def motion_result():
     return result
 
 
-def gripper_result():
-    return SimpleNamespace(reached_goal=True, stalled=False)
+def gripper_result(*, reached_goal=True, stalled=False):
+    return SimpleNamespace(reached_goal=reached_goal, stalled=stalled)
 
 
 def physical_state(
@@ -447,6 +447,64 @@ class MoveItBackendTest(unittest.TestCase):
         self.assertEqual(len(fake_clients.gazebo_attach.requests), 1)
         self.assertEqual(len(fake_clients.gazebo_detach.requests), 1)
 
+    def test_gazebo_resting_contact_is_allowed_only_until_first_lift(self):
+        fake_clients = clients()
+        backend = MoveItBackend(
+            object(),
+            MoveItBackendConfig(
+                use_gazebo=True,
+                execute_motion=True,
+                command_gripper=False,
+                verify_gazebo_reset_pose=False,
+                service_timeout_sec=0.05,
+            ),
+            clients=fake_clients,
+        )
+
+        backend.reset(task(scene="clear"))
+
+        table_request = next(
+            request
+            for request in fake_clients.upsert.requests
+            if request.collision_object.id == "table"
+        )
+        table_pose = table_request.collision_object.primitive_poses[0]
+        self.assertAlmostEqual(table_pose.position.z, -0.025)
+        self.assertEqual(
+            list(table_request.collision_object.primitives[0].dimensions),
+            [1.5, 1.0, 0.05],
+        )
+        cube_request = next(
+            request
+            for request in fake_clients.upsert.requests
+            if request.collision_object.id == "cube"
+        )
+        self.assertEqual(
+            list(cube_request.allowed_collision_links),
+            [
+                "panda_hand",
+                "panda_leftfinger",
+                "panda_rightfinger",
+                "table",
+            ],
+        )
+
+        self.assertTrue(backend.attach_object())
+        removals_before_lift = len(fake_clients.remove.requests)
+        self.assertTrue(
+            backend.move_to_pose(
+                (0.59, 0.22, 0.24),
+                backend.downward_orientation(),
+            ).success
+        )
+        self.assertEqual(len(fake_clients.remove.requests), removals_before_lift + 1)
+        self.assertEqual(fake_clients.remove.requests[-1].object_id, "cube")
+        backend.move_to_pose(
+            (0.59, -0.225, 0.24),
+            backend.downward_orientation(),
+        )
+        self.assertEqual(len(fake_clients.remove.requests), removals_before_lift + 1)
+
     def test_assisted_grasp_holds_clearance_until_gazebo_attach(self):
         gripper = FakeActionClient(gripper_result)
         fake_clients = clients(gripper=gripper)
@@ -464,9 +522,33 @@ class MoveItBackendTest(unittest.TestCase):
         backend.reset(task(scene="clear"))
 
         backend.set_gripper(backend.closed_gripper_width)
-        self.assertAlmostEqual(gripper.goals[-1].command.position, 0.03)
+        self.assertAlmostEqual(gripper.goals[-1].command.position, 0.038)
         self.assertTrue(backend.attach_object())
         self.assertAlmostEqual(gripper.goals[-1].command.position, 0.0)
+
+    def test_gripper_stall_is_rejected_before_attach_but_allowed_after_attach(self):
+        gripper = FakeActionClient(
+            lambda: gripper_result(reached_goal=False, stalled=True)
+        )
+        backend = MoveItBackend(
+            object(),
+            MoveItBackendConfig(
+                use_gazebo=True,
+                execute_motion=True,
+                command_gripper=True,
+                verify_gazebo_reset_pose=False,
+                service_timeout_sec=0.05,
+            ),
+            clients=clients(gripper=gripper),
+        )
+        backend.reset(task(scene="clear"))
+
+        with self.assertRaisesRegex(RuntimeError, "gripper_execution_failed"):
+            backend.set_gripper(backend.closed_gripper_width)
+
+        # Once the guarded Gazebo and MoveIt attach transactions succeed, a
+        # contact stall is the expected terminal state of the zero-width close.
+        self.assertTrue(backend.attach_object())
 
     def test_physics_mode_does_not_fake_moveit_attachment(self):
         fake_clients = clients()

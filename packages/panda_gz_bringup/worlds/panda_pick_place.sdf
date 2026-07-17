@@ -89,8 +89,10 @@
         <sensor name="cube_contact_sensor" type="contact">
           <always_on>true</always_on>
           <update_rate>100</update_rate>
-          <topic>/cube/contacts</topic>
-          <contact><collision>cube_collision</collision></contact>
+          <contact>
+            <collision>cube_collision</collision>
+            <topic>/cube/contacts</topic>
+          </contact>
         </sensor>
       </link>
       <plugin filename="libignition-gazebo-pose-publisher-system.so"
@@ -122,18 +124,6 @@
           <material><ambient>0.10 0.72 0.20 0.55</ambient><diffuse>0.10 0.72 0.20 0.55</diffuse></material>
         </visual>
       </link>
-      <plugin filename="libignition-gazebo-pose-publisher-system.so"
-              name="ignition::gazebo::systems::PosePublisher">
-        <publish_link_pose>false</publish_link_pose>
-        <publish_visual_pose>false</publish_visual_pose>
-        <publish_collision_pose>false</publish_collision_pose>
-        <publish_sensor_pose>false</publish_sensor_pose>
-        <publish_model_pose>true</publish_model_pose>
-        <publish_nested_model_pose>false</publish_nested_model_pose>
-        <use_pose_vector_msg>true</use_pose_vector_msg>
-        <static_publisher>false</static_publisher>
-        <update_frequency>50</update_frequency>
-      </plugin>
     </model>
 
     <model name="obstacle">
@@ -148,18 +138,6 @@
           <material><ambient>0.14 0.31 0.75 1</ambient><diffuse>0.16 0.36 0.85 1</diffuse></material>
         </visual>
       </link>
-      <plugin filename="libignition-gazebo-pose-publisher-system.so"
-              name="ignition::gazebo::systems::PosePublisher">
-        <publish_link_pose>false</publish_link_pose>
-        <publish_visual_pose>false</publish_visual_pose>
-        <publish_collision_pose>false</publish_collision_pose>
-        <publish_sensor_pose>false</publish_sensor_pose>
-        <publish_model_pose>true</publish_model_pose>
-        <publish_nested_model_pose>false</publish_nested_model_pose>
-        <use_pose_vector_msg>true</use_pose_vector_msg>
-        <static_publisher>false</static_publisher>
-        <update_frequency>50</update_frequency>
-      </plugin>
     </model>
   </world>
 </sdf>

@@ -193,11 +193,21 @@ private:
         if (pose_target.header.frame_id.empty()) {
           pose_target.header.frame_id = move_group_->getPlanningFrame();
         }
-        target_set = move_group_->setPoseTarget(pose_target, end_effector_link);
+        // Resolve the redundant Panda pose goal once, seeded by the current
+        // state, and plan to that joint target.  setPoseTarget() leaves IK goal
+        // sampling to OMPL; for adjacent manipulation stages it can select a
+        // distant elbow branch and turn a short vertical lift into a multi-rad
+        // joint-space motion.  The single-IK overload preserves local
+        // configuration continuity while RRT-Connect still plans and collision
+        // checks the path to the selected solution.
+        target_set = move_group_->setJointValueTarget(pose_target, end_effector_link);
       }
       if (!target_set) {
-        result->failure_type = "target_rejected";
-        result->moveit_error_code = moveit_msgs::msg::MoveItErrorCodes::INVALID_GOAL_CONSTRAINTS;
+        const bool pose_target = goal->target_type == Motion::Goal::TARGET_TYPE_POSE;
+        result->failure_type = pose_target ? "no_ik_solution" : "target_rejected";
+        result->moveit_error_code = pose_target ?
+          moveit_msgs::msg::MoveItErrorCodes::NO_IK_SOLUTION :
+          moveit_msgs::msg::MoveItErrorCodes::INVALID_GOAL_CONSTRAINTS;
         finish();
         return;
       }
@@ -507,14 +517,34 @@ private:
       response->message = "object_id must not be empty";
       return;
     }
+    const std::string link = request->link_name.empty() ? default_attach_link_ : request->link_name;
+    const auto& touch_links = request->touch_links.empty() ? default_touch_links_ : request->touch_links;
+    std::vector<std::string> support_collision_links;
+    if (request->attach) {
+      collision_detection::AllowedCollisionMatrix matrix;
+      if (!read_allowed_collision_matrix(
+          matrix, std::chrono::duration<double>(scene_sync_timeout_sec_)) ||
+        !allowed_collision_links_for_object(
+          matrix, request->object_id, support_collision_links))
+      {
+        response->message = "could not audit pre-attach allowed collisions";
+        return;
+      }
+      const std::set<std::string> touch_link_set(touch_links.begin(), touch_links.end());
+      support_collision_links.erase(
+        std::remove_if(
+          support_collision_links.begin(), support_collision_links.end(),
+          [&touch_link_set](const std::string& name) {
+            return touch_link_set.count(name) > 0U;
+          }),
+        support_collision_links.end());
+    }
     const bool currently_attached =
       planning_scene_->getAttachedObjects({ request->object_id }).count(request->object_id) > 0U;
     if (request->attach && currently_attached) {
       response->success = true;
       response->message = "object is already attached";
     } else if (request->attach) {
-      const std::string link = request->link_name.empty() ? default_attach_link_ : request->link_name;
-      const auto& touch_links = request->touch_links.empty() ? default_touch_links_ : request->touch_links;
       response->success = move_group_->attachObject(request->object_id, link, touch_links);
       response->message = response->success ? "attach request accepted" : "attach request failed";
     } else if (!currently_attached) {
@@ -542,21 +572,25 @@ private:
       }
     }
 
-    // Touch links on AttachedCollisionObject replace the temporary world-object
-    // ACM entries used while approaching a grasp.  Remove those explicit pairs
-    // once attachment is synchronized so they cannot leak into later episodes.
+    // Touch links move into AttachedCollisionObject.  Preserve only audited
+    // non-touch pairs (for example cube<->table while the cube is still resting
+    // on its support surface); the backend clears that pair immediately after
+    // the first successful lift.
     if (response->success && request->attach &&
-      !update_allowed_collisions(request->object_id, {}, true))
+      !update_allowed_collisions(
+        request->object_id, support_collision_links, support_collision_links.empty()))
     {
       const bool rollback_requested = move_group_->detachObject(request->object_id);
       const bool rollback_synchronized = rollback_requested &&
         wait_for_attached_state(request->object_id, false);
       response->success = false;
       response->message = rollback_synchronized ?
-        "world ACM cleanup failed; detach rollback completed" :
-        "world ACM cleanup failed; detach rollback failed";
+        "post-attach ACM synchronization failed; detach rollback completed" :
+        "post-attach ACM synchronization failed; detach rollback failed";
     } else if (response->success && request->attach) {
-      response->message = "attachment synchronized and world ACM entry removed";
+      response->message = support_collision_links.empty() ?
+        "attachment synchronized and world ACM entry removed" :
+        "attachment synchronized with temporary support collision allowed";
     }
   }
 
@@ -651,6 +685,33 @@ private:
       }
     }
     return observed == expected;
+  }
+
+  static bool allowed_collision_links_for_object(
+    const collision_detection::AllowedCollisionMatrix& matrix,
+    const std::string& object_id, std::vector<std::string>& allowed_links)
+  {
+    allowed_links.clear();
+    if (!matrix.hasEntry(object_id)) {
+      return true;
+    }
+    std::vector<std::string> names;
+    matrix.getAllEntryNames(names);
+    for (const auto& name : names) {
+      if (name == object_id) {
+        continue;
+      }
+      collision_detection::AllowedCollision::Type type;
+      if (!matrix.getEntry(object_id, name, type)) {
+        continue;
+      }
+      if (type != collision_detection::AllowedCollision::ALWAYS) {
+        return false;
+      }
+      allowed_links.push_back(name);
+    }
+    std::sort(allowed_links.begin(), allowed_links.end());
+    return true;
   }
 
   bool wait_for_allowed_collisions(

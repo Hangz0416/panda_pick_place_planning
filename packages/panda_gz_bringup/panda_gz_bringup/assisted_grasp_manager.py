@@ -48,7 +48,7 @@ class AssistedGraspManager(Node):
         self.declare_parameter("max_hand_object_distance_m", 0.09)
         # This is the single finger-joint command used by MoveItBackend. The
         # observed total opening is the sum of both finger joint positions.
-        self.declare_parameter("assisted_pre_attach_width_m", 0.030)
+        self.declare_parameter("assisted_pre_attach_width_m", 0.038)
         self.declare_parameter("per_finger_width_tolerance_m", 0.004)
         self.declare_parameter("command_timeout_sec", 2.0)
 
@@ -340,6 +340,8 @@ def main(args=None) -> None:
     executor.add_node(node)
     try:
         executor.spin()
+    except KeyboardInterrupt:
+        pass
     finally:
         executor.shutdown()
         node.destroy_node()

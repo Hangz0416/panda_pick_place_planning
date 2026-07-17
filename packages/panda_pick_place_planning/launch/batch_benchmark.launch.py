@@ -1,8 +1,5 @@
 """Sequential ROS batch orchestration for an already-running backend stack."""
 
-from pathlib import Path
-
-from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, EmitEvent, RegisterEventHandler
 from launch.event_handlers import OnProcessExit
@@ -13,12 +10,6 @@ from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description() -> LaunchDescription:
-    package_share = Path(
-        get_package_share_directory("panda_pick_place_planning")
-    )
-    backend_defaults = str(
-        package_share / "config" / "moveit_backend_defaults.yaml"
-    )
     episodes = LaunchConfiguration("episodes_per_scene")
     seed = LaunchConfiguration("seed")
     scenes_csv = LaunchConfiguration("scenes_csv")
@@ -107,7 +98,6 @@ def generate_launch_description() -> LaunchDescription:
                 output="screen",
                 parameters=[
                     common_time,
-                    backend_defaults,
                     {
                         "backend": backend,
                         "use_gui": False,

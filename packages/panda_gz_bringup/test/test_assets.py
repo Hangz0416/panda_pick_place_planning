@@ -46,7 +46,7 @@ def test_package_and_world_xml_are_well_formed():
     assert table_pose is not None
     assert abs(float(table_pose.split()[2]) - 0.35 + 0.025) < 1.0e-9
     contact_topic = world.findtext(
-        "./world/model[@name='cube']/link/sensor[@type='contact']/topic"
+        "./world/model[@name='cube']/link/sensor[@type='contact']/contact/topic"
     )
     assert contact_topic == "/cube/contacts"
     cube = world.find("./world/model[@name='cube']")
@@ -55,11 +55,7 @@ def test_package_and_world_xml_are_well_formed():
         "./plugin[@name='ignition::gazebo::systems::OdometryPublisher']"
     ) is not None
     for model_name in ("target", "obstacle"):
-        model = world.find(f"./world/model[@name='{model_name}']")
-        assert model is not None
-        assert model.find(
-            "./plugin[@name='ignition::gazebo::systems::PosePublisher']"
-        ) is not None
+        assert world.find(f"./world/model[@name='{model_name}']") is not None
 
 
 def test_one_shared_xacro_selects_mock_or_modern_gazebo():
@@ -68,6 +64,7 @@ def test_one_shared_xacro_selects_mock_or_modern_gazebo():
     ET.parse(shared)
     ET.parse(control)
     shared_text = shared.read_text()
+    dynamics = (MOVEIT / "config" / "panda_description.urdf.xacro").read_text()
     control_text = control.read_text()
     launch_text = (ROOT / "launch" / "panda_gz.launch.py").read_text()
 
@@ -75,6 +72,9 @@ def test_one_shared_xacro_selects_mock_or_modern_gazebo():
     assert 'name="hardware_type"' in shared_text
     assert "selected_hardware == 'mock'" in shared_text
     assert "selected_hardware == 'gz'" in shared_text
+    assert 'filename="panda_description.urdf.xacro"' in shared_text
+    assert dynamics.count("<inertial>") == 11
+    assert "c11f000c2737acc22ed8dfeff40555b2644a4294" in dynamics
     assert shared_text.count('name="world_to_panda_link0"') == 1
     assert "mock_components/GenericSystem" in control_text
     assert "gz_ros2_control/GazeboSimSystem" in control_text
@@ -85,9 +85,19 @@ def test_one_shared_xacro_selects_mock_or_modern_gazebo():
     assert "<child_link>cube_link</child_link>" in control_text
     assert "child_model_link" not in control_text
     assert "panda_moveit_config" in launch_text
-    assert '" hardware_type:=gz"' in launch_text
+    assert '"hardware_type": "gz"' in launch_text
+    assert "robot_sdf = convert_urdf_to_sdf(robot_description)" in launch_text
+    assert "audit_model(robot_description, robot_sdf)" in launch_text
+    assert "compose_world_with_deferred_control(base_world, robot_sdf)" in (
+        launch_text
+    )
+    assert 'executable="control_system_loader"' in launch_text
+    assert "start_controllers_if_loaded" in launch_text
+    assert "event.returncode == 0" in launch_text
+    assert 'executable="create"' not in launch_text
     assert "libgazebo_ros2_control.so" not in control_text
     assert "gazebo_ros2_control/GazeboSystem" not in control_text
+    assert "<contact>" in control_text
     assert "<topic>/panda/robot_contacts</topic>" in control_text
     assert control_text.count("<xacro:panda_contact_sensor") == 11
     for link_name in (
@@ -144,6 +154,8 @@ def test_controller_and_bridge_contracts():
     )
     assert "panda_hand_controller" in manager
     assert "panda_gripper_controller" not in manager
+    broadcaster = controllers["joint_state_broadcaster"]["ros__parameters"]
+    assert broadcaster["use_local_topics"] is True
     arm = controllers["panda_arm_controller"]["ros__parameters"]
     assert arm["joints"] == [f"panda_joint{index}" for index in range(1, 8)]
 
@@ -162,8 +174,8 @@ def test_controller_and_bridge_contracts():
     assert "/panda/detachable_joint/detach" in topics
     assert "/panda/detachable_joint/state" in topics
     assert "/panda_gz/cube_odometry" in topics
-    assert "/panda_gz/target_pose" in topics
-    assert "/panda_gz/obstacle_pose" in topics
+    assert "/panda_gz/target_pose" not in topics
+    assert "/panda_gz/obstacle_pose" not in topics
     detachable_state = next(
         item
         for item in bridges
@@ -218,12 +230,17 @@ def test_typed_reset_and_model_mapping_contract():
     assert '"cube": str(self.get_parameter("cube_model").value)' in reset_manager
     assert '"target": str(self.get_parameter("target_model").value)' in reset_manager
     assert '"obstacle": str(self.get_parameter("obstacle_model").value)' in reset_manager
-    assert "request.world_control.reset.model_only = reset_models" in reset_manager
+    assert "request.world_control.reset.model_only" not in reset_manager
+    assert "request.world_control.seed" not in reset_manager
+    assert "Fortress explicitly does not support model-only reset" in reset_manager
     assert 'require_world_frame(request.header.frame_id)' in reset_manager
     assert '"/panda_gz/cube_odometry"' in reset_manager
     assert '"/panda_gz/target_pose"' in reset_manager
     assert '"/panda_gz/obstacle_pose"' in reset_manager
     assert "_wait_for_scene_readback" in reset_manager
+    assert "_wait_for_home_settled" in reset_manager
+    assert "self._joint_state_condition.wait(" in reset_manager
+    assert 'self.declare_parameter("home_stable_sec", 0.20)' in reset_manager
     assert "if success and spec is not None" in reset_manager
     assert '"/panda_hand_controller/gripper_cmd"' in reset_manager
     assert "GetPhysicalGraspState.Request.COMMAND_RESET" in reset_manager
@@ -261,8 +278,29 @@ def test_humble_entity_pose_adapter_is_built_and_launched():
     assert "add_executable(entity_pose_bridge" in cmake
     assert "ignition-transport11::core" in cmake
     assert 'service_name_ = "/world/" + world + "/set_pose"' in source
+    assert 'pose_info_topic_ = "/world/" + world + "/pose/info"' in source
+    assert '"/panda_gz/target_pose"' in source
+    assert '"/panda_gz/obstacle_pose"' in source
+    assert "pose.name() == \"target\"" in source
+    assert "pose.name() == \"obstacle\"" in source
     assert 'executable="entity_pose_bridge"' in launch
     assert "panda_gz_set_pose_bridge" not in launch
+
+
+def test_control_system_is_loaded_after_world_iterations_and_fails_closed():
+    cmake = (ROOT / "CMakeLists.txt").read_text()
+    source = (ROOT / "src" / "control_system_loader.cpp").read_text()
+    launch = (ROOT / "launch" / "panda_gz.launch.py").read_text()
+
+    assert "add_executable(control_system_loader" in cmake
+    assert '"/entity/system/add"' in source
+    assert "model_entity_id.store(pose.id())" in source
+    assert "set_id(model_entity_id.load())" in source
+    assert "iterations.load() < 100" in source
+    assert "gz_ros2_control::GazeboSimROS2ControlPlugin" in source
+    assert '"/controller_manager/list_controllers"' in source
+    assert "return 7;" in source
+    assert "deferred gz_ros2_control loader failed" in launch
 
 
 def test_python_quality_checks_are_registered_with_colcon_test():
@@ -275,6 +313,9 @@ def test_python_quality_checks_are_registered_with_colcon_test():
     assert "<test_depend>ament_cmake_flake8</test_depend>" in package
     assert "<test_depend>ament_cmake_pep257</test_depend>" in package
     assert "scripts/stack_ready_gate" in cmake
+    assert "scripts/joint_state_canonicalizer" in cmake
+    assert "scripts/validate_episode_reset" in cmake
+    assert "scripts/validate_robot_model" in cmake
 
 
 def test_readiness_gate_is_installed_and_fail_closed():
@@ -290,6 +331,8 @@ def test_readiness_gate_is_installed_and_fail_closed():
     assert "sleep(" not in source
     assert "if not ready:" in source
     assert "ROS context stopped before stack readiness was proved" in source
+    assert 'declare_parameter("readiness_timeout_sec", 120.0)' in source
+    assert "Panda stack readiness gate timed out" in source
     assert 'if grasp_mode_value == "physics" and not physics_model_validated' in standalone
     assert "mass/inertia model has not been validated" in standalone
 
@@ -384,5 +427,5 @@ def test_assisted_width_matches_the_fsm_backend_command():
         / "backends"
         / "moveit.py"
     ).read_text()
-    assert params["assisted_pre_attach_width_m"] == 0.03
-    assert "assisted_pre_attach_width: float = 0.03" in planning_backend
+    assert params["assisted_pre_attach_width_m"] == 0.038
+    assert "assisted_pre_attach_width: float = 0.038" in planning_backend

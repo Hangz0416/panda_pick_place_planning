@@ -72,7 +72,7 @@ class MoveItBackendConfig:
     use_gazebo: bool = False
     execute_motion: bool = True
     command_gripper: bool = True
-    assisted_pre_attach_width: float = 0.03
+    assisted_pre_attach_width: float = 0.038
     max_gripper_effort: float = 20.0
 
     def __post_init__(self) -> None:
@@ -152,6 +152,7 @@ class MoveItBackend:
         self._ever_released = False
         self._physical_hold_confirmed = False
         self._physical_release_requested = False
+        self._support_collision_pending = False
         self._gripper_width = self.scene_config.open_gripper_width
         self._pose_condition = threading.Condition()
         self._tracking_lock = threading.Lock()
@@ -227,6 +228,7 @@ class MoveItBackend:
         self._ever_released = False
         self._physical_hold_confirmed = False
         self._physical_release_requested = False
+        self._support_collision_pending = False
         with self._tracking_lock:
             self._episode_tracking_max = None
             self._motion_tracking_max = None
@@ -279,11 +281,17 @@ class MoveItBackend:
             allowed_collision_links=("panda_link0",),
         )
         cube_size = (2.0 * self.scene_config.cube_half_extent,) * 3
+        cube_allowed_collisions = self.config.touch_links
+        if self.config.use_gazebo:
+            # A resting object is intentionally in contact with its support
+            # surface.  Preserve this one ACM pair through attachment, then
+            # clear it immediately after the first successful lift.
+            cube_allowed_collisions += ("table",)
         self._upsert_box(
             "cube",
             task.object_position,
             cube_size,
-            allowed_collision_links=self.config.touch_links,
+            allowed_collision_links=cube_allowed_collisions,
         )
         if task.scene == "obstacle":
             obstacle_size = tuple(
@@ -328,7 +336,32 @@ class MoveItBackend:
         goal.pose_target.pose.orientation.w = float(orientation[3])
         goal.end_effector_link = self.config.end_effector_link
         self._configure_motion_goal(goal, planner, timeout_sec)
-        return self._send_motion(goal)
+        report = self._send_motion(goal)
+        if (
+            report.success
+            and self._attached
+            and self._support_collision_pending
+        ):
+            try:
+                # RemoveWorldObject is deliberately idempotent: while cube is
+                # attached it leaves the AttachedCollisionObject untouched and
+                # removes only the temporary support-surface ACM entry.
+                self._require_world_object_removed(
+                    "cube",
+                    "planning_scene_support_cleanup_failed",
+                )
+            except BackendOperationError:
+                failed = replace(
+                    report,
+                    success=False,
+                    failure_type="planning_scene_support_cleanup_failed",
+                    planning_scene_sync_success=False,
+                )
+                self.last_failure_type = failed.failure_type
+                self.last_motion_report = failed
+                return failed
+            self._support_collision_pending = False
+        return report
 
     def move_home(self) -> BackendMotionReport:
         goal = self._new_motion_goal()
@@ -361,8 +394,10 @@ class MoveItBackend:
             and math.isclose(width, self.closed_gripper_width, abs_tol=1.0e-9)
             and not self._attached
         ):
-            # DetachableJoint cannot create a joint while collision geometries
-            # overlap.  Hold a 60 mm total gap until Gazebo confirms attach.
+            # The hand is yawed 45 degrees over the box, so its in-plane
+            # diagonal is about 70.7 mm.  Hold a commanded 76 mm total gap
+            # until Gazebo confirms attach; measured joint state remains the
+            # authority used by the guarded attach service.
             commanded_width = self.config.assisted_pre_attach_width
         self._command_gripper(commanded_width)
         self._gripper_width = commanded_width
@@ -400,8 +435,16 @@ class MoveItBackend:
 
         self._attached = True
         self._ever_attached = True
+        self._support_collision_pending = self.config.use_gazebo
         if self.config.use_gazebo:
-            self._command_gripper(self.closed_gripper_width)
+            # Contact with the constrained cube normally stalls the fingers
+            # before the zero-width command.  Accept only an explicitly
+            # reported stall here; pre-attach and release commands must reach
+            # their requested positions.
+            self._command_gripper(
+                self.closed_gripper_width,
+                allow_stall=True,
+            )
             self._gripper_width = self.closed_gripper_width
         return True
 
@@ -429,6 +472,7 @@ class MoveItBackend:
             self.planning_scene_sync_success = False
             raise BackendOperationError("planning_scene_detach_failed")
         self._attached = False
+        self._support_collision_pending = False
         self._released = not is_physics
         self.object_released_confirmed = not is_physics
         if not is_physics:
@@ -1119,7 +1163,7 @@ class MoveItBackend:
         feedback = getattr(wrapped, "feedback", wrapped)
         self._feedback_phase = str(getattr(feedback, "phase", ""))
 
-    def _command_gripper(self, width: float) -> None:
+    def _command_gripper(self, width: float, *, allow_stall: bool = False) -> None:
         if not self.config.command_gripper:
             return
         from control_msgs.action import GripperCommand
@@ -1146,10 +1190,12 @@ class MoveItBackend:
         try:
             from action_msgs.msg import GoalStatus
 
-            succeeded = wrapped.status == GoalStatus.STATUS_SUCCEEDED
+            status_succeeded = wrapped.status == GoalStatus.STATUS_SUCCEEDED
         except (ImportError, AttributeError):
-            succeeded = bool(getattr(wrapped.result, "reached_goal", True))
-        if not succeeded:
+            status_succeeded = True
+        reached_goal = bool(getattr(wrapped.result, "reached_goal", False))
+        stalled = bool(getattr(wrapped.result, "stalled", False))
+        if not status_succeeded or not (reached_goal or (allow_stall and stalled)):
             raise BackendOperationError("gripper_execution_failed")
 
     def _upsert_box(

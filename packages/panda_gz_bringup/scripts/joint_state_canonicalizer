@@ -1,0 +1,4 @@
+#!/usr/bin/env python3
+from panda_gz_bringup.joint_state_canonicalizer import main
+
+main()

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 from pathlib import Path
 import shutil
 import subprocess
@@ -26,6 +27,9 @@ DYNAMIC_LINKS = (
     "panda_rightfinger",
 )
 REQUIRED_FRAMES = ("panda_hand", "panda_grasptarget")
+ROBOT_CONTACT_TOPIC = "/panda/robot_contacts"
+GZ_CONTROL_PLUGIN_NAME = "gz_ros2_control::GazeboSimROS2ControlPlugin"
+GZ_CONTROL_PLUGIN_FILENAME = "gz_ros2_control-system"
 
 
 @dataclass(frozen=True)
@@ -122,6 +126,50 @@ def convert_urdf_to_sdf(urdf_xml: str) -> str:
     return completed.stdout
 
 
+def compose_world_with_deferred_control(
+    world_path: Path,
+    robot_sdf: str,
+    *,
+    output_directory: Path | None = None,
+) -> Path:
+    """Put Panda in the initial world but defer its control system plugin."""
+    root = ET.parse(world_path).getroot()
+    world = root.find("world")
+    if world is None:
+        raise ValueError(f"Gazebo world has no <world>: {world_path}")
+    robot_root = ET.fromstring(robot_sdf)
+    robot_model = (
+        robot_root
+        if robot_root.tag == "model"
+        else robot_root.find("model")
+    )
+    if robot_model is None or robot_model.attrib.get("name") != "panda":
+        raise ValueError("derived Panda SDF has no model named 'panda'")
+    plugins = [
+        item
+        for item in robot_model.findall("plugin")
+        if item.attrib.get("name") == GZ_CONTROL_PLUGIN_NAME
+    ]
+    if len(plugins) != 1:
+        raise ValueError("Panda SDF must have exactly one gz_ros2_control plugin")
+    if plugins[0].attrib.get("filename") != GZ_CONTROL_PLUGIN_FILENAME:
+        raise ValueError("Panda gz_ros2_control plugin filename mismatch")
+    robot_model.remove(plugins[0])
+    if world.find("./model[@name='panda']") is not None:
+        raise ValueError("base Gazebo world already contains a Panda model")
+    world.append(robot_model)
+    xml = ET.tostring(root, encoding="unicode", xml_declaration=True)
+    digest = hashlib.sha256(xml.encode("utf-8")).hexdigest()[:16]
+    directory = output_directory or (
+        Path(tempfile.gettempdir()) / "panda_gz_bringup"
+    )
+    directory.mkdir(parents=True, exist_ok=True)
+    output_path = directory / f"panda_pick_place_{digest}.sdf"
+    if not output_path.exists() or output_path.read_text() != xml:
+        output_path.write_text(xml, encoding="utf-8")
+    return output_path
+
+
 def validate_sdf(sdf_xml: str) -> ET.Element:
     """Verify required joints and task frames survived URDF-to-SDF conversion."""
     root = ET.fromstring(sdf_xml)
@@ -141,6 +189,28 @@ def validate_sdf(sdf_xml: str) -> ET.Element:
     missing_frames = sorted(set(REQUIRED_FRAMES) - frame_names)
     if missing_frames:
         raise ValueError(f"SDF missing required links/frames: {missing_frames}")
+    contact_sensors = model.findall(".//sensor[@type='contact']")
+    if len(contact_sensors) != len(DYNAMIC_LINKS):
+        raise ValueError(
+            "SDF contact sensor count mismatch: "
+            f"expected {len(DYNAMIC_LINKS)}, got {len(contact_sensors)}"
+        )
+    for sensor in contact_sensors:
+        topic = sensor.findtext("./contact/topic")
+        if topic != ROBOT_CONTACT_TOPIC:
+            raise ValueError(
+                "SDF contact sensor has invalid type-specific topic: "
+                f"{sensor.attrib.get('name')}: {topic!r}"
+            )
+    control_plugins = [
+        plugin
+        for plugin in model.findall(".//plugin")
+        if plugin.attrib.get("name") == GZ_CONTROL_PLUGIN_NAME
+    ]
+    if len(control_plugins) != 1:
+        raise ValueError("SDF Panda must own exactly one gz_ros2_control plugin")
+    if control_plugins[0].attrib.get("filename") != GZ_CONTROL_PLUGIN_FILENAME:
+        raise ValueError("SDF Panda gz_ros2_control plugin filename mismatch")
     return root
 
 

@@ -8,6 +8,36 @@ from typing import Sequence
 SUPPORTED_SCENES = frozenset({"clear", "obstacle"})
 SUPPORTED_GRASP_MODES = frozenset({"assisted", "physics"})
 SUPPORTED_RESET_FRAMES = frozenset({"", "world"})
+RESET_VALIDATION_THRESHOLDS = {
+    "joint_position_error_rad": 0.025,
+    "joint_velocity_rad_s": 0.025,
+    "gripper_position_error_m": 0.003,
+    "cube_position_error_m": 0.005,
+    "target_position_error_m": 0.005,
+    "obstacle_position_error_m": 0.005,
+    "cube_linear_speed_mps": 0.010,
+    "cube_angular_speed_rad_s": 0.050,
+}
+
+
+@dataclass(frozen=True)
+class ResetValidationMetrics:
+    """Maximum error channels observed after one successful reset."""
+
+    joint_position_error_rad: float
+    joint_velocity_rad_s: float
+    gripper_position_error_m: float
+    cube_position_error_m: float
+    target_position_error_m: float
+    obstacle_position_error_m: float
+    cube_linear_speed_mps: float
+    cube_angular_speed_rad_s: float
+
+    def passed(self) -> bool:
+        return all(
+            getattr(self, field) <= limit
+            for field, limit in RESET_VALIDATION_THRESHOLDS.items()
+        )
 
 
 def require_world_frame(frame_id: str) -> None:

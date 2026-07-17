@@ -6,15 +6,28 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
+    EmitEvent,
     IncludeLaunchDescription,
+    LogInfo,
     OpaqueFunction,
     RegisterEventHandler,
+    SetEnvironmentVariable,
 )
 from launch.event_handlers import OnProcessExit
+from launch.events import Shutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command, FindExecutable, LaunchConfiguration
+from launch.substitutions import (
+    EnvironmentVariable,
+    LaunchConfiguration,
+)
 from launch_ros.actions import Node
-from launch_ros.parameter_descriptions import ParameterValue
+import xacro
+
+from panda_gz_bringup.model_validation import (
+    audit_model,
+    compose_world_with_deferred_control,
+    convert_urdf_to_sdf,
+)
 
 
 def _launch_setup(context):
@@ -36,7 +49,7 @@ def _launch_setup(context):
     use_sim_time = LaunchConfiguration("use_sim_time")
     auto_reset = LaunchConfiguration("auto_reset")
 
-    world = package_share / "worlds" / "panda_pick_place.sdf"
+    base_world = package_share / "worlds" / "panda_pick_place.sdf"
     controllers = package_share / "config" / "controllers.yaml"
     bridge = package_share / "config" / "bridge.yaml"
     grasp = package_share / "config" / "grasp.yaml"
@@ -46,26 +59,44 @@ def _launch_setup(context):
         / "config"
         / "panda.urdf.xacro"
     )
-
-    robot_description = ParameterValue(
-        Command(
-            [
-                FindExecutable(name="xacro"),
-                " ",
-                str(robot_xacro),
-                " hardware_type:=gz",
-                " controllers_file:=",
-                str(controllers),
-                " assisted_grasp:=",
-                str(assisted_grasp).lower(),
-            ]
-        ),
-        value_type=str,
+    initial_positions = robot_xacro.parent / "initial_positions.yaml"
+    panda_description_share = Path(
+        get_package_share_directory("moveit_resources_panda_description")
     )
+    gazebo_resource_root = str(panda_description_share.parent)
+    gazebo_resource_path = SetEnvironmentVariable(
+        name="IGN_GAZEBO_RESOURCE_PATH",
+        value=[
+            gazebo_resource_root,
+            ":",
+            EnvironmentVariable("IGN_GAZEBO_RESOURCE_PATH", default_value=""),
+        ],
+    )
+
+    # Fortress must see contact sensors during world initialization, while the
+    # Humble gz_ros2_control plugin crashes if it is initialized in that same
+    # phase. Derive both from one audited Xacro, put Panda geometry in the
+    # initial world, then load only the control plugin after simulation starts.
+    robot_description = xacro.process_file(
+        str(robot_xacro),
+        mappings={
+            "hardware_type": "gz",
+            "initial_positions_file": str(initial_positions),
+            "controllers_file": str(controllers),
+            "assisted_grasp": str(assisted_grasp).lower(),
+        },
+    ).toxml()
+    robot_sdf = convert_urdf_to_sdf(robot_description)
+    audit_model(robot_description, robot_sdf)
+    world = compose_world_with_deferred_control(base_world, robot_sdf)
     gz_args = f"{'-s ' if headless else ''}-r -v 3 {world}"
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            str(Path(get_package_share_directory("ros_gz_sim")) / "launch" / "gz_sim.launch.py")
+            str(
+                Path(get_package_share_directory("ros_gz_sim"))
+                / "launch"
+                / "gz_sim.launch.py"
+            )
         ),
         launch_arguments={"gz_args": gz_args}.items(),
     )
@@ -74,24 +105,32 @@ def _launch_setup(context):
         executable="robot_state_publisher",
         name="robot_state_publisher",
         output="screen",
-        parameters=[{"robot_description": robot_description, "use_sim_time": use_sim_time}],
+        parameters=[
+            {
+                "robot_description": robot_description,
+                "use_sim_time": use_sim_time,
+            }
+        ],
     )
-    spawn_robot = Node(
-        package="ros_gz_sim",
-        executable="create",
-        name="spawn_panda",
+    joint_state_canonicalizer = Node(
+        package="panda_gz_bringup",
+        executable="joint_state_canonicalizer",
+        name="panda_joint_state_canonicalizer",
         output="screen",
-        arguments=[
-            "-name",
-            "panda",
-            "-topic",
-            "robot_description",
-            "-x",
-            "0.0",
-            "-y",
-            "0.0",
-            "-z",
-            "0.0",
+        parameters=[{"use_sim_time": use_sim_time}],
+    )
+    control_loader = Node(
+        package="panda_gz_bringup",
+        executable="control_system_loader",
+        name="panda_control_system_loader",
+        output="screen",
+        parameters=[
+            {
+                "world_name": "panda_pick_place",
+                "entity_name": "panda",
+                "controllers_file": str(controllers),
+                "timeout_sec": 60.0,
+            }
         ],
     )
     bridge_topics = Node(
@@ -143,10 +182,25 @@ def _launch_setup(context):
                 output="screen",
             )
         )
-    start_controllers = RegisterEventHandler(
-        OnProcessExit(target_action=spawn_robot, on_exit=spawners)
-    )
 
+    def start_controllers_if_loaded(event, _context):
+        if event.returncode == 0:
+            return spawners
+        reason = (
+            "deferred gz_ros2_control loader failed with code "
+            f"{event.returncode}"
+        )
+        return [
+            LogInfo(msg=f"ERROR: {reason}"),
+            EmitEvent(event=Shutdown(reason=reason)),
+        ]
+
+    start_controllers = RegisterEventHandler(
+        OnProcessExit(
+            target_action=control_loader,
+            on_exit=start_controllers_if_loaded,
+        )
+    )
     grasp_manager = Node(
         package="panda_gz_bringup",
         executable="assisted_grasp_manager",
@@ -201,12 +255,14 @@ def _launch_setup(context):
     managers.append(reset_manager)
 
     return [
+        gazebo_resource_path,
         gazebo,
         state_publisher,
+        joint_state_canonicalizer,
         bridge_topics,
         bridge_control,
         entity_pose_bridge,
-        spawn_robot,
+        control_loader,
         start_controllers,
         *managers,
     ]

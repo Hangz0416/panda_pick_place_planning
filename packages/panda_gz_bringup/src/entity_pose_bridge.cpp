@@ -16,11 +16,14 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <stdexcept>
 #include <string>
 
 #include <ignition/msgs/boolean.pb.h>
 #include <ignition/msgs/pose.pb.h>
+#include <ignition/msgs/pose_v.pb.h>
 #include <ignition/transport/Node.hh>
+#include <geometry_msgs/msg/pose_array.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <ros_gz_interfaces/srv/set_entity_pose.hpp>
 
@@ -39,17 +42,66 @@ public:
     timeout_ms_ = static_cast<unsigned int>(
       declare_parameter<std::int64_t>("request_timeout_ms", 5000));
     service_name_ = "/world/" + world + "/set_pose";
+    pose_info_topic_ = "/world/" + world + "/pose/info";
+    target_pose_pub_ = create_publisher<geometry_msgs::msg::PoseArray>(
+      "/panda_gz/target_pose", 10);
+    obstacle_pose_pub_ = create_publisher<geometry_msgs::msg::PoseArray>(
+      "/panda_gz/obstacle_pose", 10);
     service_ = create_service<SetEntityPose>(
       service_name_,
       std::bind(
         &EntityPoseBridge::set_pose, this, std::placeholders::_1,
         std::placeholders::_2));
+    if (!transport_node_.Subscribe(
+        pose_info_topic_, &EntityPoseBridge::on_pose_info, this))
+    {
+      throw std::runtime_error(
+              "failed to subscribe to Gazebo world pose info: " + pose_info_topic_);
+    }
     RCLCPP_INFO(
-      get_logger(), "Bridging ROS %s to Gazebo Transport %s",
-      service_name_.c_str(), service_name_.c_str());
+      get_logger(),
+      "Bridging ROS %s and Gazebo pose readback from %s",
+      service_name_.c_str(), pose_info_topic_.c_str());
   }
 
 private:
+  static geometry_msgs::msg::Pose to_ros_pose(const ignition::msgs::Pose & pose)
+  {
+    geometry_msgs::msg::Pose result;
+    result.position.x = pose.position().x();
+    result.position.y = pose.position().y();
+    result.position.z = pose.position().z();
+    result.orientation.x = pose.orientation().x();
+    result.orientation.y = pose.orientation().y();
+    result.orientation.z = pose.orientation().z();
+    result.orientation.w = pose.orientation().w();
+    return result;
+  }
+
+  void on_pose_info(const ignition::msgs::Pose_V & poses)
+  {
+    geometry_msgs::msg::PoseArray target;
+    geometry_msgs::msg::PoseArray obstacle;
+    target.header.frame_id = "world";
+    obstacle.header.frame_id = "world";
+    const auto stamp = now();
+    target.header.stamp = stamp;
+    obstacle.header.stamp = stamp;
+    for (const auto & pose : poses.pose()) {
+      if (pose.name() == "target") {
+        target.poses.push_back(to_ros_pose(pose));
+      } else if (pose.name() == "obstacle") {
+        obstacle.poses.push_back(to_ros_pose(pose));
+      }
+    }
+    if (!target.poses.empty()) {
+      target_pose_pub_->publish(target);
+    }
+    if (!obstacle.poses.empty()) {
+      obstacle_pose_pub_->publish(obstacle);
+    }
+  }
+
   void set_pose(
     const std::shared_ptr<SetEntityPose::Request> request,
     std::shared_ptr<SetEntityPose::Response> response)
@@ -90,8 +142,11 @@ private:
   }
 
   ignition::transport::Node transport_node_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr target_pose_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr obstacle_pose_pub_;
   rclcpp::Service<SetEntityPose>::SharedPtr service_;
   std::string service_name_;
+  std::string pose_info_topic_;
   unsigned int timeout_ms_{5000U};
 };
 

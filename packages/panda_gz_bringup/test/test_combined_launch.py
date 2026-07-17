@@ -9,6 +9,7 @@ import pytest
 ROOT = Path(__file__).parents[1]
 COMBINED = ROOT / "launch" / "panda_moveit_gz.launch.py"
 STANDALONE = ROOT / "launch" / "panda_gz.launch.py"
+BATCH = ROOT / "launch" / "gazebo_batch.launch.py"
 
 
 def test_combined_launch_static_generation_contract():
@@ -33,6 +34,8 @@ def test_combined_launch_static_generation_contract():
         '"seed": seed',
         '"grasp_mode": grasp_mode',
         'executable="stack_ready_gate"',
+        "ParameterValue(",
+        "readiness_timeout, value_type=float",
         "OnProcessExit(",
         "target_action=ready_gate",
         "if event.returncode == 0",
@@ -48,6 +51,9 @@ def test_combined_launch_static_generation_contract():
     standalone = STANDALONE.read_text()
     assert standalone.count('package="robot_state_publisher"') == 1
     assert 'executable="ros2_control_node"' not in standalone
+    assert 'executable="joint_state_canonicalizer"' in standalone
+    assert "IGN_GAZEBO_RESOURCE_PATH" in standalone
+    assert "moveit_resources_panda_description" in standalone
     assert "TimerAction" not in source
     assert "TimerAction" not in standalone
     assert "if event.returncode == 0:" in source
@@ -55,6 +61,17 @@ def test_combined_launch_static_generation_contract():
     assert "on_exit=[application]" not in source
     assert "gz_args = [" not in standalone
     assert "gz_args = f\"" in standalone
+
+
+def test_readiness_gate_uses_humble_compatible_clock_qos():
+    source = (ROOT / "panda_gz_bringup" / "stack_ready_gate.py").read_text()
+    assert "from rclpy.qos import qos_profile_clock" not in source
+    assert "CLOCK_QOS = QoSProfile(" in source
+    assert "ReliabilityPolicy.BEST_EFFORT" in source
+    assert "DurabilityPolicy.VOLATILE" in source
+    assert 'declare_parameter("controller_query_timeout_sec", 2.0)' in source
+    assert "stale_future.cancel()" in source
+    assert "retrying readiness probe" in source
 
 
 def test_combined_launch_description_generates_when_ros_is_available(monkeypatch):
@@ -80,4 +97,49 @@ def test_combined_launch_description_generates_when_ros_is_available(monkeypatch
         "start_application",
         "output_path",
         "physics_model_validated",
+        "readiness_timeout_sec",
     } <= argument_names
+
+
+def test_gazebo_batch_wrapper_is_fail_closed_and_assisted_only():
+    source = BATCH.read_text()
+    tree = ast.parse(source)
+    assert any(
+        isinstance(node, ast.FunctionDef)
+        and node.name == "generate_launch_description"
+        for node in tree.body
+    )
+    for contract in (
+        '"start_application": "false"',
+        '"grasp_mode": "assisted"',
+        '"physics_model_validated": "false"',
+        '"simulator": "gazebo"',
+        '"use_gazebo": "true"',
+        '"moveit_execute": "true"',
+        '"moveit_command_gripper": "true"',
+        'executable="stack_ready_gate"',
+        "if event.returncode == 0",
+        "Shutdown(reason=reason)",
+        "batch will not start",
+    ):
+        assert contract in source
+    declared_arguments = {
+        node.args[0].value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "DeclareLaunchArgument"
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+    }
+    assert {
+        "episodes_per_scene",
+        "seed",
+        "scenes_csv",
+        "headless",
+        "use_rviz",
+        "output_path",
+        "summary_path",
+        "readiness_timeout_sec",
+    } <= declared_arguments
+    assert 'DeclareLaunchArgument("grasp_mode"' not in source
