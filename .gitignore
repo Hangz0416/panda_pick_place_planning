@@ -31,6 +31,7 @@ results/v2/reports/*
 
 docs/*
 !docs/resume_and_interview.md
-!docs/media/
-!docs/media/gazebo_clear_assisted.mp4
-!docs/media/gazebo_obstacle_assisted.mp4
+!docs/architecture.md
+!docs/experiments.md
+!docs/known_issues.md
+!docs/development_history.md

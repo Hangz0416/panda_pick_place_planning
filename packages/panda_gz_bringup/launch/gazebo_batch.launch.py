@@ -118,11 +118,11 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "output_path",
-                default_value="results/v2/gazebo_assisted_final/episodes.jsonl",
+                default_value="results/runs/gazebo_assisted/episodes.jsonl",
             ),
             DeclareLaunchArgument(
                 "summary_path",
-                default_value="results/v2/gazebo_assisted_final/summary.json",
+                default_value="results/runs/gazebo_assisted/summary.json",
             ),
             DeclareLaunchArgument(
                 "readiness_timeout_sec", default_value="120.0"

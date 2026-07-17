@@ -29,8 +29,8 @@ class PickPlaceState(str, Enum):
 class PickPlaceRunner:
     """Backend-agnostic pick/place state machine.
 
-    Passing a raw ``PyBulletPandaEnv`` remains supported for V1 callers; it is
-    wrapped in ``PyBulletBackend`` rather than creating a second state machine.
+    Passing a raw ``PyBulletPandaEnv`` remains supported for compatibility; it
+    is wrapped in ``PyBulletBackend`` rather than creating a second state machine.
     """
 
     def __init__(self, backend: ManipulationBackend | PyBulletPandaEnv) -> None:

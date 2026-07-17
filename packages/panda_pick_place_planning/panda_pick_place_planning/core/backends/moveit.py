@@ -323,7 +323,7 @@ class MoveItBackend:
         seed: int = 0,
         timeout_sec: float = 1.0,
     ) -> BackendMotionReport:
-        del seed  # OMPL seeding is controlled by MoveIt; do not imply parity with V1.
+        del seed  # OMPL seeding is controlled by MoveIt, not the task generator.
         self._last_target_position = tuple(float(value) for value in position)
         goal = self._new_motion_goal()
         goal.target_type = goal.TARGET_TYPE_POSE

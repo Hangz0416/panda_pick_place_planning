@@ -393,7 +393,7 @@ class EpisodeResetManager(Node):
 
             detail = (
                 f"episode={spec.episode_id} seed={spec.task_seed} "
-                f"scene={spec.scene} reset at V1 home"
+                f"scene={spec.scene} reset at configured home"
             )
             self._publish_status(StatusCode.RESET_SUCCEEDED, detail)
             return True, StatusCode.RESET_SUCCEEDED, detail

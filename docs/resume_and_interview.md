@@ -1,52 +1,34 @@
-# 简历表述与 V2 模拟面试提纲
+# 简历表述与模拟面试提纲
 
-这份文档只使用当前已经实现、已经运行验证的事实。最重要的边界是：
+这份文档只使用已经实现且运行验证的事实。当前仓库只有一套源码主线：PyBullet 是
+自研规划基线，MoveIt/Gazebo 是工程化规划执行后端。历史目录名只为保持原始数据哈希和
+引用稳定，不需要在简历中讲版本迁移。
 
-- PyBullet V1 的 200 episode 原始 JSONL/CSV 与汇总文件由 manifest SHA256 和回归测试冻结；
-  PyBullet V2 的 200 episode 也是本轮真实运行、可复查的结果；
-- seed 42 的 clear/obstacle 单次 PyBullet Demo 均有独立 EpisodeResult 文件；
-- V2 已完成多包架构、统一后端、类型化接口、MoveIt bridge/config 和 Gazebo bringup 代码；
-- 最终五包 clean build，全部 178 项测试通过；MoveIt 最终 planning-only 50+50 为 100/100
-  规划成功，并保持 `not_executed` 语义；
-- Gazebo assisted 最终 50 clear + 50 obstacle 为 100/100 完整任务成功、0 collision episode、
-  0 scene sync error、0 未分类 runtime_error；同一 obstacle/seed 42 reset 连续 10/10 通过；
-- assisted 使用门控 DetachableJoint，不是 physics grasp；physics 与两段 MP4 仍未交付。
-
-面试时主动说清验证边界，比把“写了配置”说成“系统跑通”更可信。
+面试时需要主动说清：Gazebo 使用门控 DetachableJoint 的 assisted grasp，不是 physics
+grasp；物体位姿来自仿真真值，尚未接入视觉；结果不外推为真机成功率。
 
 ## 当前可直接使用的简历项目经历
 
-**Panda 双后端抓取放置规划与评测系统｜个人项目**
+**基于 ROS2、MoveIt 2 与双仿真后端的 Panda 抓取放置系统｜个人项目**
 
-技术栈：ROS 2 Humble、Python、C++、PyBullet、MoveIt 2、OMPL、ros2_control
+技术栈：Python / C++ / ROS2 Humble / PyBullet / MoveIt 2 / Gazebo Fortress / ros2_control / RRT-Connect
 
-- 基于 ROS 2 与 PyBullet 搭建 Franka Panda 抓取放置闭环，实现任务生成、逆运动学、关节限位、
-  自碰撞/环境碰撞、Linear 与双向 RRT-Connect、状态机执行及 JSONL/CSV/JSON 评测；将
-  PyBullet V1 的 200 episode 原始 JSONL/CSV 与汇总文件冻结为 v0.1-pybullet-baseline，
-  通过 manifest SHA256 回归防止基线被静默修改。
-- 在固定主 seed 42 的 PyBullet V2 200 episode 实测中，clear 场景 Linear/RRT-Connect 均
-  50/50 成功，平均规划耗时 1.750/1.922 ms；obstacle Linear 对 50/50 条受阻直线路径返回
-  `planning_collision`，RRT-Connect 50/50 成功，平均规划耗时 33.157 ms、平均关节路径长度
-  1.312717 rad；全部 200 episode 的执行碰撞数为 0。
-- 对 V1/V2 raw 结果做 `(scene, task_seed)` 配对审计，coverage 为 100/100、missing 均为空，
-  成功/失败分类无漂移；耗时与路径只按各自版本报告，不宣称数值相同。
-- 抽象 ManipulationBackend 并保留唯一 PickPlaceRunner FSM，使 PyBulletBackend 与
-  MoveItBackend 共享 RESET、PRE_GRASP、GRASP、LIFT、TRANSFER、PLACE、RETREAT 流程；
-  将 ROS2 在线通信由 String + JSON 迁移为自定义消息、服务与 PlanExecuteMotion Action。
-- 完善 PyBullet 携带物体碰撞：根据 `panda_grasptarget（末端）—方块` 相对变换预测候选
-  状态下的方块位姿，
-  检查其与桌面/障碍物的接触及 10 mm 安全距离，并区分规划阶段与执行阶段的携物碰撞失败。
-- 使用 C++ MoveGroupInterface 与 PlanningSceneInterface 实现 MoveIt 规划/执行 bridge，
-  支持 named/pose target、世界碰撞物、ACM 与 attach/detach 同步；实现共享 Xacro、Gazebo
-  combined launch、readiness gate、typed reset/碰撞观测；MoveIt planning-only 50+50 实测
-  100/100 规划成功，未将未执行轨迹写成抓取成功。
-- 接入 Gazebo Fortress 与 gz_ros2_control，实现确定性 reset、约束门控辅助抓取及
-  PlanningScene/Gazebo 事务式同步；固定 seed 42 的 50 clear + 50 obstacle 完整 episode 均
-  50/50 成功，碰撞 episode 为 0，平均 transfer 规划耗时 23.768/33.413 ms，平均关节路径长度
-  0.797926/2.669548 rad，平均最大跟踪误差 0.049584/0.052208 rad。
+- 在 PyBullet 中搭建 Franka Panda 桌面抓取放置环境，实现随机任务生成、逆运动学、关节限位、
+  自碰撞与环境碰撞检测、轨迹执行及任务结果判定，形成可复现的机械臂操作闭环。
+- 抽象统一 `ManipulationBackend` 接口，使 PyBullet 与 MoveIt 2 后端复用同一抓取放置状态机；
+  基于 ROS2 自定义消息和 Action 拆分任务生成、运动执行与评测统计。
+- 实现关节空间 Linear 与双向 RRT-Connect。在固定种子任务上，clear 场景两种规划器
+  平均规划时间为 1.75 ms 和 1.92 ms；障碍场景中 RRT-Connect 平均规划时间为
+  33.16 ms、平均关节路径长度为 1.31 rad，Linear 能识别被障碍物阻断的直线路径。
+- 使用 C++ 封装 MoveIt 2 规划执行桥接，支持位姿目标、PlanningScene 障碍物与物体
+  attach/detach；接入 Gazebo Fortress 与 `gz_ros2_control`，完成控制器驱动、确定性重置
+  和约束辅助抓放，clear/obstacle 平均规划时间为 23.77 ms 和 33.41 ms。
+- 建立 IK、规划、碰撞、抓取、执行、场景同步和放置失败分类；针对 PyBullet IK 可运动关节
+  映射、固定关节连杆伪自碰撞及 Gazebo 夹爪 `stalled` 问题，分别完成参数映射、刚性组件
+  内部接触过滤和带门控回滚的抓取事务修复。
 
-这版简历可以写“Gazebo assisted 闭环完成”，但不能写“完成物理抓取”或“生成 Demo 视频”。
-100% 是当前固定任务集的仿真结果，不外推为真机成功率。
+简历可以写“Gazebo assisted 闭环完成”，不能写“完成物理抓取”。实验结果只限于
+当前固定仿真任务分布。
 
 ## 仍不能使用的 physics 简历句式
 
@@ -59,22 +41,19 @@ physics 模式必须等后续独立实验完成后单列：
 
 ## 60 秒项目介绍
 
-这个项目最初是一个 PyBullet 中的 Panda 抓取放置与路径规划系统。我没有停留在“机械臂能动”
-的 Demo，而是先把任务生成、IK、碰撞检测、Linear/RRT-Connect、状态机和固定种子评测做成
-闭环，并冻结了 200 episode 的 V1 基线。
-
-V2 的核心改动是把状态机与执行引擎分开。我定义了 ManipulationBackend，PyBullet 和 MoveIt
+这个项目从 PyBullet 中的 Panda 抓取放置与路径规划起步。我先把任务生成、IK、碰撞检测、
+Linear/RRT-Connect、状态机和固定种子评测做成闭环，再把状态机与执行引擎分开。
+我定义了 ManipulationBackend，PyBullet 和 MoveIt
 都实现同一组 reset、move、gripper、attach/detach 与 object_state 接口，因此只保留一套
 PickPlaceRunner。ROS2 在线链路也从 JSON 字符串迁移成自定义消息和 Action。MoveIt 部分用
 C++ MoveGroupInterface 做规划与可选执行，用 PlanningSceneInterface 管理桌面、方块、障碍物
 和 AttachedCollisionObject；Python 继续负责抓放阶段与 EpisodeResult。
 
 我还补上了 PyBullet 携带方块后的碰撞检查：保存 `panda_grasptarget`（末端）到方块的相对
-变换，在每个候选关节状态预测方块位姿，分别判断机器人碰撞和携物碰撞。最终五包 clean build
-和 178 项测试通过。MoveIt planning-only 50+50 为 100/100 规划成功，但全部保持
-`not_executed`；Gazebo assisted 先通过 5+5，再完成 50 clear + 50 obstacle，100 条均完整
-成功且碰撞为 0。这里的 grasp 是位姿与实测夹爪宽度门控后的 DetachableJoint 辅助抓取，
-physics 和视频尚未完成，我不会混写。
+变换，在每个候选关节状态预测方块位姿，分别判断机器人碰撞和携物碰撞。
+MoveIt planning-only 全部保持 `not_executed`，不把未执行轨迹写成抓取成功。
+Gazebo 中的 grasp 是位姿与实测夹爪宽度门控后的 DetachableJoint 辅助抓取，因此我把结果
+限定为 assisted 规划控制闭环，不会混写成 physics grasp。
 
 ## 代码流程
 
@@ -196,10 +175,9 @@ MoveItBackend 也不会伪造 attach 成功。
 
 ### 1. 这个项目现在到底完成到什么程度？
 
-回答要点：PyBullet V1 基线冻结，PyBullet V2 200 episode 与双场景 Demo 已验证；五包 clean
-build、178 项测试通过；MoveIt planning-only 100/100 规划成功；Gazebo assisted 100/100 完整
-成功、0 碰撞，reset 10/10。physics 与视频未完成，Humble `move_group` 在结果落盘后的关闭
-析构存在已知段错误。
+回答要点：PyBullet 算法基线、双场景 Demo 和固定任务评测已验证；MoveIt planning-only
+保持不执行语义；Gazebo assisted 已完成双场景完整闭环。当前边界是未完成 physics
+grasp 和视觉位姿估计，Humble `move_group` 在结果落盘后的关闭析构存在已知段错误。
 
 ### 2. 为什么要保留 PyBullet，还要接 MoveIt 和 Gazebo？
 
@@ -223,7 +201,7 @@ planning-only 或 plan+execute。二者必须统一返回 planning_success、exe
 
 回答要点：编译期字段检查、ros2 interface introspection、Action feedback/cancel、服务请求/
 响应语义更清晰，避免节点各自解析字符串。JSON 仍适合离线保存，但不适合作为内部实时协议。
-同时保留 V1 JSON 向后读取，避免历史结果失效。
+同时保留历史 JSON 向后读取，避免已记录实验失效。
 
 ### 6. Panda 是 7 自由度，为什么 IK 参数是 9 维？
 
@@ -325,20 +303,20 @@ episode，不能混用。
 ### 22. 当前最大的工程风险是什么？
 
 回答要点：assisted 运行期已经验收，当前风险转为三项：DetachableJoint 结果不能外推为
-physics/真机；MoveIt 2.5.9 的批次关闭析构不干净；两段展示视频尚未录制。physics 仍必须
+physics/真机；MoveIt 2.5.9 的批次关闭析构不干净；物体位姿依赖仿真真值。physics 仍必须
 fail-closed，不能因为 assisted 达到 100% 就跳过动力学验证。
 
 ### 23. 下一步你会按什么顺序推进？
 
-回答要点：先录制 clear/obstacle assisted 视频并处理/记录 teardown issue，完成 V2 展示交付；
-下一阶段若做 physics，先校准碰撞、摩擦和动力学，再每场景至少 20 次并单列双指接触、滑落、
-漂移和释放稳定时间。视觉、强化学习和真机不与这一阶段混做。
+回答要点：先将仓库和文档收敛为单一主线；再增加 ObjectPoseProvider，用真值 provider
+保留基线，用 RGB-D provider 完成图像检测、深度反投影和 TF2 坐标转换。先比较位姿误差和
+抓放结果，不在 assisted 动力学边界上直接叠加强化学习。
 
 ### 24. 为什么当前不加入强化学习？
 
-回答要点：全局规划、控制执行、reset、观测和成功判据尚未在 Gazebo 形成可信闭环，此时加入
-RL 会把基础设施错误混入 reward 和训练不稳定。未来接入点限定在 PRE_GRASP → GRASP 的局部
-阶段，不改动 MoveIt 全局规划与统一评测接口。
+回答要点：当前 Gazebo 依赖 assisted 固定约束，质量/惯量和接触参数也没有达到纯物理抓取
+的验证标准。RL 策略可能利用人工约束或仿真误差，得不到可迁移的接触控制证据。岗位更关注
+视觉与机械臂，因此优先做 RGB-D 位姿估计闭环。
 
 ## 面试前自查清单
 
@@ -350,6 +328,6 @@ RL 会把基础设施错误混入 reward 和训练不稳定。未来接入点限
 - 能说明 MoveIt Action 每个 goal/result 字段的用途。
 - 能区分 planning-only、mock execution、Gazebo execution 和 task_success。
 - 能解释 Gazebo/PlanningScene attach 的顺序与回滚。
-- 能主动说出当前未交付的是 physics、视频和干净 teardown，而不是等面试官追问。
-- 能从冻结 manifest 找到 V1 数据，并保证新结果写入新目录。
+- 能主动说出当前未交付的是 physics、视觉和干净 teardown，而不是等面试官追问。
+- 能从冻结 manifest 找到历史数据，并保证新结果写入 results/runs。
 - 能根据真实失败类型提出下一项实验，而不是先调成功率口径。

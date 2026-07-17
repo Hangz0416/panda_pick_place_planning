@@ -80,8 +80,8 @@ class EpisodeResult:
     """One evaluation result.
 
     For full pick/place episodes, the legacy top-level planning/path fields keep
-    V1's critical TRANSFER-motion scope; ``stage_metrics`` contains every FSM
-    state.  Planning-only regression results instead aggregate their explicitly
+    the critical TRANSFER-motion scope; ``stage_metrics`` contains every FSM
+    state. Planning-only regression results instead aggregate their explicitly
     independent named/pose requests and identify that scope in batch summaries.
     """
 

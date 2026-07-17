@@ -6,13 +6,16 @@ It deliberately uses `ros_gz`, `gz_ros2_control/GazeboSimSystem`, and Fortress'
 
 ## Verification boundary
 
-This package is currently **static-tested but not runtime-verified**. Its asset,
-launch-contract, reset, readiness, grasp, and collision-classifier suite is
-**44/44**. Those tests are not Gazebo runtime execution evidence. The current
-machine is missing `ignition-msgs8`, `ros_gz`, and
-`gz_ros2_control`, so this package was not part of the final four-package build.
-No Gazebo controller/runtime reset, assisted 50+50 batch, physics episode, or
-video has been verified. A launch file or static test is not execution evidence.
+The Gazebo assisted runtime is verified with the complete MoveIt/controller
+stack. The fixed seed-42 regression contains 50 clear and 50 obstacle episodes;
+both groups completed 50/50 tasks. The same stack also completed the readiness
+checks and deterministic reset validation. Curated raw data and summaries are
+documented in `../../docs/experiments.md`.
+
+This evidence is limited to guarded assisted grasp. The physics monitor and
+interfaces exist, but `physics_model_validated=false` deliberately rejects a
+physics-grasp launch until mass/inertia, contact geometry, friction, and runtime
+behavior receive a separate audit.
 
 The shared description has one authoritative frame chain:
 `world -> panda_link0 -> panda_hand -> panda_grasptarget`. Pose goals use the
@@ -105,13 +108,13 @@ and cube pose have all arrived. This is intentionally different from a manual
 
 The reset manager performs a model-only Gazebo reset (so `/clock` does not jump
 backwards), detaches the cube, reapplies task poses, sends the Panda arm to the
-V1 home and opens `panda_hand_controller`, verifies arm/hand position and zero
+configured home and opens `panda_hand_controller`, verifies arm/hand position and zero
 velocity tolerances, reapplies task poses while paused, and resets both monitor
 states. Humble's stock bridge does not convert `SetEntityPose`; the package's
 small C++ `entity_pose_bridge` maps the standard ROS service to Fortress's
 native Transport service. No joint state is mutated behind `ros2_control`.
 
-The Gazebo collision table is the V1-sized 1.5 x 1.0 x 0.05 m slab with its top
+The Gazebo collision table matches the PyBullet 1.5 x 1.0 x 0.05 m slab with its top
 at z=0; table legs are visual-only. Assisted and physical results must be
 reported separately. This package contains measurement interfaces, not claimed
 physical-grasp success rates.

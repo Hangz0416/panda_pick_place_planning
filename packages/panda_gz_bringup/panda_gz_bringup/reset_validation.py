@@ -156,7 +156,7 @@ def parse_args(args=None):
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("results/v2/gazebo_assisted_final/reset_validation.json"),
+        default=Path("results/runs/gazebo_assisted/reset_validation.json"),
     )
     parsed = parser.parse_args(args)
     if parsed.repetitions <= 0:

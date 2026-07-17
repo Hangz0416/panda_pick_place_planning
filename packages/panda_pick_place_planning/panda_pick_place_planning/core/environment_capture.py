@@ -1,4 +1,4 @@
-"""Capture reproducible V2 software and configuration provenance as JSON."""
+"""Capture reproducible software and configuration provenance as JSON."""
 
 from __future__ import annotations
 

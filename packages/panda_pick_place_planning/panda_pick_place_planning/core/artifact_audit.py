@@ -1,4 +1,4 @@
-"""Fail-closed audit for final V2 benchmark artifacts."""
+"""Fail-closed audit for curated benchmark artifacts."""
 
 from __future__ import annotations
 
