@@ -6,8 +6,6 @@
   <maintainer email="3136412152@qq.com">韩广志</maintainer>
   <license>MIT</license>
 
-  <buildtool_depend>ament_python</buildtool_depend>
-
   <exec_depend>rclpy</exec_depend>
   <exec_depend>ament_index_python</exec_depend>
   <exec_depend>action_msgs</exec_depend>

@@ -8,19 +8,36 @@
   <xacro:arg name="assisted_grasp" default="true" />
 
   <!-- This is the only Panda robot_description entry point for mock and Gazebo. -->
-  <xacro:include filename="$(find moveit_resources_panda_description)/urdf/panda.urdf" />
-  <xacro:include filename="$(find panda_moveit_config)/config/panda.ros2_control.xacro" />
+  <xacro:include filename="panda_description.urdf.xacro" />
+  <xacro:include filename="panda.ros2_control.xacro" />
 
   <!-- PyBullet's Panda model exposes link 11 as a tool target 105 mm in
        front of panda_hand.  Keep the same collision-free frame here so task
        poses have identical meaning in both backends; objects still attach to
        the physical panda_hand link. -->
-  <link name="panda_grasptarget" />
+  <link name="panda_grasptarget">
+    <!-- libsdformat drops massless fixed child links even when
+         preserveFixedJoint is requested.  This 0.1 g virtual-tool inertia is
+         deliberately negligible (and is not part of the validated Franka
+         physics model); it only keeps the task frame addressable in SDF. -->
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="0.0001" />
+      <inertia ixx="1e-8" ixy="0" ixz="0" iyy="1e-8" iyz="0" izz="1e-8" />
+    </inertial>
+  </link>
   <joint name="panda_grasptarget_hand" type="fixed">
     <parent link="panda_hand" />
     <child link="panda_grasptarget" />
     <origin xyz="0 0 0.105" rpy="0 0 0" />
   </joint>
+
+  <!-- Keep the task frame addressable after libsdformat reduces fixed URDF
+       joints. Depending on the sdformat version it is emitted as a link or a
+       named frame; both forms are accepted by the model audit. -->
+  <gazebo reference="panda_grasptarget_hand">
+    <preserveFixedJoint>true</preserveFixedJoint>
+  </gazebo>
 
   <!-- A real fixed root gives both backends exactly one world -> panda_link0 TF
        and anchors the Gazebo arm. No static TF publisher or SRDF virtual joint

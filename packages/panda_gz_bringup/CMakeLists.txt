@@ -30,6 +30,7 @@ install(PROGRAMS
   scripts/execution_collision_monitor
   scripts/physical_grasp_monitor
   scripts/stack_ready_gate
+  scripts/validate_robot_model
   DESTINATION lib/${PROJECT_NAME}
 )
 install(DIRECTORY launch config worlds
@@ -50,6 +51,7 @@ if(BUILD_TESTING)
     scripts/execution_collision_monitor
     scripts/physical_grasp_monitor
     scripts/stack_ready_gate
+    scripts/validate_robot_model
   )
   ament_flake8(MAX_LINE_LENGTH 100 ${panda_gz_python_sources})
   ament_pep257(${panda_gz_python_sources})
