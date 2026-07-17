@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "captured_at_utc": "2026-07-17T06:19:20.562999+00:00",
+  "captured_at_utc": "2026-07-17T09:43:41.643182+00:00",
   "platform": {
     "os": "Ubuntu 22.04.5 LTS",
     "kernel": "6.8.0-124-generic",
@@ -10,11 +10,11 @@
   "ros_distro": "humble",
   "simulator": "moveit_mock",
   "git": {
-    "commit": "3c8ade40960662658d04d0082beed0b0fa32b497",
+    "commit": "42cc06c3ad3889c8907e3e87f4bd4829bfd7ce14",
     "branch": "feature/moveit-gazebo-v2",
     "dirty": true,
-    "source_tree_sha256": "0b094f05bf791de83b85776fa7a2bbb52bf595ff22652b94e5a9cb49493eea3d",
-    "source_file_count": 142
+    "source_tree_sha256": "a9cf29d44506c718f0dda20466b35fcb4bf2b37aa69e7a4cfb8c2d8f91409dbc",
+    "source_file_count": 146
   },
   "packages": {
     "ros-humble-moveit-resources-panda-description": "2.0.7-1jammy.20260304.090524",

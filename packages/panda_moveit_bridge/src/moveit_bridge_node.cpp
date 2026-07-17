@@ -186,6 +186,7 @@ private:
       }
 
       bool target_set = false;
+      bool pose_uses_single_ik = false;
       if (goal->target_type == Motion::Goal::TARGET_TYPE_NAMED) {
         target_set = move_group_->setNamedTarget(goal->named_target);
       } else {
@@ -193,19 +194,25 @@ private:
         if (pose_target.header.frame_id.empty()) {
           pose_target.header.frame_id = move_group_->getPlanningFrame();
         }
-        // Resolve the redundant Panda pose goal once, seeded by the current
-        // state, and plan to that joint target.  setPoseTarget() leaves IK goal
-        // sampling to OMPL; for adjacent manipulation stages it can select a
-        // distant elbow branch and turn a short vertical lift into a multi-rad
-        // joint-space motion.  The single-IK overload preserves local
-        // configuration continuity while RRT-Connect still plans and collision
-        // checks the path to the selected solution.
-        target_set = move_group_->setJointValueTarget(pose_target, end_effector_link);
+        if (goal->execute) {
+          // Resolve an executed redundant Panda pose goal once, seeded by the
+          // current state, and plan to that joint target. setPoseTarget() leaves
+          // IK goal sampling to OMPL; for adjacent executed stages it can select
+          // a distant elbow branch and turn a short lift into a multi-rad motion.
+          pose_uses_single_ik = true;
+          target_set = move_group_->setJointValueTarget(
+            pose_target, end_effector_link);
+        } else {
+          // Planning-only regression requests are intentionally independent and
+          // do not update the mock robot between stages. Keep pose-goal sampling
+          // here so OMPL can select any collision-free IK branch from home.
+          target_set = move_group_->setPoseTarget(pose_target, end_effector_link);
+        }
       }
       if (!target_set) {
-        const bool pose_target = goal->target_type == Motion::Goal::TARGET_TYPE_POSE;
-        result->failure_type = pose_target ? "no_ik_solution" : "target_rejected";
-        result->moveit_error_code = pose_target ?
+        result->failure_type = pose_uses_single_ik ?
+          "no_ik_solution" : "target_rejected";
+        result->moveit_error_code = pose_uses_single_ik ?
           moveit_msgs::msg::MoveItErrorCodes::NO_IK_SOLUTION :
           moveit_msgs::msg::MoveItErrorCodes::INVALID_GOAL_CONSTRAINTS;
         finish();

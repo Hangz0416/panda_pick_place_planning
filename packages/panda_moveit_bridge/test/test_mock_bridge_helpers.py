@@ -126,11 +126,14 @@ def test_transient_planning_retries_share_one_budget_and_accumulate_time():
     assert "Codes::NO_IK_SOLUTION" not in retry_body
 
 
-def test_pose_goal_uses_current_seeded_single_ik_target():
+def test_executed_pose_uses_single_ik_but_planning_only_keeps_pose_sampling():
     source = (MODULE_PATH.parents[1] / "src" / "moveit_bridge_node.cpp").read_text()
     target_body = source.split("bool target_set = false;", 1)[1].split(
         "publish_feedback(goal_handle, \"planning\")", 1
     )[0]
-    assert "setJointValueTarget(pose_target, end_effector_link)" in target_body
-    assert "setPoseTarget(pose_target, end_effector_link)" not in target_body
-    assert 'result->failure_type = pose_target ? "no_ik_solution"' in target_body
+    assert "if (goal->execute)" in target_body
+    assert "setJointValueTarget(" in target_body
+    assert "pose_target, end_effector_link)" in target_body
+    assert "setPoseTarget(pose_target, end_effector_link)" in target_body
+    assert "result->failure_type = pose_uses_single_ik ?" in target_body
+    assert '"no_ik_solution" : "target_rejected"' in target_body

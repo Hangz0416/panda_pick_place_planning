@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 import math
+from pathlib import Path
 import threading
 import time
 import unittest
@@ -270,6 +271,23 @@ def clients(
 
 
 class MoveItBackendTest(unittest.TestCase):
+    def test_runtime_serializes_backend_callbacks_separately_from_tasks(self):
+        source = (
+            Path(__file__).parents[1]
+            / "panda_pick_place_planning"
+            / "nodes"
+            / "manipulation_node.py"
+        ).read_text()
+        self.assertIn(
+            "self.task_callback_group = MutuallyExclusiveCallbackGroup()",
+            source,
+        )
+        self.assertIn(
+            "self.backend_callback_group = MutuallyExclusiveCallbackGroup()",
+            source,
+        )
+        self.assertIn("MultiThreadedExecutor(num_threads=2)", source)
+
     def test_default_gripper_action_matches_shared_controller_contract(self):
         self.assertEqual(
             MoveItBackendConfig().gripper_action_name,
@@ -526,7 +544,7 @@ class MoveItBackendTest(unittest.TestCase):
         self.assertTrue(backend.attach_object())
         self.assertAlmostEqual(gripper.goals[-1].command.position, 0.0)
 
-    def test_gripper_stall_is_rejected_before_attach_but_allowed_after_attach(self):
+    def test_assisted_pre_attach_stall_defers_to_gate_but_release_rejects_it(self):
         gripper = FakeActionClient(
             lambda: gripper_result(reached_goal=False, stalled=True)
         )
@@ -543,12 +561,15 @@ class MoveItBackendTest(unittest.TestCase):
         )
         backend.reset(task(scene="clear"))
 
-        with self.assertRaisesRegex(RuntimeError, "gripper_execution_failed"):
-            backend.set_gripper(backend.closed_gripper_width)
+        backend.set_gripper(backend.closed_gripper_width)
 
-        # Once the guarded Gazebo and MoveIt attach transactions succeed, a
-        # contact stall is the expected terminal state of the zero-width close.
+        # The guarded Gazebo attach independently validates measured finger
+        # width and pose before the zero-width post-attach close is accepted.
         self.assertTrue(backend.attach_object())
+
+        # Release is not protected by the pre-attach gate and remains strict.
+        with self.assertRaisesRegex(RuntimeError, "gripper_execution_failed"):
+            backend.set_gripper(backend.open_gripper_width)
 
     def test_physics_mode_does_not_fake_moveit_attachment(self):
         fake_clients = clients()

@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "final_batch": {
+    "episodes": 100,
+    "failures": 0,
+    "failure_examples": []
+  },
+  "preserved_failed_attempt": {
+    "path": "../gazebo_assisted_failed_attempt_20260717_gripper/episodes.jsonl",
+    "sha256": "5dab44d0f7193f08e8ca73d6aceefbf1bc7758c3b4df6562975ecb5497ba442a",
+    "episodes_completed_before_stop": 12,
+    "successes": 9,
+    "failures": 3,
+    "examples": [
+      {
+        "scene": "clear",
+        "task_seed": 44,
+        "failure_state": "grasp",
+        "failure_type": "gripper_execution_failed",
+        "object_attached": false
+      },
+      {
+        "scene": "clear",
+        "task_seed": 49,
+        "failure_state": "grasp",
+        "failure_type": "gripper_execution_failed",
+        "object_attached": false
+      },
+      {
+        "scene": "clear",
+        "task_seed": 51,
+        "failure_state": "grasp",
+        "failure_type": "gripper_execution_failed",
+        "object_attached": false
+      }
+    ],
+    "diagnosis": "The low-gain position interface intermittently reported stalled while moving each finger from 0.040 m to the 0.038 m assisted pre-attach position.",
+    "fix_boundary": "Only the assisted pre-attach command may defer a stalled result to the guarded Gazebo attach service, which independently validates measured finger width and grasp pose. Release remains fail-closed on stalled.",
+    "post_fix_evidence": "The final-code 5+5 quick check and 50+50 formal batch completed 110/110 tasks successfully with zero collision episodes."
+  },
+  "runtime_note": {
+    "scope": "shutdown_only",
+    "component": "MoveIt 2 Humble 2.5.9 move_group",
+    "observation": "After the batch generator, manipulation node, and evaluator completed and all result files were written, move_group segfaulted while destroying a callback group during launch shutdown.",
+    "episode_impact": false,
+    "status": "known_teardown_issue"
+  }
+}

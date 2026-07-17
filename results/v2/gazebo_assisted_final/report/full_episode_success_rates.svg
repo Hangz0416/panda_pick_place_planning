@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="420" viewBox="0 0 1500 420" role="img" aria-labelledby="chart-title">
+<title id="chart-title">Panda V2 Gazebo Assisted Benchmark — Full episode success rates</title>
+<style>
+text { font-family: Inter, "Noto Sans", "DejaVu Sans", sans-serif; fill: #263238; }
+.chart-title { font-size: 24px; font-weight: 700; }
+.chart-subtitle { font-size: 13px; fill: #52606D; }
+.legend-label, .tick-label { font-size: 12px; }
+.axis-label { font-size: 13px; font-weight: 600; }
+.group-label { font-size: 12px; font-weight: 600; }
+.value-label, .na-label { font-size: 11px; }
+.na-label, .empty-label { fill: #6B7785; font-style: italic; }
+.segment-label { fill: #FFFFFF; font-size: 11px; font-weight: 700; }
+.footer { font-size: 11px; fill: #6B7785; }
+</style>
+<rect width="1500" height="420" fill="#FFFFFF"/>
+<text class="chart-title" x="32" y="38">Panda V2 Gazebo Assisted Benchmark — Full episode success rates</text>
+<text class="chart-subtitle" x="32" y="64">N/A means the source did not report that outcome.</text>
+<line x1="32" y1="72" x2="1468" y2="72" stroke="#D9E1E8"/>
+<rect x="508.0" y="75" width="13" height="13" rx="2" fill="#0072B2"/>
+<text class="legend-label" x="528.0" y="86">Planning success</text>
+<rect x="792.0" y="75" width="13" height="13" rx="2" fill="#E69F00"/>
+<text class="legend-label" x="812.0" y="86">Execution success</text>
+<rect x="1076.0" y="75" width="13" height="13" rx="2" fill="#009E73"/>
+<text class="legend-label" x="1096.0" y="86">Task success</text>
+<line x1="508.00" y1="145" x2="508.00" y2="315" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="508.00" y="337" text-anchor="middle">0%</text>
+<line x1="678.40" y1="145" x2="678.40" y2="315" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="678.40" y="337" text-anchor="middle">20%</text>
+<line x1="848.80" y1="145" x2="848.80" y2="315" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="848.80" y="337" text-anchor="middle">40%</text>
+<line x1="1019.20" y1="145" x2="1019.20" y2="315" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1019.20" y="337" text-anchor="middle">60%</text>
+<line x1="1189.60" y1="145" x2="1189.60" y2="315" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1189.60" y="337" text-anchor="middle">80%</text>
+<line x1="1360.00" y1="145" x2="1360.00" y2="315" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1360.00" y="337" text-anchor="middle">100%</text>
+<line x1="508" y1="315" x2="1360" y2="315" stroke="#52606D"/>
+<text class="axis-label" x="934.00" y="363" text-anchor="middle">success rate</text>
+<text class="group-label" x="494" y="176.5" text-anchor="end">gazebo_assisted · moveit/gazebo · clear · RRTConnectkConfigDefault</text>
+<rect x="508" y="145" width="852.00" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="1354.00" y="157" text-anchor="end" fill="#FFFFFF">100.0%</text>
+<rect x="508" y="166" width="852.00" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="1354.00" y="178" text-anchor="end" fill="#FFFFFF">100.0%</text>
+<rect x="508" y="187" width="852.00" height="16" rx="3" fill="#009E73"/>
+<text class="value-label" x="1354.00" y="199" text-anchor="end" fill="#FFFFFF">100.0%</text>
+<text class="group-label" x="494" y="261.5" text-anchor="end">gazebo_assisted · moveit/gazebo · obstacle · RRTConnectkConfigDefault</text>
+<rect x="508" y="230" width="852.00" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="1354.00" y="242" text-anchor="end" fill="#FFFFFF">100.0%</text>
+<rect x="508" y="251" width="852.00" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="1354.00" y="263" text-anchor="end" fill="#FFFFFF">100.0%</text>
+<rect x="508" y="272" width="852.00" height="16" rx="3" fill="#009E73"/>
+<text class="value-label" x="1354.00" y="284" text-anchor="end" fill="#FFFFFF">100.0%</text>
+<text class="footer" x="1468" y="402" text-anchor="end">Recorded data only · N/A = not reported or not applicable</text>
+</svg>

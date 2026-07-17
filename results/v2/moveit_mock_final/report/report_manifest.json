@@ -24,11 +24,11 @@
   "evaluation_modes": [
     "planning_only"
   ],
-  "generated_at_utc": "2026-07-17T06:19:20.447995+00:00",
+  "generated_at_utc": "2026-07-17T08:33:09.954757+00:00",
   "groups": [
     {
-      "dataset": "moveit-mock",
-      "display_label": "moveit-mock · moveit/moveit_mock · clear · RRTConnectkConfigDefault",
+      "dataset": "moveit_mock",
+      "display_label": "moveit_mock · moveit/moveit_mock · clear · RRTConnectkConfigDefault",
       "episodes": 50,
       "evaluation_mode": "planning_only",
       "execution_success_rate": null,
@@ -52,18 +52,18 @@
         "task_success_rate": 0,
         "tracking_error": 0
       },
-      "path_length_mean_rad": 7.8689032589446795,
-      "path_length_median_rad": 7.93436699224554,
+      "path_length_mean_rad": 7.401611213647858,
+      "path_length_median_rad": 7.432460416875037,
       "planning_success_rate": 1.0,
-      "planning_time_mean_sec": 0.12008755174,
-      "planning_time_median_sec": 0.1209188875,
-      "planning_time_p95_sec": 0.1317070221,
+      "planning_time_mean_sec": 0.12580557216,
+      "planning_time_median_sec": 0.12535080650000002,
+      "planning_time_p95_sec": 0.1394745759,
       "task_success_rate": null,
       "tracking_error_mean_rad": null
     },
     {
-      "dataset": "moveit-mock",
-      "display_label": "moveit-mock · moveit/moveit_mock · obstacle · RRTConnectkConfigDefault",
+      "dataset": "moveit_mock",
+      "display_label": "moveit_mock · moveit/moveit_mock · obstacle · RRTConnectkConfigDefault",
       "episodes": 50,
       "evaluation_mode": "planning_only",
       "execution_success_rate": null,
@@ -87,12 +87,12 @@
         "task_success_rate": 0,
         "tracking_error": 0
       },
-      "path_length_mean_rad": 8.149983804737591,
-      "path_length_median_rad": 8.051169191303902,
+      "path_length_mean_rad": 7.704005286012297,
+      "path_length_median_rad": 7.679396801130826,
       "planning_success_rate": 1.0,
-      "planning_time_mean_sec": 0.12121050797999999,
-      "planning_time_median_sec": 0.1206695295,
-      "planning_time_p95_sec": 0.13384299659999999,
+      "planning_time_mean_sec": 0.1296072494,
+      "planning_time_median_sec": 0.1300234555,
+      "planning_time_p95_sec": 0.1455446775,
       "task_success_rate": null,
       "tracking_error_mean_rad": null
     }
@@ -112,13 +112,13 @@
       "evaluation_modes": [
         "planning_only"
       ],
-      "label": "moveit-mock",
+      "label": "moveit_mock",
       "path": "results/v2/moveit_mock_final/episodes.jsonl",
-      "sha256": "21057e54d0e44ecf47d43d1d03137e83599c6189e0b79b0ac636175242e6f638",
+      "sha256": "187c66c7153ba2504bb8dc7110c73ded6d699a757e9d793f858210af92437798",
       "source_kind": "episode_jsonl",
       "warnings": []
     }
   ],
-  "title": "Panda V2 MoveIt mock planning-only final",
+  "title": "MoveIt mock final planning-only regression",
   "warnings": []
 }

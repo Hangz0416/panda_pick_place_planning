@@ -20,6 +20,8 @@ results/v2/*
 !results/v2/moveit_mock_failed_attempt_20260717_99_of_100/**
 !results/v2/gazebo_assisted_final/
 !results/v2/gazebo_assisted_final/**
+!results/v2/gazebo_assisted_failed_attempt_20260717_gripper/
+!results/v2/gazebo_assisted_failed_attempt_20260717_gripper/**
 !results/v2/reports/
 results/v2/reports/*
 !results/v2/reports/pybullet_final/

@@ -6,9 +6,9 @@ orchestration.
 
 ## Verified status
 
-- The final four buildable packages (`interfaces`, `planning`, `moveit_bridge`,
-  `moveit_config`) build successfully and their colcon result is 77/77 with
-  zero errors, failures, or skipped tests.
+- All five packages (`interfaces`, `planning`, `moveit_bridge`, `moveit_config`,
+  `gz_bringup`) clean-build successfully. The final suite is 178/178 with zero
+  errors, failures, or skipped tests.
 - The real PyBullet V2 seed-42 benchmark contains 200 episodes. Clear Linear
   and RRT-Connect, plus obstacle RRT-Connect, are 50/50 successful; obstacle
   Linear is 0/50 with 50 `planning_collision` results. There are zero collision
@@ -32,14 +32,16 @@ The complete 200-episode V1 raw JSONL/CSV and summary are frozen under
 `baselines/v0.1-pybullet-baseline/`; a regression test recomputes every
 artifact SHA256 recorded by the manifest.
 
-- Before the final audit changes, enhanced MoveIt clear/obstacle smoke and a
-  5+5 planning-only batch passed 10/10. DDS could not be restarted after the
-  audit, so neither a final-code 5+5 nor 50+50 batch is final-verified. Do not
-  publish the earlier 10/10 as the formal result.
-- Gazebo runtime is not verified. Its static / pure-logic suite is **44/44**;
-  those tests are not runtime execution evidence. The current machine lacks
-  `ignition-msgs8`, `ros_gz`, and
-  `gz_ros2_control`; Gazebo 50+50, physics grasp, and video remain unrun.
+- Final-code MoveIt planning-only smoke and 5+5 passed, followed by 50 clear +
+  50 obstacle at 100/100 planning success and zero PlanningScene sync errors.
+  All rows retain `task_success=false` and `failure_type=not_executed`.
+- Gazebo assisted 5+5 passed, followed by 50 clear + 50 obstacle at 100/100
+  full task success, zero collision episodes, zero scene-sync errors, and zero
+  unclassified runtime errors. Obstacle/seed 42 deterministic reset passed
+  10/10. These are guarded DetachableJoint results, not physics-grasp results.
+- Videos and physics grasp are not delivered. Humble MoveIt 2.5.9 can segfault
+  in `move_group` teardown after a completed batch; the episode writers finish
+  cleanly and the persisted result still has to pass the independent audit.
 
 ## MoveIt planning-only batch
 
@@ -142,22 +144,24 @@ error may be calculated from the recorded final and target positions, and its
 origin is recorded in the manifest. Existing report files are not overwritten
 unless `--force` is passed, protecting frozen baseline artifacts.
 
-## Gazebo batch arguments
+## Gazebo assisted batch
 
-The combined launch and typed reset/collision interfaces exist, but the command
-below is a future runtime procedure, not a completed experiment. After the
-missing Gazebo dependencies are installed and readiness succeeds, the same
-sequential entry uses these backend arguments:
+The verified wrapper owns exactly one Gazebo/MoveIt/controller stack, waits for
+readiness, starts the sequential assisted batch, and shuts the stack down when
+the batch exits:
 
 ```bash
-ros2 launch panda_pick_place_planning batch_benchmark.launch.py \
-  episodes_per_scene:=5 \
-  backend:=moveit simulator:=gazebo use_gazebo:=true \
-  moveit_execute:=true moveit_command_gripper:=true \
-  grasp_mode:=assisted \
+ros2 launch panda_gz_bringup gazebo_batch.launch.py \
+  episodes_per_scene:=5 seed:=42 scenes_csv:=clear,obstacle \
+  headless:=true use_rviz:=false \
   output_path:=results/gazebo_quick.jsonl \
   summary_path:=results/gazebo_quick_summary.json
 ```
+
+Use `episodes_per_scene:=50` and a new output path only after the 5+5 check.
+The curated formal raw data, summary, reset validation, SVG report, failure
+evidence, environment, and hash manifest are under
+`results/v2/gazebo_assisted_final/`.
 
 Execution collision truth is queried from the typed
 `/panda_gz/get_execution_collision_state` service. An unavailable query becomes

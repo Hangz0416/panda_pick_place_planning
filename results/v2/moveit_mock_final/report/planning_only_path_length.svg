@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1500" height="378" viewBox="0 0 1500 378" role="img" aria-labelledby="chart-title">
-<title id="chart-title">Panda V2 MoveIt mock planning-only final — Planning-only joint-path length</title>
+<title id="chart-title">MoveIt mock final planning-only regression — Planning-only joint-path length</title>
 <style>
 text { font-family: Inter, "Noto Sans", "DejaVu Sans", sans-serif; fill: #263238; }
 .chart-title { font-size: 24px; font-weight: 700; }
@@ -14,7 +14,7 @@ text { font-family: Inter, "Noto Sans", "DejaVu Sans", sans-serif; fill: #263238
 .footer { font-size: 11px; fill: #6B7785; }
 </style>
 <rect width="1500" height="378" fill="#FFFFFF"/>
-<text class="chart-title" x="32" y="38">Panda V2 MoveIt mock planning-only final — Planning-only joint-path length</text>
+<text class="chart-title" x="32" y="38">MoveIt mock final planning-only regression — Planning-only joint-path length</text>
 <text class="chart-subtitle" x="32" y="64">Successful plans with a reported top-level joint-path metric; missing statistics are N/A.</text>
 <line x1="32" y1="72" x2="1468" y2="72" stroke="#D9E1E8"/>
 <rect x="515.0" y="75" width="13" height="13" rx="2" fill="#0072B2"/>
@@ -35,15 +35,15 @@ text { font-family: Inter, "Noto Sans", "DejaVu Sans", sans-serif; fill: #263238
 <text class="tick-label" x="1360.00" y="295" text-anchor="middle">10</text>
 <line x1="515" y1="273" x2="1360" y2="273" stroke="#52606D"/>
 <text class="axis-label" x="937.50" y="321" text-anchor="middle">joint path length (rad)</text>
-<text class="group-label" x="501" y="166.0" text-anchor="end">moveit-mock · moveit/moveit_mock · clear · RRTConnectkConfigDefault</text>
-<rect x="515" y="145" width="664.92" height="16" rx="3" fill="#0072B2"/>
-<text class="value-label" x="1186.92" y="157" text-anchor="start" fill="#263238">7.869 rad</text>
-<rect x="515" y="166" width="670.45" height="16" rx="3" fill="#E69F00"/>
-<text class="value-label" x="1192.45" y="178" text-anchor="start" fill="#263238">7.934 rad</text>
-<text class="group-label" x="501" y="230.0" text-anchor="end">moveit-mock · moveit/moveit_mock · obstacle · RRTConnectkConfigDefault</text>
-<rect x="515" y="209" width="688.67" height="16" rx="3" fill="#0072B2"/>
-<text class="value-label" x="1210.67" y="221" text-anchor="start" fill="#263238">8.15 rad</text>
-<rect x="515" y="230" width="680.32" height="16" rx="3" fill="#E69F00"/>
-<text class="value-label" x="1202.32" y="242" text-anchor="start" fill="#263238">8.051 rad</text>
+<text class="group-label" x="501" y="166.0" text-anchor="end">moveit_mock · moveit/moveit_mock · clear · RRTConnectkConfigDefault</text>
+<rect x="515" y="145" width="625.44" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="1147.44" y="157" text-anchor="start" fill="#263238">7.402 rad</text>
+<rect x="515" y="166" width="628.04" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="1150.04" y="178" text-anchor="start" fill="#263238">7.432 rad</text>
+<text class="group-label" x="501" y="230.0" text-anchor="end">moveit_mock · moveit/moveit_mock · obstacle · RRTConnectkConfigDefault</text>
+<rect x="515" y="209" width="650.99" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="1172.99" y="221" text-anchor="start" fill="#263238">7.704 rad</text>
+<rect x="515" y="230" width="648.91" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="1170.91" y="242" text-anchor="start" fill="#263238">7.679 rad</text>
 <text class="footer" x="1468" y="360" text-anchor="end">Recorded data only · N/A = not reported or not applicable</text>
 </svg>

@@ -6,7 +6,7 @@ import threading
 
 from ament_index_python.packages import get_package_share_directory
 import rclpy
-from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
@@ -51,7 +51,14 @@ def default_scene_config_path() -> Path:
 class ManipulationNode(Node):
     def __init__(self) -> None:
         super().__init__("manipulation")
-        self.callback_group = ReentrantCallbackGroup()
+        # The task callback blocks while the synchronous FSM waits for ROS
+        # futures, so it must not share a mutually-exclusive group with those
+        # clients.  Keep backend Action/Service/subscription callbacks in one
+        # separate serialized group: this still lets them make progress while
+        # a task runs, without allowing Humble rclpy native entities to be
+        # entered concurrently by several executor threads.
+        self.task_callback_group = MutuallyExclusiveCallbackGroup()
+        self.backend_callback_group = MutuallyExclusiveCallbackGroup()
         self.task_lock = threading.Lock()
         self.declare_parameter("backend", "pybullet")
         self.declare_parameter("use_gui", True)
@@ -87,7 +94,7 @@ class ManipulationNode(Node):
             "/manipulation_task",
             self.on_task,
             reliable_qos(transient_local=True),
-            callback_group=self.callback_group,
+            callback_group=self.task_callback_group,
         )
 
     def on_task(self, message: ManipulationTask) -> None:
@@ -180,7 +187,7 @@ class ManipulationNode(Node):
                 self,
                 config,
                 scene_config=self.scene_config,
-                callback_group=self.callback_group,
+                callback_group=self.backend_callback_group,
             )
         raise ValueError("backend must be 'pybullet' or 'moveit'")
 
@@ -349,7 +356,7 @@ def runtime_error_result(
 def main(args=None) -> None:
     rclpy.init(args=args)
     node = ManipulationNode()
-    executor = MultiThreadedExecutor(num_threads=4)
+    executor = MultiThreadedExecutor(num_threads=2)
     executor.add_node(node)
     try:
         executor.spin()

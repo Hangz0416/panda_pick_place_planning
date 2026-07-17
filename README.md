@@ -18,15 +18,20 @@ Fortress bringup。
   对 50/50 条受阻直线路径返回 `planning_collision`，全部 200 episode 的执行碰撞数为 0。
   seed 42 的 clear 和 obstacle 单次 Demo 也均成功。
 - **全部 5 个 ROS2 包已 clean build 并通过测试。** `rosdep check` 无未满足依赖；独立
-  `/tmp` build/install/log 目录中的 `colcon test-result` 为 165 tests、0 errors、0 failures、
-  0 skipped，包含真实 Xacro→SDF 检查和 PyBullet 冒烟测试。
+  `/tmp` build/install/log 目录中的最终测试为 178 tests、0 errors、0 failures、0 skipped，
+  包含真实 Xacro→SDF 检查、PyBullet 冒烟和 Gazebo/MoveIt 合约测试。
 - **MoveIt mock 最终规划回归已完成。** 最终代码的 clear/obstacle bridge smoke、5+5 快检
   均通过；固定 seed 42 的 50 clear + 50 obstacle 为 100/100 规划成功、0 PlanningScene
   同步错误。该组严格是 planning-only：`task_success=false`、`failure_type=not_executed`，
   不把未执行的轨迹描述成抓取成功。
-- **Gazebo runtime 仍为 NOT VERIFIED。** Fortress、ros_gz 与 gz_ros2_control 依赖现已安装，
-  Gazebo 包也已进入完整 build/test；但控制器 runtime、10 次 reset、assisted 完整 episode、
-  50+50 和视频尚未验收，因此当前没有可引用的 Gazebo 成功率。
+- **Gazebo assisted runtime 已完成正式回归。** 固定 seed 42 的 5+5 快检和 50 clear + 50
+  obstacle 正式批量均完整运行；正式结果为 100/100 task success、0 collision episode、0
+  PlanningScene 同步错误、0 未分类 `runtime_error`。同一 obstacle/seed 42 的确定性 reset
+  连续 10/10 通过。这里的抓取使用门控后的 DetachableJoint，不能描述成纯物理抓取。
+- **尚未交付的是视频和 physics 抓取。** 当前没有提交 MP4；`physics_model_validated` 仍为
+  false。Humble MoveIt 2.5.9 在批次已经完成、结果已经落盘后的关闭析构路径会触发
+  `move_group` teardown-only 段错误，运行期任务节点与 100 条结果不受影响，但仍作为已知问题
+  保留，不把退出日志描述为完全干净。
 
 ## 系统架构
 
@@ -168,7 +173,8 @@ DetachableJoint ABI，不使用 Gazebo Classic 或 gazebo_ros2_control。
 - `panda_moveit_gz.launch.py` 单入口，以及等待 `/clock`、关节/方块状态、三个控制器、必要
   service/action 全部就绪后才启动应用的 readiness gate。
 
-这些是已经实现并通过静态/纯逻辑测试的代码，不等于 Gazebo 完整运行已经验收。
+上述链路已经通过 5+5 快检、50+50 正式运行和 10 次 reset 验证；assisted 与 physics 的证据
+仍严格分组。
 
 ### 5. assisted 与 physics 严格分开
 
@@ -221,8 +227,8 @@ home 状态独立规划 home、pre-grasp、transfer 和 place 请求，不执行
 
 | 场景 | 规划成功率 | 规划耗时均值 / 中位数 / P95 | 平均关节路径长度 | 平均轨迹点 |
 | --- | ---: | ---: | ---: | ---: |
-| clear | 50/50 (100%) | 120.088 / 120.919 / 131.707 ms | 7.868903 rad | 152.04 |
-| obstacle | 50/50 (100%) | 121.211 / 120.670 / 133.843 ms | 8.149984 rad | 164.70 |
+| clear | 50/50 (100%) | 125.806 / 125.351 / 139.475 ms | 7.401611 rad | 144.76 |
+| obstacle | 50/50 (100%) | 129.607 / 130.023 / 145.545 ms | 7.704005 rad | 155.16 |
 
 两组共 100/100 规划成功、0 PlanningScene 同步错误。表中规划耗时采用 Action 墙钟时间；
 若有限重规划触发，会把同一 3 秒预算内的所有尝试计入，而不是只统计最终成功路径。第一次
@@ -233,6 +239,41 @@ home 状态独立规划 home、pre-grasp、transfer 和 place 请求，不执行
 `failure_type=not_executed`，跟踪误差、XY/Z 放置误差和物体速度均为 `null`。原始 JSONL、
 summary、环境快照、SVG 与 SHA256 manifest 位于 `results/v2/moveit_mock_final/`。
 
+## Gazebo assisted 最终完整闭环结果
+
+运行环境与精确依赖版本记录在
+`results/v2/gazebo_assisted_final/environment.json`。固定主 seed 42，MoveIt
+`RRTConnectkConfigDefault`、3 秒规划预算、速度/加速度缩放 0.2，Gazebo Fortress 1 ms
+物理步进、ros2_control 100 Hz；每个场景 50 个 episode。表中顶层运动指标对应关键
+`TRANSFER` 阶段，其他阶段保存在每条记录的 `stage_metrics`。
+
+| 场景 | 完整任务成功率 | 规划耗时均值 / 中位数 / P95 | 平均关节路径长度 | 平均执行耗时 | 平均 XY / Z 误差 | 平均最大跟踪误差 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| clear | 50/50 (100%) | 23.768 / 24.913 / 35.034 ms | 0.797926 rad | 13.296161 s | 0.142 / 0.000499 mm | 0.049584 rad |
+| obstacle | 50/50 (100%) | 33.413 / 31.825 / 55.437 ms | 2.669548 rad | 17.230351 s | 0.145 / 0.000558 mm | 0.052208 rad |
+
+两组共 100/100 planning、execution 与 task success；所有 episode 均确认 attach 与 release，
+最终物体速度均为 0，collision episode 为 0，PlanningScene 同步失败和未分类
+`runtime_error` 均为 0。该结果超过预先锁定的 clear ≥95%、obstacle ≥90%、碰撞 ≤2% 门槛。
+这些是辅助抓取结果：位姿、姿态、距离与实测夹爪宽度门控通过后使用 DetachableJoint 固定
+方块，不代表仅依靠摩擦和接触的 physics grasp。
+
+第一次正式尝试真实运行 12 个 clear episode，其中 seed 44、49、51 在 76 mm 总开度的 2 mm
+预夹紧动作上被低增益位置接口报告为 stalled，分类为 `gripper_execution_failed`。原始 12 条
+记录保存在 `results/v2/gazebo_assisted_failed_attempt_20260717_gripper/`。修复只允许 assisted
+预夹紧把 stalled 交给随后独立校验实测指宽与抓取位姿的 attach 门控；释放仍严格拒绝 stalled。
+修复后的 5+5 和正式 100 条全部成功，没有删除失败证据。
+
+同一 obstacle/seed 42 连续 10 次 reset 全部通过；最大关节位置/速度误差分别为
+`5.88e-9 rad` / `6.52e-8 rad/s`，最大夹爪位置误差 `9.41e-8 m`，最大方块位置误差
+`9.81e-11 m`，物体线/角速度最大值均为 0。逐次记录、正式 JSONL/summary、SVG 和哈希审计
+位于 `results/v2/gazebo_assisted_final/`。
+
+MoveIt mock 与 Gazebo assisted 使用同一任务生成规则；联合报告对原始 JSONL 做
+`(scene, task_seed)` 审计，双方 coverage 均为 100、`paired=true`、missing 集合为空，保存在
+`results/v2/gazebo_assisted_final/paired_report/`。该配对只保证任务覆盖一致，不把不同执行后端
+的绝对耗时解释为算法快慢。
+
 ## V2 验证矩阵
 
 | 验证项 | 当前状态 | 可引用证据 |
@@ -242,15 +283,16 @@ summary、环境快照、SVG 与 SHA256 manifest 位于 `results/v2/moveit_mock_
 | PyBullet V2 200 episode | VERIFIED | 上表四组真实结果；0 collision episode |
 | V1/V2 raw paired audit | VERIFIED | coverage 100/100、paired=true、missing 为空、分类无漂移 |
 | 全部 5 包 clean build | VERIFIED | 独立 build/install/log 目录，`rosdep check` 通过 |
-| 最终 colcon 测试 | VERIFIED | 165 tests；0 errors、0 failures、0 skipped |
+| 最终 colcon 测试 | VERIFIED | 178 tests；0 errors、0 failures、0 skipped |
 | Xacro→SDF 模型审计 | VERIFIED | 7 arm、2 finger、hand/grasptarget；质量/惯量检查通过 |
 | 最终 MoveIt enhanced smoke | VERIFIED | clear/obstacle、控制器、ACM、attach/detach 均通过 |
 | 最终 MoveIt planning-only 快检 | VERIFIED | 5 clear + 5 obstacle，10/10 |
 | 最终 MoveIt 50+50 | VERIFIED | 100/100 planning；0 scene sync error；不宣称 task success |
 | Gazebo 包 build | VERIFIED | Fortress/ros_gz/gz_ros2_control 依赖已安装并进入 5 包 build |
-| Gazebo runtime | NOT VERIFIED | 控制器、reset 与完整 episode 尚无 runtime 证据 |
-| Gazebo reset、assisted 50+50 | NOT VERIFIED | 无 runtime EpisodeResult，不提供成功率 |
-| physics 与视频 | OUT OF SCOPE | 辨识惯量只验收到 assisted；physics 保持 fail-closed；未录制视频 |
+| Gazebo runtime | VERIFIED | readiness、三个 active controller、typed service/action、双场景闭环 |
+| Gazebo reset、assisted 50+50 | VERIFIED | reset 10/10；clear 50/50、obstacle 50/50；0 collision |
+| Gazebo 关闭路径 | KNOWN ISSUE | 结果落盘后 MoveIt 2.5.9 析构段错误；不影响 episode，但退出不干净 |
+| physics 与视频 | NOT DELIVERED | physics 保持 fail-closed；MP4 尚未提交，不能写入简历成果 |
 
 ## 环境与依赖
 
@@ -358,9 +400,8 @@ colcon test --return-code-on-test-failure
 colcon test-result --verbose
 ~~~
 
-最终 clean build 结果为 165 tests（0 errors、0 failures、0 skipped），5 个包均进入 build/test。
-这仍不等于 Gazebo runtime 已验收；runtime 必须继续通过 readiness、controller、reset 和
-完整 episode 门槛。
+最终 clean build 结果为 178 tests（0 errors、0 failures、0 skipped），5 个包均进入
+build/test；Gazebo runtime 另由 readiness、controller、reset 和 100 个完整 episode 验收。
 
 进入批量评测前，必须先保证对应依赖、build 和 test 全部通过，再为每组跑 5 次快速检查。
 
@@ -457,9 +498,28 @@ ros2 control list_controllers
 ros2 service list | grep panda_gz
 ~~~
 
-**截至当前版本，这些 Gazebo runtime 命令尚未完成验收。** 单入口、typed reset、typed
-collision query、120 秒 readiness timeout 与 batch wrapper 已实现并通过代码测试，但控制器、
-连续 reset 和完整 episode 仍需真实运行。不能把 build/launch 文件存在写成 Gazebo 已跑通。
+已验证的一键 5+5 快检（完成后自动关闭整套系统）：
+
+~~~bash
+ros2 launch panda_gz_bringup gazebo_batch.launch.py \
+  episodes_per_scene:=5 seed:=42 scenes_csv:=clear,obstacle \
+  headless:=true use_rviz:=false \
+  output_path:=results/gazebo_quick.jsonl \
+  summary_path:=results/gazebo_quick_summary.json
+~~~
+
+正式 50+50 只把 `episodes_per_scene` 改为 50，并使用新的输出路径。reset 验证需要终端 A 以
+`start_application:=false` 启动 combined stack，终端 B 执行：
+
+~~~bash
+ros2 run panda_gz_bringup validate_episode_reset \
+  --repetitions 10 --scene obstacle --seed 42 \
+  --output results/reset_validation.json
+~~~
+
+Humble MoveIt 2.5.9 在自动关闭 `move_group` 的析构路径存在 teardown-only 段错误；判断批次
+是否有效应同时要求 batch generator/评测节点正常结束、summary 为 `complete`、JSONL 行数与
+期望一致，并通过 artifact audit，不能只看 launch 最后一行。
 
 ## 成功判据与指标
 
@@ -500,19 +560,15 @@ EpisodeResult V2 记录：
 | 观测 | collision_state_unavailable |
 | 边界异常 | moveit_action_unavailable、moveit_client_error、bridge_exception、runtime_error |
 
-目标门槛不是当前实验结果：后续 Gazebo assisted 评测希望 clear ≥ 95%、obstacle ≥ 90%、
-碰撞 episode ≤ 2%，且无未分类 runtime_error。若未达到，应保留真实结果并按失败状态修复，
-不能缩小任务范围来掩盖失败。
+预先锁定的 Gazebo assisted 门槛为 clear ≥95%、obstacle ≥90%、碰撞 episode ≤2%，且无
+未分类 runtime_error；本轮真实结果分别为 100%、100%、0% 和 0 条。任务范围和 seed 生成
+规则没有为提高成功率而修改。
 
-## 下一步验收顺序
+## 剩余交付
 
-1. 启动 combined launch，验证 `/clock`、readiness gate、三个 active controller 和全部
-   reset/attach/detach/碰撞服务。
-2. 对同一 `(scene, seed=42)` 连续 reset 10 次，保存关节、夹爪、实体和速度误差。
-3. 跑 clear + seed 42、obstacle + seed 42 的 assisted 完整闭环，检查 scene/entity/joint 同步。
-4. 每组先跑 5 次；无 runtime_error、未知碰撞或 reset 失败后，再跑 50+50 正式评测。
-5. 保存逐 episode、汇总、失败案例、环境、SHA256/SVG 审计和两段 assisted 视频。
-
-本阶段不把 `physics_model_validated` 改为 true，也不评测 physics 抓取。
-
-只有上述运行证据完成后，才更新 V2 成功率、图表、视频和简历中的 Gazebo 表述。
+1. 录制并提交 clear、obstacle 两段 Gazebo assisted 完整抓放 MP4；当前 README 和简历不把
+   视频列为已完成成果。
+2. 单独处理或记录 Humble MoveIt 2.5.9 的关闭析构问题，不用它否定已经通过哈希审计的运行期
+   episode，也不把退出描述成完全干净。
+3. 在上述展示材料完成前不创建 V2 完成标签。`physics_model_validated` 继续保持 false，physics
+   抓取、视觉、强化学习、真机和 MTC 均不进入本阶段。

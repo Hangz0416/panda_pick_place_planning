@@ -1,0 +1,134 @@
+{
+  "charts": [
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "rates",
+      "path": "full_episode_success_rates.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "planning_time",
+      "path": "full_episode_planning_time.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "path_length",
+      "path": "full_episode_path_length.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "failures",
+      "path": "full_episode_failure_counts.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "place_error",
+      "path": "full_episode_place_error.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "tracking_error",
+      "path": "full_episode_tracking_error.svg"
+    }
+  ],
+  "evaluation_modes": [
+    "full_episode"
+  ],
+  "generated_at_utc": "2026-07-17T09:31:23.666203+00:00",
+  "groups": [
+    {
+      "dataset": "gazebo_assisted",
+      "display_label": "gazebo_assisted · moveit/gazebo · clear · RRTConnectkConfigDefault",
+      "episodes": 50,
+      "evaluation_mode": "full_episode",
+      "execution_success_rate": 1.0,
+      "failure_counts": {},
+      "final_xy_error_mean_m": 0.00014188052366528983,
+      "final_z_error_mean_m": 4.992125398155939e-07,
+      "group_key": "moveit/gazebo/clear/RRTConnectkConfigDefault/assisted",
+      "metric_origins": {
+        "path_length": "reported_planning_success_episode_values",
+        "placement_error": "reported",
+        "planning_time": "reported_episode_values",
+        "tracking_error": "reported_episode_values"
+      },
+      "metric_sample_counts": {
+        "execution_success_rate": 50,
+        "final_xy_error": 50,
+        "final_z_error": 50,
+        "path_length": 50,
+        "planning_success_rate": 50,
+        "planning_time": 50,
+        "task_success_rate": 50,
+        "tracking_error": 50
+      },
+      "path_length_mean_rad": 0.7979258970055507,
+      "path_length_median_rad": 0.7949168486908404,
+      "planning_success_rate": 1.0,
+      "planning_time_mean_sec": 0.02376757174,
+      "planning_time_median_sec": 0.0249134165,
+      "planning_time_p95_sec": 0.03503412634999999,
+      "task_success_rate": 1.0,
+      "tracking_error_mean_rad": 0.049584108876218606
+    },
+    {
+      "dataset": "gazebo_assisted",
+      "display_label": "gazebo_assisted · moveit/gazebo · obstacle · RRTConnectkConfigDefault",
+      "episodes": 50,
+      "evaluation_mode": "full_episode",
+      "execution_success_rate": 1.0,
+      "failure_counts": {},
+      "final_xy_error_mean_m": 0.00014467207700750935,
+      "final_z_error_mean_m": 5.580100666925658e-07,
+      "group_key": "moveit/gazebo/obstacle/RRTConnectkConfigDefault/assisted",
+      "metric_origins": {
+        "path_length": "reported_planning_success_episode_values",
+        "placement_error": "reported",
+        "planning_time": "reported_episode_values",
+        "tracking_error": "reported_episode_values"
+      },
+      "metric_sample_counts": {
+        "execution_success_rate": 50,
+        "final_xy_error": 50,
+        "final_z_error": 50,
+        "path_length": 50,
+        "planning_success_rate": 50,
+        "planning_time": 50,
+        "task_success_rate": 50,
+        "tracking_error": 50
+      },
+      "path_length_mean_rad": 2.6695483789024594,
+      "path_length_median_rad": 2.5436604798857894,
+      "planning_success_rate": 1.0,
+      "planning_time_mean_sec": 0.03341295422,
+      "planning_time_median_sec": 0.031825022,
+      "planning_time_p95_sec": 0.05543735414999998,
+      "task_success_rate": 1.0,
+      "tracking_error_mean_rad": 0.05220836081359464
+    }
+  ],
+  "paired_coverage": null,
+  "report_schema_version": 1,
+  "semantic_notes": {
+    "full_episode": "Planning, execution, and task rates are shown when reported; missing metrics remain null/N/A.",
+    "path_length": "Mean and median use planning-success rows with a reported top-level joint path length.",
+    "placement_error": "Uses reported final errors, or derives absolute XY/Z error from recorded final and target positions in raw full-episode JSONL.",
+    "planning_only": "Only planning_success is a success-rate outcome; execution and task success are not applicable because no trajectory or grasp ran."
+  },
+  "sources": [
+    {
+      "batch_status": null,
+      "episode_count": 100,
+      "evaluation_modes": [
+        "full_episode"
+      ],
+      "label": "gazebo_assisted",
+      "path": "results/v2/gazebo_assisted_final/episodes.jsonl",
+      "sha256": "1594392a0495d0dd1286ea8bb64b227f5a49c0bc891d470c078da02109aea3c1",
+      "source_kind": "episode_jsonl",
+      "warnings": []
+    }
+  ],
+  "title": "Panda V2 Gazebo Assisted Benchmark",
+  "warnings": []
+}

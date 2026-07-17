@@ -1,9 +1,10 @@
 """ROS 2 / MoveIt implementation of the common manipulation backend.
 
 The state machine deliberately stays synchronous.  Its ROS calls are safe when
-the owning node is run in a ``MultiThreadedExecutor`` and all clients use a
-``ReentrantCallbackGroup`` (see ``manipulation_node.py``).  Waiting is done with
-events instead of trying to spin a node that is already owned by an executor.
+the owning node is run in a ``MultiThreadedExecutor`` and the blocking task
+callback is isolated from a serialized backend callback group (see
+``manipulation_node.py``).  Waiting is done with events instead of trying to
+spin a node that is already owned by an executor.
 """
 
 from __future__ import annotations
@@ -387,19 +388,26 @@ class MoveItBackend:
                 raise BackendOperationError(failure)
             self._physical_release_requested = True
         commanded_width = width
-        if (
+        assisted_pre_attach = bool(
             self.config.use_gazebo
             and self._task is not None
             and self._task.grasp_mode == "assisted"
             and math.isclose(width, self.closed_gripper_width, abs_tol=1.0e-9)
             and not self._attached
-        ):
+        )
+        if assisted_pre_attach:
             # The hand is yawed 45 degrees over the box, so its in-plane
             # diagonal is about 70.7 mm.  Hold a commanded 76 mm total gap
             # until Gazebo confirms attach; measured joint state remains the
-            # authority used by the guarded attach service.
+            # authority used by the guarded attach service.  The low-gain
+            # position interface can report a stall for this 2 mm adjustment;
+            # accept that status only here because the guarded attach service
+            # immediately audits the measured width and grasp pose.
             commanded_width = self.config.assisted_pre_attach_width
-        self._command_gripper(commanded_width)
+        self._command_gripper(
+            commanded_width,
+            allow_stall=assisted_pre_attach,
+        )
         self._gripper_width = commanded_width
         if physics_release:
             failure = self._validate_physical_grasp_state(expect_holding=False)

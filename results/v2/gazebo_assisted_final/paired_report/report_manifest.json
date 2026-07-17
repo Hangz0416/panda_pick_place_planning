@@ -1,0 +1,250 @@
+{
+  "charts": [
+    {
+      "evaluation_mode": "planning_only",
+      "metric": "rates",
+      "path": "planning_only_success_rates.svg"
+    },
+    {
+      "evaluation_mode": "planning_only",
+      "metric": "planning_time",
+      "path": "planning_only_planning_time.svg"
+    },
+    {
+      "evaluation_mode": "planning_only",
+      "metric": "path_length",
+      "path": "planning_only_path_length.svg"
+    },
+    {
+      "evaluation_mode": "planning_only",
+      "metric": "failures",
+      "path": "planning_only_failure_counts.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "rates",
+      "path": "full_episode_success_rates.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "planning_time",
+      "path": "full_episode_planning_time.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "path_length",
+      "path": "full_episode_path_length.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "failures",
+      "path": "full_episode_failure_counts.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "place_error",
+      "path": "full_episode_place_error.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "tracking_error",
+      "path": "full_episode_tracking_error.svg"
+    }
+  ],
+  "evaluation_modes": [
+    "planning_only",
+    "full_episode"
+  ],
+  "generated_at_utc": "2026-07-17T09:36:38.554437+00:00",
+  "groups": [
+    {
+      "dataset": "moveit_mock",
+      "display_label": "moveit_mock · moveit/moveit_mock · clear · RRTConnectkConfigDefault",
+      "episodes": 50,
+      "evaluation_mode": "planning_only",
+      "execution_success_rate": null,
+      "failure_counts": {},
+      "final_xy_error_mean_m": null,
+      "final_z_error_mean_m": null,
+      "group_key": "moveit/moveit_mock/clear/RRTConnectkConfigDefault/assisted",
+      "metric_origins": {
+        "path_length": "reported_planning_success_episode_values",
+        "placement_error": "not_applicable",
+        "planning_time": "reported_episode_values",
+        "tracking_error": "unavailable"
+      },
+      "metric_sample_counts": {
+        "execution_success_rate": 0,
+        "final_xy_error": 0,
+        "final_z_error": 0,
+        "path_length": 50,
+        "planning_success_rate": 50,
+        "planning_time": 50,
+        "task_success_rate": 0,
+        "tracking_error": 0
+      },
+      "path_length_mean_rad": 7.401611213647858,
+      "path_length_median_rad": 7.432460416875037,
+      "planning_success_rate": 1.0,
+      "planning_time_mean_sec": 0.12580557216,
+      "planning_time_median_sec": 0.12535080650000002,
+      "planning_time_p95_sec": 0.1394745759,
+      "task_success_rate": null,
+      "tracking_error_mean_rad": null
+    },
+    {
+      "dataset": "moveit_mock",
+      "display_label": "moveit_mock · moveit/moveit_mock · obstacle · RRTConnectkConfigDefault",
+      "episodes": 50,
+      "evaluation_mode": "planning_only",
+      "execution_success_rate": null,
+      "failure_counts": {},
+      "final_xy_error_mean_m": null,
+      "final_z_error_mean_m": null,
+      "group_key": "moveit/moveit_mock/obstacle/RRTConnectkConfigDefault/assisted",
+      "metric_origins": {
+        "path_length": "reported_planning_success_episode_values",
+        "placement_error": "not_applicable",
+        "planning_time": "reported_episode_values",
+        "tracking_error": "unavailable"
+      },
+      "metric_sample_counts": {
+        "execution_success_rate": 0,
+        "final_xy_error": 0,
+        "final_z_error": 0,
+        "path_length": 50,
+        "planning_success_rate": 50,
+        "planning_time": 50,
+        "task_success_rate": 0,
+        "tracking_error": 0
+      },
+      "path_length_mean_rad": 7.704005286012297,
+      "path_length_median_rad": 7.679396801130826,
+      "planning_success_rate": 1.0,
+      "planning_time_mean_sec": 0.1296072494,
+      "planning_time_median_sec": 0.1300234555,
+      "planning_time_p95_sec": 0.1455446775,
+      "task_success_rate": null,
+      "tracking_error_mean_rad": null
+    },
+    {
+      "dataset": "gazebo_assisted",
+      "display_label": "gazebo_assisted · moveit/gazebo · clear · RRTConnectkConfigDefault",
+      "episodes": 50,
+      "evaluation_mode": "full_episode",
+      "execution_success_rate": 1.0,
+      "failure_counts": {},
+      "final_xy_error_mean_m": 0.00014188052366528983,
+      "final_z_error_mean_m": 4.992125398155939e-07,
+      "group_key": "moveit/gazebo/clear/RRTConnectkConfigDefault/assisted",
+      "metric_origins": {
+        "path_length": "reported_planning_success_episode_values",
+        "placement_error": "reported",
+        "planning_time": "reported_episode_values",
+        "tracking_error": "reported_episode_values"
+      },
+      "metric_sample_counts": {
+        "execution_success_rate": 50,
+        "final_xy_error": 50,
+        "final_z_error": 50,
+        "path_length": 50,
+        "planning_success_rate": 50,
+        "planning_time": 50,
+        "task_success_rate": 50,
+        "tracking_error": 50
+      },
+      "path_length_mean_rad": 0.7979258970055507,
+      "path_length_median_rad": 0.7949168486908404,
+      "planning_success_rate": 1.0,
+      "planning_time_mean_sec": 0.02376757174,
+      "planning_time_median_sec": 0.0249134165,
+      "planning_time_p95_sec": 0.03503412634999999,
+      "task_success_rate": 1.0,
+      "tracking_error_mean_rad": 0.049584108876218606
+    },
+    {
+      "dataset": "gazebo_assisted",
+      "display_label": "gazebo_assisted · moveit/gazebo · obstacle · RRTConnectkConfigDefault",
+      "episodes": 50,
+      "evaluation_mode": "full_episode",
+      "execution_success_rate": 1.0,
+      "failure_counts": {},
+      "final_xy_error_mean_m": 0.00014467207700750935,
+      "final_z_error_mean_m": 5.580100666925658e-07,
+      "group_key": "moveit/gazebo/obstacle/RRTConnectkConfigDefault/assisted",
+      "metric_origins": {
+        "path_length": "reported_planning_success_episode_values",
+        "placement_error": "reported",
+        "planning_time": "reported_episode_values",
+        "tracking_error": "reported_episode_values"
+      },
+      "metric_sample_counts": {
+        "execution_success_rate": 50,
+        "final_xy_error": 50,
+        "final_z_error": 50,
+        "path_length": 50,
+        "planning_success_rate": 50,
+        "planning_time": 50,
+        "task_success_rate": 50,
+        "tracking_error": 50
+      },
+      "path_length_mean_rad": 2.6695483789024594,
+      "path_length_median_rad": 2.5436604798857894,
+      "planning_success_rate": 1.0,
+      "planning_time_mean_sec": 0.03341295422,
+      "planning_time_median_sec": 0.031825022,
+      "planning_time_p95_sec": 0.05543735414999998,
+      "task_success_rate": 1.0,
+      "tracking_error_mean_rad": 0.05220836081359464
+    }
+  ],
+  "paired_coverage": {
+    "available": true,
+    "coverage_counts": {
+      "gazebo_assisted": 100,
+      "moveit_mock": 100
+    },
+    "missing_by_input": {
+      "gazebo_assisted": [],
+      "moveit_mock": []
+    },
+    "paired": true,
+    "paired_task_count": 100,
+    "union_task_count": 100
+  },
+  "report_schema_version": 1,
+  "semantic_notes": {
+    "full_episode": "Planning, execution, and task rates are shown when reported; missing metrics remain null/N/A.",
+    "path_length": "Mean and median use planning-success rows with a reported top-level joint path length.",
+    "placement_error": "Uses reported final errors, or derives absolute XY/Z error from recorded final and target positions in raw full-episode JSONL.",
+    "planning_only": "Only planning_success is a success-rate outcome; execution and task success are not applicable because no trajectory or grasp ran."
+  },
+  "sources": [
+    {
+      "batch_status": null,
+      "episode_count": 100,
+      "evaluation_modes": [
+        "planning_only"
+      ],
+      "label": "moveit_mock",
+      "path": "results/v2/moveit_mock_final/episodes.jsonl",
+      "sha256": "187c66c7153ba2504bb8dc7110c73ded6d699a757e9d793f858210af92437798",
+      "source_kind": "episode_jsonl",
+      "warnings": []
+    },
+    {
+      "batch_status": null,
+      "episode_count": 100,
+      "evaluation_modes": [
+        "full_episode"
+      ],
+      "label": "gazebo_assisted",
+      "path": "results/v2/gazebo_assisted_final/episodes.jsonl",
+      "sha256": "1594392a0495d0dd1286ea8bb64b227f5a49c0bc891d470c078da02109aea3c1",
+      "source_kind": "episode_jsonl",
+      "warnings": []
+    }
+  ],
+  "title": "Panda V2 Paired Task Coverage",
+  "warnings": []
+}

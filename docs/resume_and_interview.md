@@ -6,11 +6,11 @@
   PyBullet V2 的 200 episode 也是本轮真实运行、可复查的结果；
 - seed 42 的 clear/obstacle 单次 PyBullet Demo 均有独立 EpisodeResult 文件；
 - V2 已完成多包架构、统一后端、类型化接口、MoveIt bridge/config 和 Gazebo bringup 代码；
-- 最终四包 build 成功，colcon 77/77；Gazebo 静态/纯逻辑测试 44/44（仍非 runtime），
-  flake8 67 files；
-- MoveIt 审计前 enhanced smoke 与 planning-only 5+5 曾 10/10，但审计后因 DDS 无法启动而
-  没有最终复验，不能将旧数据当作正式 5+5/50+50；
-- Gazebo runtime、完整抓放、批量成功率、physics 抓取和视频均为 NOT YET VERIFIED。
+- 最终五包 clean build，全部 178 项测试通过；MoveIt 最终 planning-only 50+50 为 100/100
+  规划成功，并保持 `not_executed` 语义；
+- Gazebo assisted 最终 50 clear + 50 obstacle 为 100/100 完整任务成功、0 collision episode、
+  0 scene sync error、0 未分类 runtime_error；同一 obstacle/seed 42 reset 连续 10/10 通过；
+- assisted 使用门控 DetachableJoint，不是 physics grasp；physics 与两段 MP4 仍未交付。
 
 面试时主动说清验证边界，比把“写了配置”说成“系统跑通”更可信。
 
@@ -38,22 +38,19 @@
   检查其与桌面/障碍物的接触及 10 mm 安全距离，并区分规划阶段与执行阶段的携物碰撞失败。
 - 使用 C++ MoveGroupInterface 与 PlanningSceneInterface 实现 MoveIt 规划/执行 bridge，
   支持 named/pose target、世界碰撞物、ACM 与 attach/detach 同步；实现共享 Xacro、Gazebo
-  combined launch、readiness gate、typed reset/碰撞观测。MoveIt 最终批量回归和 Gazebo
-  runtime 均待环境恢复后运行，不在简历中声称闭环成功。
+  combined launch、readiness gate、typed reset/碰撞观测；MoveIt planning-only 50+50 实测
+  100/100 规划成功，未将未执行轨迹写成抓取成功。
+- 接入 Gazebo Fortress 与 gz_ros2_control，实现确定性 reset、约束门控辅助抓取及
+  PlanningScene/Gazebo 事务式同步；固定 seed 42 的 50 clear + 50 obstacle 完整 episode 均
+  50/50 成功，碰撞 episode 为 0，平均 transfer 规划耗时 23.768/33.413 ms，平均关节路径长度
+  0.797926/2.669548 rad，平均最大跟踪误差 0.049584/0.052208 rad。
 
-这版简历没有写“Gazebo 闭环完成”“完成物理抓取”“Gazebo 成功率达到 95%”或“生成 Demo
-视频”，因为目前没有对应运行证据。
+这版简历可以写“Gazebo assisted 闭环完成”，但不能写“完成物理抓取”或“生成 Demo 视频”。
+100% 是当前固定任务集的仿真结果，不外推为真机成功率。
 
-## Gazebo 跑通后才能替换的简历句式
+## 仍不能使用的 physics 简历句式
 
-下面是占位模板，不是当前成果。只有逐 episode 文件、汇总文件和失败案例都保存后，才能把
-方括号替换为真实值：
-
-> 接入 Gazebo Fortress 与 gz_ros2_control，实现确定性 episode reset、约束门控辅助抓取和
-> PlanningScene/Gazebo 双向同步；在固定任务集上完成 50 clear + 50 obstacle episode，
-> 成功率分别为 [真实 clear 结果] 与 [真实 obstacle 结果]，主要失败为 [真实失败分布]。
-
-physics 模式也必须单列：
+physics 模式必须等后续独立实验完成后单列：
 
 > 移除 DetachableJoint 后，仅依靠夹爪碰撞与摩擦完成物理抓取；每个场景运行 [真实 episode
 > 数]，记录双指接触、滑落、相对位姿漂移和释放稳定时间。
@@ -73,13 +70,11 @@ C++ MoveGroupInterface 做规划与可选执行，用 PlanningSceneInterface 管
 和 AttachedCollisionObject；Python 继续负责抓放阶段与 EpisodeResult。
 
 我还补上了 PyBullet 携带方块后的碰撞检查：保存 `panda_grasptarget`（末端）到方块的相对
-变换，在每个候选关节状态预测方块位姿，分别判断机器人碰撞和携物碰撞。最终四包 build 与
-77 项 colcon 测试通过，Gazebo
-代码的 44/44 静态/纯逻辑测试通过，但这仍不是 Gazebo runtime 证据。MoveIt 在审计前跑过
-enhanced smoke 和 5+5 planning-only，
-但最终审计后没有重新启动 DDS，因此我不会把旧 10/10 当作正式结果。Gazebo 还缺
-`ignition-msgs8`、`ros_gz`、`gz_ros2_control`，所以 runtime、50+50、physics 与视频都不写成
-已完成成果。
+变换，在每个候选关节状态预测方块位姿，分别判断机器人碰撞和携物碰撞。最终五包 clean build
+和 178 项测试通过。MoveIt planning-only 50+50 为 100/100 规划成功，但全部保持
+`not_executed`；Gazebo assisted 先通过 5+5，再完成 50 clear + 50 obstacle，100 条均完整
+成功且碰撞为 0。这里的 grasp 是位姿与实测夹爪宽度门控后的 DetachableJoint 辅助抓取，
+physics 和视频尚未完成，我不会混写。
 
 ## 代码流程
 
@@ -136,9 +131,9 @@ RESET
 5. Upsert/Remove 服务更新世界模型；SetAttachedObject 调用 attachObject/detachObject，并等待
    PlanningScene 中的实际 attached 状态。
 
-Python FSM 使用 MultiThreadedExecutor 和 ReentrantCallbackGroup。同步状态机等待 Action/Service
-Future 时只等待事件，由其他 executor 线程处理回调，避免在已经加入 executor 的 Node 上再次
-spin 导致死锁。
+Python FSM 使用两线程 MultiThreadedExecutor；长任务订阅和后端 Action/Service/遥测分别放入
+两个 MutuallyExclusiveCallbackGroup。同步状态机只等待 Future 事件，另一个线程串行处理后端
+回调，既避免再次 spin 导致死锁，也避免 Humble rclpy 原生实体被多个线程并发进入。
 
 ### 5. MoveIt mock 分支的含义
 
@@ -158,9 +153,9 @@ mock ros2_control 的 GenericSystem 可以验证：
 - 发生了有效碰撞监测；
 - 完整抓取放置 task_success。
 
-审计修复前，enhanced clear/obstacle smoke 与 5 clear + 5 obstacle planning-only 曾 10/10。
-最终审计又收紧了 reset/readback、物理状态 latch 和 typed metrics；随后本轮 DDS 无法启动，
-所以旧结果只能作为历史链路证据，不能写成最终代码的正式 5+5 或 50+50。
+最终代码先通过 enhanced clear/obstacle smoke 与 5 clear + 5 obstacle，再完成 50+50；两组
+均 50/50 规划成功、0 PlanningScene 同步错误。全部记录保持 `task_success=false`、
+`execution_success=false`、`failure_type=not_executed`，因此只证明规划链路，不证明抓放执行。
 
 ### 6. Gazebo assisted 分支的设计流程
 
@@ -171,7 +166,8 @@ mock ros2_control 的 GenericSystem 可以验证：
    service/action 全部就绪，才允许启动共享 FSM。
 4. typed ResetEpisode 暂停世界、请求 detach、按任务 seed reset model、用轨迹控制器回 home、
    校验关节位置/速度、再次设置方块/目标/障碍物后恢复。
-5. 抓取前先保持 60 mm 总开度，避免 50 mm 方块与手指互穿。
+5. 抓取前先保持 76 mm 总开度；45° 手爪下 50 mm 方块的平面对角线约为 70.7 mm，因此可避免
+   方块与手指互穿。
 6. AssistedGraspManager 同时检查手—物相对位置、姿态、距离与夹爪宽度。
 7. Gazebo 确认 DetachableJoint attached 后，MoveItBackend 才添加
    AttachedCollisionObject；失败则回滚 detach。
@@ -179,7 +175,10 @@ mock ros2_control 的 GenericSystem 可以验证：
 9. 释放时先 detach Gazebo，再 detach PlanningScene；等待方块稳定后读取实际位姿并重新加入
    MoveIt world，最后规划 retreat。
 
-这是代码设计，不是当前已经跑过的完整序列。
+该序列已经由 5+5 快检和 50+50 正式 episode 完整运行验证。第一次正式尝试的 12 条中有 3 条
+在 2 mm 预夹紧时被低增益控制器报告为 stalled；修复只允许 assisted 预夹紧把 stalled 交给
+随后独立校验实测指宽和位姿的 attach gate，释放仍严格拒绝 stalled。修复后的 110 条快检与
+正式 episode 全部成功，原失败记录仍保留。
 
 ### 7. physics 分支为何默认 fail-closed
 
@@ -187,10 +186,9 @@ physics 模式不加载 DetachableJoint，也不允许 fixed-joint attach。双�
 位姿、平移/旋转漂移、滑落 latch、释放和稳定时间的 monitor 与 typed 结果字段已经实现，
 MoveItBackend 也不会伪造 attach 成功。
 
-当前共享 Panda 描述没有经过审计、可用于可信动力学的质量/惯量模型。因此 launch 默认
-`physics_model_validated:=false` 并拒绝 physics，monitor 返回
-`physics_model_unvalidated`。下一步不是补一段接触逻辑，而是补充/审计惯量，完成 Gazebo
-runtime 验证后才允许开启 physics，并与 assisted 分组报告。
+当前共享 Panda 描述已引入 Franka 上游公开的辨识惯量并通过正定检查，但上游明确说明这些不是
+官方 Panda 惯量，因此不能据此宣称可信物理抓取。launch 默认 `physics_model_validated:=false`
+并拒绝 physics；后续必须独立标定/审计摩擦、碰撞和动力学，再与 assisted 分组报告。
 
 ## 模拟面试问题
 
@@ -198,11 +196,10 @@ runtime 验证后才允许开启 physics，并与 assisted 分组报告。
 
 ### 1. 这个项目现在到底完成到什么程度？
 
-回答要点：PyBullet V1 基线冻结，PyBullet V2 的 200 episode 和 seed 42 双场景 Demo 已真实
-验证；最终四包 build、colcon 77/77、Gazebo 静态测试 44/44（仍非 runtime）、flake8 67
-files。MoveIt 审计前
-smoke/5+5 曾通过，但审计后 DDS 未恢复，不能当最终批量结果。Gazebo runtime、50+50、physics
-与视频尚未验证。
+回答要点：PyBullet V1 基线冻结，PyBullet V2 200 episode 与双场景 Demo 已验证；五包 clean
+build、178 项测试通过；MoveIt planning-only 100/100 规划成功；Gazebo assisted 100/100 完整
+成功、0 碰撞，reset 10/10。physics 与视频未完成，Humble `move_group` 在结果落盘后的关闭
+析构存在已知段错误。
 
 ### 2. 为什么要保留 PyBullet，还要接 MoveIt 和 Gazebo？
 
@@ -284,14 +281,14 @@ table/obstacle 做 contact 和 closest-point 查询。检查结束恢复真实 p
 ### 15. 为什么辅助抓取前不直接把夹爪闭到方块上？
 
 回答要点：Fortress DetachableJoint 不能在模型已经互相穿透时可靠建立连接。当前先保持两指
-总开度约 60 mm，围绕 50 mm cube 留出间隙；位姿、姿态、距离和开度门控全部通过后 attach，
+总开度约 76 mm，高于 50 mm cube 在 45° 手爪下约 70.7 mm 的对角宽度；位姿、姿态、距离和开度门控全部通过后 attach，
 再执行闭合指令。
 
 ### 16. assisted 和 physics 有什么本质区别？
 
 回答要点：assisted 用经过门控的固定约束提供稳定基线；physics 不允许固定约束，只依靠接触、
 摩擦和 gripper action。两者必须用 grasp_mode 分组，physics 还要记录双指接触、滑落和漂移。
-这些 observation/latch 已实现，但共享 Panda 惯量未审计，physics 默认 fail-closed 且未运行；
+这些 observation/latch 已实现，但现有辨识惯量不等于官方动力学模型，physics 默认 fail-closed 且未运行；
 不能拿 assisted 成功率代替。
 
 ### 17. Gazebo reset 为什么不能直接改机器人关节状态？
@@ -314,9 +311,10 @@ collision_state_known；未知时 FSM 返回 collision_state_unavailable，即�
 
 ### 20. MoveIt mock home 成功证明了什么，又没有证明什么？
 
-回答要点：审计前的 MoveIt smoke/5+5 证明当时 robot_description/SRDF、KDL/OMPL、
-move_group、mock controller、bridge、PlanningScene 与 Action 链路可用。最终审计后未能重启
-DDS，所以它不证明最终代码的正式回归，更不证明 Gazebo 执行、抓取或 task_success。
+回答要点：最终 MoveIt smoke、5+5 和 50+50 证明 robot_description/SRDF、KDL/OMPL、
+move_group、mock controller、bridge、PlanningScene 与 Action 链路可用；但 100 条都明确
+`not_executed`，所以不证明 Gazebo 执行、抓取或 task_success。Gazebo 证据来自另一组完整
+episode，不能混用。
 
 ### 21. 如何保证批量对照公平？
 
@@ -326,15 +324,15 @@ DDS，所以它不证明最终代码的正式回归，更不证明 Gazebo 执行
 
 ### 22. 当前最大的工程风险是什么？
 
-回答要点：combined launch、readiness、typed reset/collision 和 physics monitor 已实现，但
-Gazebo 缺 `ignition-msgs8`、`ros_gz`、`gz_ros2_control`，runtime 尚未验收；共享 Panda 惯量
-也不可信，physics 必须 fail-closed。先恢复依赖和运行证据，再谈成功率和视频。
+回答要点：assisted 运行期已经验收，当前风险转为三项：DetachableJoint 结果不能外推为
+physics/真机；MoveIt 2.5.9 的批次关闭析构不干净；两段展示视频尚未录制。physics 仍必须
+fail-closed，不能因为 assisted 达到 100% 就跳过动力学验证。
 
 ### 23. 下一步你会按什么顺序推进？
 
-回答要点：恢复 DDS 并重跑最终代码 MoveIt smoke/5+5 → 安装缺失 Gazebo 依赖并 build → 用已有
-combined launch 验证 readiness/controller/10 次 reset → seed 42 assisted 双场景 → 每组 5 次
-再 50+50 → 补充并审计 Panda 惯量 → 最后开启并单列 physics。
+回答要点：先录制 clear/obstacle assisted 视频并处理/记录 teardown issue，完成 V2 展示交付；
+下一阶段若做 physics，先校准碰撞、摩擦和动力学，再每场景至少 20 次并单列双指接触、滑落、
+漂移和释放稳定时间。视觉、强化学习和真机不与这一阶段混做。
 
 ### 24. 为什么当前不加入强化学习？
 
@@ -352,6 +350,6 @@ RL 会把基础设施错误混入 reward 和训练不稳定。未来接入点限
 - 能说明 MoveIt Action 每个 goal/result 字段的用途。
 - 能区分 planning-only、mock execution、Gazebo execution 和 task_success。
 - 能解释 Gazebo/PlanningScene attach 的顺序与回滚。
-- 能主动说出当前 NOT YET VERIFIED 的项目，而不是等面试官追问。
+- 能主动说出当前未交付的是 physics、视频和干净 teardown，而不是等面试官追问。
 - 能从冻结 manifest 找到 V1 数据，并保证新结果写入新目录。
 - 能根据真实失败类型提出下一项实验，而不是先调成功率口径。
