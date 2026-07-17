@@ -5,13 +5,13 @@
 引用稳定，不需要在简历中讲版本迁移。
 
 面试时需要主动说清：Gazebo 使用门控 DetachableJoint 的 assisted grasp，不是 physics
-grasp；物体位姿来自仿真真值，尚未接入视觉；结果不外推为真机成功率。
+grasp；RGB-D 只做已知颜色、已知尺寸、轴对齐目标的位置估计；结果不外推为真机成功率。
 
 ## 当前可直接使用的简历项目经历
 
-**基于 ROS2、MoveIt 2 与双仿真后端的 Panda 抓取放置系统｜个人项目**
+**基于 ROS2、MoveIt 2 与 RGB-D 感知的 Panda 抓取放置系统｜个人项目**
 
-技术栈：Python / C++ / ROS2 Humble / PyBullet / MoveIt 2 / Gazebo Fortress / ros2_control / RRT-Connect
+技术栈：Python / C++ / ROS2 Humble / OpenCV / RGB-D / PyBullet / MoveIt 2 / Gazebo Fortress / ros2_control / RRT-Connect
 
 - 在 PyBullet 中搭建 Franka Panda 桌面抓取放置环境，实现随机任务生成、逆运动学、关节限位、
   自碰撞与环境碰撞检测、轨迹执行及任务结果判定，形成可复现的机械臂操作闭环。
@@ -23,6 +23,10 @@ grasp；物体位姿来自仿真真值，尚未接入视觉；结果不外推为
 - 使用 C++ 封装 MoveIt 2 规划执行桥接，支持位姿目标、PlanningScene 障碍物与物体
   attach/detach；接入 Gazebo Fortress 与 `gz_ros2_control`，完成控制器驱动、确定性重置
   和约束辅助抓放，clear/obstacle 平均规划时间为 23.77 ms 和 33.41 ms。
+- 增加 Gazebo 顶置 RGB-D 相机与 OpenCV 感知节点，通过近似时间同步、HSV 分割、深度反投影、
+  中值/MAD 过滤和 TF2 估计方块、目标区及障碍物中心；抽象 `ScenePoseProvider`，使真值 oracle
+  与 RGB-D 位姿源复用同一状态机，并对视觉模式建立防真值泄漏测试；视觉闭环中方块、目标区
+  和障碍物位置误差 P95 分别不超过 4.07 mm、3.35 mm 和 2.31 mm。
 - 建立 IK、规划、碰撞、抓取、执行、场景同步和放置失败分类；针对 PyBullet IK 可运动关节
   映射、固定关节连杆伪自碰撞及 Gazebo 夹爪 `stalled` 问题，分别完成参数映射、刚性组件
   内部接触过滤和带门控回滚的抓取事务修复。
@@ -41,7 +45,8 @@ physics 模式必须等后续独立实验完成后单列：
 
 ## 60 秒项目介绍
 
-这个项目从 PyBullet 中的 Panda 抓取放置与路径规划起步。我先把任务生成、IK、碰撞检测、
+这个项目实现了一条 RGB-D 感知、MoveIt 规划、Gazebo 控制执行和量化评测闭环。项目从
+PyBullet 中的 Panda 抓取放置与路径规划起步，我先把任务生成、IK、碰撞检测、
 Linear/RRT-Connect、状态机和固定种子评测做成闭环，再把状态机与执行引擎分开。
 我定义了 ManipulationBackend，PyBullet 和 MoveIt
 都实现同一组 reset、move、gripper、attach/detach 与 object_state 接口，因此只保留一套
@@ -54,6 +59,9 @@ C++ MoveGroupInterface 做规划与可选执行，用 PlanningSceneInterface 管
 MoveIt planning-only 全部保持 `not_executed`，不把未执行轨迹写成抓取成功。
 Gazebo 中的 grasp 是位姿与实测夹爪宽度门控后的 DetachableJoint 辅助抓取，因此我把结果
 限定为 assisted 规划控制闭环，不会混写成 physics grasp。
+视觉部分使用顶置 RGB-D：HSV 分割场景目标，利用深度和内参反投影，再经 TF2 转到 world。
+`ScenePoseProvider` 保证视觉结果直接驱动运动目标和 PlanningScene；任务真值只负责 reset 与
+离线误差统计，因此不会出现视觉模式偷偷读取真值的问题。
 
 ## 代码流程
 
@@ -73,6 +81,7 @@ PickPlaceRunner.run() 的状态顺序是：
 
 ~~~text
 RESET
+  → PERCEPTION：等待 reset 后新 RGB-D 帧并估计 world 坐标对象中心
   → PRE_GRASP：到物体上方，再下降到抓取位姿
   → GRASP：闭合夹爪并请求后端确认 attach
   → LIFT：携物抬升
@@ -114,7 +123,23 @@ Python FSM 使用两线程 MultiThreadedExecutor；长任务订阅和后端 Acti
 两个 MutuallyExclusiveCallbackGroup。同步状态机只等待 Future 事件，另一个线程串行处理后端
 回调，既避免再次 spin 导致死锁，也避免 Humble rclpy 原生实体被多个线程并发进入。
 
-### 5. MoveIt mock 分支的含义
+### 5. RGB-D 感知与防真值泄漏
+
+1. Gazebo 顶置相机以 640×480、20 Hz 发布 RGB、32FC1 depth 和 CameraInfo，静态 TF 为
+   `world → overhead_camera_link → overhead_camera_optical_frame`。
+2. `SceneEstimatorNode` 用 ApproximateTimeSynchronizer 配对 RGB/depth；每次 EstimateScene
+   请求记住当前帧代数，只接受请求之后到达的新同步帧。
+3. `HSVSceneDetector` 取最大连通域，进行面积过滤；有效深度先裁剪范围，再通过中值和 MAD
+   剔除异常值。
+4. 像素通过 `(u-cx)z/fx, (v-cy)z/fy, z` 反投影到光学坐标系，再使用 TF2 转到 world；
+   已知顶面高度用于换算轴对齐物体中心高度。
+5. `RGBDScenePoseProvider` 将类型化服务结果转换为统一 `SceneEstimate`。FSM 的 pre-grasp、
+   transfer 和 MoveIt PlanningScene 使用这些估计；原始 TaskSpec 只传给 Gazebo reset，并用于
+   计算 object/target/obstacle position error。
+6. obstacle 场景缺障碍物立即返回 `obstacle_not_detected`，clear 场景不要求障碍物。任何感知
+   失败都停在 PERCEPTION，不继续规划或执行。
+
+### 6. MoveIt mock 分支的含义
 
 mock ros2_control 的 GenericSystem 可以验证：
 
@@ -136,7 +161,7 @@ mock ros2_control 的 GenericSystem 可以验证：
 均 50/50 规划成功、0 PlanningScene 同步错误。全部记录保持 `task_success=false`、
 `execution_success=false`、`failure_type=not_executed`，因此只证明规划链路，不证明抓放执行。
 
-### 6. Gazebo assisted 分支的设计流程
+### 7. Gazebo assisted 分支的设计流程
 
 1. `panda_moveit_gz.launch.py` 是已有单入口；它复用共享 Panda Xacro 的 `hardware_type:=gz`，
    只创建一份 robot_state_publisher/controller manager，并组合 move_group、bridge 与应用节点。
@@ -159,7 +184,7 @@ mock ros2_control 的 GenericSystem 可以验证：
 随后独立校验实测指宽和位姿的 attach gate，释放仍严格拒绝 stalled。修复后的 110 条快检与
 正式 episode 全部成功，原失败记录仍保留。
 
-### 7. physics 分支为何默认 fail-closed
+### 8. physics 分支为何默认 fail-closed
 
 physics 模式不加载 DetachableJoint，也不允许 fixed-joint attach。双指持续接触、抓取后相对
 位姿、平移/旋转漂移、滑落 latch、释放和稳定时间的 monitor 与 typed 结果字段已经实现，
@@ -175,9 +200,10 @@ MoveItBackend 也不会伪造 attach 成功。
 
 ### 1. 这个项目现在到底完成到什么程度？
 
-回答要点：PyBullet 算法基线、双场景 Demo 和固定任务评测已验证；MoveIt planning-only
-保持不执行语义；Gazebo assisted 已完成双场景完整闭环。当前边界是未完成 physics
-grasp 和视觉位姿估计，Humble `move_group` 在结果落盘后的关闭析构存在已知段错误。
+回答要点：PyBullet 算法基线、MoveIt planning-only 和 Gazebo assisted 均已验证；RGB-D
+感知已经通过 `ScenePoseProvider` 接入同一状态机，视觉结果驱动运动目标和 PlanningScene。
+当前边界是未完成 physics grasp、真机和通用 6D 位姿，Humble `move_group` 在结果落盘后的
+关闭析构存在已知段错误。
 
 ### 2. 为什么要保留 PyBullet，还要接 MoveIt 和 Gazebo？
 
@@ -303,20 +329,45 @@ episode，不能混用。
 ### 22. 当前最大的工程风险是什么？
 
 回答要点：assisted 运行期已经验收，当前风险转为三项：DetachableJoint 结果不能外推为
-physics/真机；MoveIt 2.5.9 的批次关闭析构不干净；物体位姿依赖仿真真值。physics 仍必须
-fail-closed，不能因为 assisted 达到 100% 就跳过动力学验证。
+physics/真机；MoveIt 2.5.9 的批次关闭析构不干净；HSV 方法依赖已知颜色、尺寸和顶置相机，
+不能外推为开放场景识别。physics 仍必须 fail-closed，不能因为 assisted 达到较高成功率就
+跳过动力学验证。
 
 ### 23. 下一步你会按什么顺序推进？
 
-回答要点：先将仓库和文档收敛为单一主线；再增加 ObjectPoseProvider，用真值 provider
-保留基线，用 RGB-D provider 完成图像检测、深度反投影和 TF2 坐标转换。先比较位姿误差和
-抓放结果，不在 assisted 动力学边界上直接叠加强化学习。
+回答要点：当前先用配对任务比较 ground truth 与 RGB-D 的位姿误差和抓放结果，按感知失败
+类型改进阈值与遮挡鲁棒性；若岗位需要，再保持 `ScenePoseProvider` 接口不变，用 YOLO 替换
+颜色分割。仍不在 assisted 动力学边界上直接叠加强化学习。
 
 ### 24. 为什么当前不加入强化学习？
 
 回答要点：当前 Gazebo 依赖 assisted 固定约束，质量/惯量和接触参数也没有达到纯物理抓取
 的验证标准。RL 策略可能利用人工约束或仿真误差，得不到可迁移的接触控制证据。岗位更关注
 视觉与机械臂，因此优先做 RGB-D 位姿估计闭环。
+
+### 25. 如何从一个深度像素得到 world 坐标？
+
+回答要点：CameraInfo 给出 `fx, fy, cx, cy`，深度为 z 时，光学坐标为
+`x=(u-cx)z/fx, y=(v-cy)z/fy, z=z`。先对连通域内有效深度做 median/MAD 过滤，再用
+`world <- overhead_camera_optical_frame` 的 TF 变换三维点。已知顶面位置最后换算成物体中心 z。
+
+### 26. 为什么服务必须等待 reset 后的新图像？
+
+回答要点：相机持续发布，若服务直接返回缓存，episode N 可能拿到 episode N-1 的方块位置。
+节点记录同步帧 generation，服务到达后只接受 generation 增加的帧；超时返回明确的 RGB、depth
+或 perception timeout，不允许用旧数据继续规划。
+
+### 27. 如何证明视觉模式没有偷偷使用真值？
+
+回答要点：TaskSpec 真值只传给 reset 和最终误差计算；pre-grasp、transfer 目标以及 MoveIt
+cube/obstacle PlanningScene 更新都读取 `SceneEstimate`。测试用故意偏移的视觉估计，断言 backend
+收到偏移目标；再让 provider 失败，断言状态机在任何运动调用前结束。
+
+### 28. 为什么先用 HSV，而不是直接训练 YOLO？
+
+回答要点：当前目标是先打通可解释的视觉—规划—执行接口。HSV 在固定仿真颜色下 CPU 可运行，
+误差来源和失败分类清楚；检测器被封装在 `EstimateScene` / `ScenePoseProvider` 后面，后续替换 YOLO
+不需要改 FSM、MoveIt 后端或结果 schema。不能把这套 HSV 结果描述成开放场景泛化能力。
 
 ## 面试前自查清单
 
@@ -328,6 +379,7 @@ fail-closed，不能因为 assisted 达到 100% 就跳过动力学验证。
 - 能说明 MoveIt Action 每个 goal/result 字段的用途。
 - 能区分 planning-only、mock execution、Gazebo execution 和 task_success。
 - 能解释 Gazebo/PlanningScene attach 的顺序与回滚。
-- 能主动说出当前未交付的是 physics、视觉和干净 teardown，而不是等面试官追问。
+- 能解释 RGB-D 同步、反投影、TF2 变换，以及视觉模式为何没有真值泄漏。
+- 能主动说出当前未交付的是 physics、真机、通用 6D 感知和干净 teardown。
 - 能从冻结 manifest 找到历史数据，并保证新结果写入 results/runs。
 - 能根据真实失败类型提出下一项实验，而不是先调成功率口径。

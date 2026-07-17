@@ -7,6 +7,7 @@
 | PyBullet 当前基线 | 自研规划和 PyBullet 执行 | `results/v2/pybullet_shared_geometry_200_final/` |
 | MoveIt mock | 独立阶段 planning-only | `results/v2/moveit_mock_final/` |
 | Gazebo assisted | MoveIt 规划、控制器执行和约束辅助抓放 | `results/v2/gazebo_assisted_final/` |
+| Gazebo RGB-D assisted | RGB-D 位置估计驱动 MoveIt/Gazebo 闭环 | `results/runs/gazebo_rgbd/` |
 | 历史 PyBullet 冻结数据 | 保留原始哈希的早期基线 | `baselines/v0.1-pybullet-baseline/` |
 | 失败证据 | 用于定位问题，不混入最终汇总 | `results/v2/*failed_attempt*/` |
 
@@ -64,9 +65,24 @@ clear 中 RRT-Connect 先检查直连边，因此与 Linear 得到相同的路�
 - Gazebo 夹爪在 assisted 预夹紧的小位移中曾被低增益控制器报告 `stalled`。修复只允许
   assisted 预夹紧将该结果交给独立位姿/开度门控，release 仍 fail-closed。
 
+## Gazebo RGB-D assisted
+
+正式视觉评测沿用相同主种子、任务生成规则、MoveIt 参数和 assisted 成功判据。RGB-D 相机为
+640×480、20 Hz，处理端加入固定 2 mm 标准差的轻量深度噪声。运动目标和 PlanningScene
+使用视觉估计，任务真值只用于 reset 与误差评测。
+
+| 场景 | 任务结果 | 感知耗时均值 / 中位数 / P95 | 方块误差均值 / P95 | 目标误差均值 / P95 | 障碍物误差均值 / P95 |
+| --- | --- | ---: | ---: | ---: | ---: |
+| clear | 50/50 | 72.0 / 50.6 / 165.5 ms | 2.38 / 4.07 mm | 2.18 / 3.35 mm | N/A |
+| obstacle | 50/50 | 54.3 / 56.7 / 125.9 ms | 1.43 / 2.75 mm | 2.00 / 3.19 mm | 2.30 / 2.31 mm |
+
+clear/obstacle 的关键 transfer 平均规划时间分别为 25.71 ms 和 33.93 ms，平均关节路径为
+0.792 rad 和 2.142 rad；平均最终 XY 放置误差为 2.10 mm 和 2.12 mm。全部记录均完成
+release，碰撞率为 0%，没有 PlanningScene 同步错误或未分类 `runtime_error`。结果目录中的
+summary、环境信息、SVG 报告和 artifact manifest 均由原始 JSONL 重算或哈希生成。
+
 ## 跨后端比较边界
 
 PyBullet 自研 RRT-Connect 和 MoveIt OMPL RRTConnect 的算法实现、碰撞引擎、规划请求和计时
 边界不同。相同 `(scene, task_seed)` 用于检查任务覆盖，不能将两者的绝对耗时
 直接解释为算法优劣。
-

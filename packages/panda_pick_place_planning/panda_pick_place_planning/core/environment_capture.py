@@ -22,6 +22,11 @@ APT_PACKAGES = (
     "ros-humble-gz-ros2-control",
     "libignition-msgs8-dev",
     "libignition-transport11-dev",
+    "ros-humble-cv-bridge",
+    "ros-humble-message-filters",
+    "ros-humble-tf2-ros",
+    "python3-numpy",
+    "python3-opencv",
 )
 
 

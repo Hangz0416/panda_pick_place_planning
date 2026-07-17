@@ -25,7 +25,7 @@ C++ MoveIt bridge、共享 Panda 描述、Gazebo Fortress 和 `gz_ros2_control`�
 
 ## 当前规则
 
-- 当前代码就是 `packages/` 下的五个 ROS 2 包，不再用 V1/V2 区分功能。
+- 当前代码就是 `packages/` 下的六个 ROS 2 包，不再用 V1/V2 区分功能。
 - `baselines/` 和已提交的 `results/v2/` 只读保留。
 - 新演示、快检和批量运行写入 `results/runs/`。
 - 新结果如需成为策展证据，需先重算 summary、生成 environment 和 artifact manifest，

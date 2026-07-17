@@ -37,7 +37,15 @@ setup(
                 "panda_pick_place_planning.core.artifact_audit:main"
             ),
             (
+                "audit_results = "
+                "panda_pick_place_planning.core.artifact_audit:main"
+            ),
+            (
                 "capture_v2_environment = "
+                "panda_pick_place_planning.core.environment_capture:main"
+            ),
+            (
+                "capture_environment = "
                 "panda_pick_place_planning.core.environment_capture:main"
             ),
             "task_generator_node = panda_pick_place_planning.nodes.task_generator_node:main",

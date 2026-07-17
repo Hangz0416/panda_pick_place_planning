@@ -13,6 +13,12 @@ task_generator_node
 manipulation_node
         |
         v
+ScenePoseProvider
+        +--> GroundTruthPoseProvider (oracle regression)
+        `--> RGBDScenePoseProvider --> EstimateScene service
+                                      --> RGB + depth + CameraInfo + TF2
+        |
+        v
 PickPlaceRunner
         |
         +--> PyBulletBackend --> IK / Linear / RRT-Connect / PyBullet
@@ -33,6 +39,7 @@ evaluator_node --> JSONL
 | --- | --- |
 | 任务生成与固定种子 | `core/tasks.py` |
 | 统一数据结构 | `core/schemas.py` |
+| 位姿源协议与实现 | `core/scene_pose_provider.py` |
 | Backend 协议 | `core/backends/base.py` |
 | 抓放状态机 | `core/pick_place_fsm.py` |
 | PyBullet 后端 | `core/backends/pybullet.py` |
@@ -45,6 +52,8 @@ evaluator_node --> JSONL
 | Gazebo reset | `panda_gz_bringup/episode_reset_manager.py` |
 | assisted 抓取与回滚 | `panda_gz_bringup/assisted_grasp_manager.py` |
 | Gazebo 碰撞观测 | `panda_gz_bringup/execution_collision_monitor.py` |
+| RGB-D 检测器 | `panda_perception/detector.py` |
+| 感知 ROS 节点 | `panda_perception/scene_estimator_node.py` |
 
 `core/` 不依赖具体 ROS launch 结构；`nodes/` 只负责通信和调度。MoveIt 规划细节集中在
 C++ bridge，Gazebo 世界管理集中在 `panda_gz_bringup`。
@@ -52,7 +61,7 @@ C++ bridge，Gazebo 世界管理集中在 `panda_gz_bringup`。
 ## 状态机
 
 ```text
-RESET -> HOME -> PRE_GRASP -> GRASP -> LIFT -> TRANSFER -> PLACE -> RETREAT -> DONE
+RESET -> PERCEPTION -> PRE_GRASP -> GRASP -> LIFT -> TRANSFER -> PLACE -> RETREAT -> DONE
   |        |          |          |        |          |        |          |
   +--------+----------+----------+--------+----------+--------+----------+--> FAILED
 ```
@@ -77,15 +86,17 @@ RESET -> HOME -> PRE_GRASP -> GRASP -> LIFT -> TRANSFER -> PLACE -> RETREAT -> D
    失败都要回滚前面的外部状态。
 5. release 后先等待物体稳定，再读取真实位姿并放回 PlanningScene，最后规划 retreat。
 
-## 视觉扩展位置
+## RGB-D 感知分支
 
-后续不应将视觉逻辑写进状态机。计划增加：
+视觉逻辑没有写进运动后端或状态机，而是通过统一 provider 接入：
 
 ```text
-ObjectPoseProvider
+ScenePoseProvider
 |- GroundTruthPoseProvider   # 保留当前基线
-`- RGBDPoseProvider          # RGB + Depth + CameraInfo + TF2
+`- RGBDScenePoseProvider     # 调用类型化 EstimateScene 服务
 ```
 
-两种 provider 输出相同的世界坐标物体位姿，状态机和 backend 不因视觉算法而分叉。
-
+`panda_perception` 对彩色/深度图做近似同步，HSV 分割红色方块、绿色目标区和蓝色障碍物，
+再使用 CameraInfo 反投影、中值/MAD 过滤和 TF2 转到 `world`。服务只使用请求到达后的新帧，
+避免跨 episode 缓存泄漏。两种 provider 输出相同的世界坐标对象估计，状态机和 backend
+不因视觉算法而分叉；视觉模式下真值只用于 reset 和误差评测。

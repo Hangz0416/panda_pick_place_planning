@@ -26,15 +26,16 @@ DetachableJoint。它是用来验证全局规划、控制、场景同步和评�
 
 ## 视觉与真机
 
-当前任务使用仿真中的已知方块位姿，未从 RGB-D 图像估计位姿。没有手眼标定、相机噪声
-建模或真机部署证据。
+当前已接入 Gazebo 顶置 RGB-D 相机和 `GroundTruthPoseProvider` / `RGBDScenePoseProvider`
+对照。RGB-D 模式使用 HSV 颜色分割、已知尺寸和轴对齐假设，只估计物体中心位置；它不是
+通用目标检测或六自由度姿态估计。正式仿真使用固定轻量深度噪声，但没有真实相机标定、
+域随机化或真机部署证据。
 
-下一阶段应该先加入 `GroundTruthPoseProvider` / `RGBDPoseProvider` 对照，再评估视觉误差
-对抓放的影响。
+运动目标和 PlanningScene 在 RGB-D 模式中来自视觉估计，任务真值只用于 reset 和误差评测。
+若后续加入 YOLO，应替换检测器/provider 实现，不修改 FSM 或 MoveIt 后端。
 
 ## 强化学习
 
 当前不适合将强化学习接在 assisted 抓取上。策略可能利用固定约束或未验证动力学，
 无法证明学会了可迁移的接触操作。只有在物理模型审计、无约束抓取基线和明确的
 局部控制接口完成后，才重新评估强化学习。
-
