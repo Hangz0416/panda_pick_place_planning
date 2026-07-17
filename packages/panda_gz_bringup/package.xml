@@ -32,6 +32,7 @@
   <exec_depend>nav_msgs</exec_depend>
   <exec_depend>panda_moveit_bridge</exec_depend>
   <exec_depend>panda_moveit_config</exec_depend>
+  <exec_depend>panda_perception</exec_depend>
   <exec_depend>panda_pick_place_interfaces</exec_depend>
   <exec_depend>panda_pick_place_planning</exec_depend>
   <exec_depend>rclpy</exec_depend>

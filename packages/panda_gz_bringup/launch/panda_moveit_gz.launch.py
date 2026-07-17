@@ -17,6 +17,7 @@ from launch.event_handlers import OnProcessExit
 from launch.events import Shutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
+from launch.substitutions import PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from moveit_configs_utils import MoveItConfigsBuilder
@@ -40,6 +41,9 @@ def _launch_setup(context):
     output_path = LaunchConfiguration("output_path")
     readiness_timeout = LaunchConfiguration("readiness_timeout_sec")
     physics_model_validated = LaunchConfiguration("physics_model_validated")
+    pose_source = LaunchConfiguration("pose_source")
+    perception_timeout = LaunchConfiguration("perception_timeout_sec")
+    use_perception_debug = LaunchConfiguration("use_perception_debug")
     grasp_mode_value = grasp_mode.perform(context)
     controllers = bringup_share / "config" / "controllers.yaml"
 
@@ -130,6 +134,22 @@ def _launch_setup(context):
         ],
         condition=IfCondition(use_rviz),
     )
+    perception = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            str(
+                Path(get_package_share_directory("panda_perception"))
+                / "launch"
+                / "perception.launch.py"
+            )
+        ),
+        launch_arguments={
+            "use_sim_time": "true",
+            "use_debug_overlay": use_perception_debug,
+        }.items(),
+        condition=IfCondition(
+            PythonExpression(["'", pose_source, "' == 'rgbd'"])
+        ),
+    )
 
     application = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -147,6 +167,8 @@ def _launch_setup(context):
             "moveit_command_gripper": "true",
             "moveit_collision_monitor_available": "false",
             "output_path": output_path,
+            "pose_source": pose_source,
+            "perception_timeout_sec": perception_timeout,
         }.items(),
     )
     ready_gate = Node(
@@ -158,6 +180,7 @@ def _launch_setup(context):
             sim_time,
             {
                 "grasp_mode": grasp_mode,
+                "pose_source": pose_source,
                 "readiness_timeout_sec": ParameterValue(
                     readiness_timeout, value_type=float
                 ),
@@ -188,6 +211,7 @@ def _launch_setup(context):
         move_group,
         moveit_bridge,
         rviz,
+        perception,
         ready_gate,
         start_when_ready,
     ]
@@ -231,6 +255,17 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument(
                 "physics_model_validated",
                 default_value="false",
+                choices=["true", "false"],
+            ),
+            DeclareLaunchArgument(
+                "pose_source",
+                default_value="ground_truth",
+                choices=["ground_truth", "rgbd"],
+            ),
+            DeclareLaunchArgument("perception_timeout_sec", default_value="3.0"),
+            DeclareLaunchArgument(
+                "use_perception_debug",
+                default_value="true",
                 choices=["true", "false"],
             ),
             OpaqueFunction(function=_launch_setup),

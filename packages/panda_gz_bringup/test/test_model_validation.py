@@ -2,6 +2,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
+import yaml
 import xacro
 
 from panda_gz_bringup.model_validation import (
@@ -136,6 +137,30 @@ def test_initial_world_keeps_contacts_and_defers_control_plugin(tmp_path):
         _sdf(),
         output_directory=tmp_path / "generated",
     ) == output
+
+
+def test_generated_world_camera_matches_shared_yaml(tmp_path):
+    base_world = tmp_path / "base.sdf"
+    base_world.write_text('<sdf version="1.8"><world name="test" /></sdf>')
+    perception = ROOT.parent / "panda_perception" / "config" / "perception.yaml"
+    camera = yaml.safe_load(perception.read_text())["camera"]
+
+    output = compose_world_with_deferred_control(
+        base_world,
+        _sdf(),
+        output_directory=tmp_path / "generated",
+        camera_config=camera,
+    )
+
+    root = ET.parse(output).getroot()
+    model = root.find("./world/model[@name='overhead_camera']")
+    sensor = model.find("./link/sensor[@type='rgbd_camera']")
+    assert model.findtext("pose") == " ".join(
+        str(float(value)) for value in (*camera["position"], *camera["rpy"])
+    )
+    assert sensor.findtext("update_rate") == str(camera["update_rate_hz"])
+    assert sensor.findtext("camera/image/width") == str(camera["width"])
+    assert sensor.findtext("camera/image/height") == str(camera["height"])
 
 
 def test_shared_gazebo_xacro_converts_to_valid_sdf():

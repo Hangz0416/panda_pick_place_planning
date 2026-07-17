@@ -1,0 +1,38 @@
+camera:
+  model_name: overhead_camera
+  link_name: overhead_camera_link
+  sensor_name: rgbd_camera
+  optical_frame: overhead_camera_optical_frame
+  world_frame: world
+  position: [0.55, 0.0, 1.35]
+  rpy: [0.0, 1.5707963267948966, 0.0]
+  optical_rpy_from_link: [-1.5707963267948966, 0.0, -1.5707963267948966]
+  width: 640
+  height: 480
+  update_rate_hz: 20.0
+  horizontal_fov_rad: 1.2
+  near_clip_m: 0.1
+  far_clip_m: 2.0
+  depth_noise_stddev_m: 0.002
+
+processing:
+  sync_slop_sec: 0.05
+  morphology_kernel_px: 5
+  mad_scale: 3.5
+  minimum_confidence: 0.35
+  objects:
+    cube:
+      hsv_ranges: [[[0, 80, 40], [12, 255, 255]], [[168, 80, 40], [179, 255, 255]]]
+      min_pixels: 80
+      expected_pixels: 350
+      output_center_z_m: 0.025
+    target:
+      hsv_ranges: [[[35, 65, 35], [88, 255, 255]]]
+      min_pixels: 250
+      expected_pixels: 1500
+      output_center_z_m: 0.025
+    obstacle:
+      hsv_ranges: [[[90, 65, 35], [138, 255, 255]]]
+      min_pixels: 120
+      expected_pixels: 900
+      output_center_z_m: 0.14

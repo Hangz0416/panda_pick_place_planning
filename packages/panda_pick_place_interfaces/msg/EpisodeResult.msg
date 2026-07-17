@@ -7,6 +7,7 @@ string planner_id
 uint64 planner_seed
 string scene
 string grasp_mode
+string pose_source
 
 bool planning_success
 bool execution_success
@@ -27,6 +28,12 @@ float64 max_joint_tracking_error_rad
 float64 final_xy_error_m
 float64 final_z_error_m
 float64 final_object_speed_mps
+bool perception_success
+float64 perception_latency_sec
+float64 object_position_error_m
+float64 target_position_error_m
+float64 obstacle_position_error_m
+float64 minimum_perception_confidence
 uint32 collision_count
 
 string failed_state

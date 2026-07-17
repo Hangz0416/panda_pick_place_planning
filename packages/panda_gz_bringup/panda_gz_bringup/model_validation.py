@@ -131,6 +131,7 @@ def compose_world_with_deferred_control(
     robot_sdf: str,
     *,
     output_directory: Path | None = None,
+    camera_config: dict | None = None,
 ) -> Path:
     """Put Panda in the initial world but defer its control system plugin."""
     root = ET.parse(world_path).getroot()
@@ -157,6 +158,8 @@ def compose_world_with_deferred_control(
     robot_model.remove(plugins[0])
     if world.find("./model[@name='panda']") is not None:
         raise ValueError("base Gazebo world already contains a Panda model")
+    if camera_config is not None:
+        _append_rgbd_camera(world, camera_config)
     world.append(robot_model)
     xml = ET.tostring(root, encoding="unicode", xml_declaration=True)
     digest = hashlib.sha256(xml.encode("utf-8")).hexdigest()[:16]
@@ -168,6 +171,47 @@ def compose_world_with_deferred_control(
     if not output_path.exists() or output_path.read_text() != xml:
         output_path.write_text(xml, encoding="utf-8")
     return output_path
+
+
+def _append_rgbd_camera(world: ET.Element, config: dict) -> None:
+    """Append the fixed RGB-D model generated from perception.yaml."""
+    name = str(config["model_name"])
+    if world.find(f"./model[@name='{name}']") is not None:
+        raise ValueError(f"base Gazebo world already contains camera {name!r}")
+    position = tuple(float(value) for value in config["position"])
+    rpy = tuple(float(value) for value in config["rpy"])
+    if len(position) != 3 or len(rpy) != 3:
+        raise ValueError("camera position and rpy must contain three values")
+    model = ET.SubElement(world, "model", {"name": name})
+    ET.SubElement(model, "static").text = "true"
+    ET.SubElement(model, "pose").text = " ".join(
+        str(value) for value in (*position, *rpy)
+    )
+    link = ET.SubElement(model, "link", {"name": str(config["link_name"])})
+    visual = ET.SubElement(link, "visual", {"name": "camera_visual"})
+    geometry = ET.SubElement(visual, "geometry")
+    box = ET.SubElement(geometry, "box")
+    ET.SubElement(box, "size").text = "0.06 0.04 0.04"
+    sensor = ET.SubElement(
+        link,
+        "sensor",
+        {"name": str(config["sensor_name"]), "type": "rgbd_camera"},
+    )
+    ET.SubElement(sensor, "always_on").text = "true"
+    ET.SubElement(sensor, "update_rate").text = str(config["update_rate_hz"])
+    ET.SubElement(sensor, "visualize").text = "false"
+    ET.SubElement(sensor, "topic").text = f"/{name}"
+    camera = ET.SubElement(sensor, "camera")
+    ET.SubElement(camera, "horizontal_fov").text = str(
+        config["horizontal_fov_rad"]
+    )
+    image = ET.SubElement(camera, "image")
+    ET.SubElement(image, "width").text = str(config["width"])
+    ET.SubElement(image, "height").text = str(config["height"])
+    ET.SubElement(image, "format").text = "R8G8B8"
+    clip = ET.SubElement(camera, "clip")
+    ET.SubElement(clip, "near").text = str(config["near_clip_m"])
+    ET.SubElement(clip, "far").text = str(config["far_clip_m"])
 
 
 def validate_sdf(sdf_xml: str) -> ET.Element:

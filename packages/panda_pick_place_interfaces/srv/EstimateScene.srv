@@ -1,0 +1,9 @@
+uint64 episode_id
+string scene
+string[] required_object_ids
+float64 timeout_sec
+---
+bool success
+string failure_type
+float64 latency_sec
+SceneObjectEstimate[] estimates

@@ -33,6 +33,9 @@ def _launch_setup(_context):
     output_path = LaunchConfiguration("output_path")
     summary_path = LaunchConfiguration("summary_path")
     readiness_timeout = LaunchConfiguration("readiness_timeout_sec")
+    pose_source = LaunchConfiguration("pose_source")
+    perception_timeout = LaunchConfiguration("perception_timeout_sec")
+    use_perception_debug = LaunchConfiguration("use_perception_debug")
 
     stack = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -47,6 +50,9 @@ def _launch_setup(_context):
             "start_application": "false",
             "physics_model_validated": "false",
             "readiness_timeout_sec": readiness_timeout,
+            "pose_source": pose_source,
+            "perception_timeout_sec": perception_timeout,
+            "use_perception_debug": use_perception_debug,
         }.items(),
     )
     gate = Node(
@@ -55,7 +61,11 @@ def _launch_setup(_context):
         name="panda_batch_stack_ready_gate",
         output="screen",
         parameters=[
-            {"use_sim_time": True, "grasp_mode": "assisted"},
+            {
+                "use_sim_time": True,
+                "grasp_mode": "assisted",
+                "pose_source": pose_source,
+            },
             {
                 "readiness_timeout_sec": ParameterValue(
                     readiness_timeout, value_type=float
@@ -80,6 +90,8 @@ def _launch_setup(_context):
             "moveit_command_gripper": "true",
             "output_path": output_path,
             "summary_path": summary_path,
+            "pose_source": pose_source,
+            "perception_timeout_sec": perception_timeout,
         }.items(),
     )
 
@@ -118,14 +130,25 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "output_path",
-                default_value="results/runs/gazebo_assisted/episodes.jsonl",
+                default_value="results/runs/gazebo_rgbd/episodes.jsonl",
             ),
             DeclareLaunchArgument(
                 "summary_path",
-                default_value="results/runs/gazebo_assisted/summary.json",
+                default_value="results/runs/gazebo_rgbd/summary.json",
             ),
             DeclareLaunchArgument(
                 "readiness_timeout_sec", default_value="120.0"
+            ),
+            DeclareLaunchArgument(
+                "pose_source",
+                default_value="rgbd",
+                choices=["ground_truth", "rgbd"],
+            ),
+            DeclareLaunchArgument("perception_timeout_sec", default_value="3.0"),
+            DeclareLaunchArgument(
+                "use_perception_debug",
+                default_value="false",
+                choices=["true", "false"],
             ),
             OpaqueFunction(function=_launch_setup),
         ]

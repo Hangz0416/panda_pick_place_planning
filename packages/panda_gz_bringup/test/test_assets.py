@@ -8,6 +8,7 @@ ROOT = Path(__file__).parents[1]
 PACKAGES = ROOT.parent
 MOVEIT = PACKAGES / "panda_moveit_config"
 INTERFACES = PACKAGES / "panda_pick_place_interfaces"
+PERCEPTION = PACKAGES / "panda_perception"
 
 
 def test_package_and_world_xml_are_well_formed():
@@ -88,9 +89,8 @@ def test_one_shared_xacro_selects_mock_or_modern_gazebo():
     assert '"hardware_type": "gz"' in launch_text
     assert "robot_sdf = convert_urdf_to_sdf(robot_description)" in launch_text
     assert "audit_model(robot_description, robot_sdf)" in launch_text
-    assert "compose_world_with_deferred_control(base_world, robot_sdf)" in (
-        launch_text
-    )
+    assert "compose_world_with_deferred_control(" in launch_text
+    assert "camera_config=camera_config" in launch_text
     assert 'executable="control_system_loader"' in launch_text
     assert "start_controllers_if_loaded" in launch_text
     assert "event.returncode == 0" in launch_text
@@ -204,6 +204,18 @@ def test_controller_and_bridge_contracts():
     )
     assert cube_odometry["ros_type_name"] == "nav_msgs/msg/Odometry"
     assert cube_odometry["gz_type_name"] == "gz.msgs.Odometry"
+    camera_bridges = {
+        item["ros_topic_name"]: item for item in bridges
+        if item["ros_topic_name"].startswith("/panda_perception/")
+    }
+    assert set(camera_bridges) == {
+        "/panda_perception/color/image_raw",
+        "/panda_perception/depth/image_raw",
+        "/panda_perception/camera_info",
+    }
+    assert camera_bridges["/panda_perception/color/image_raw"][
+        "gz_topic_name"
+    ] == "/overhead_camera/image"
 
 
 def test_typed_reset_and_model_mapping_contract():
@@ -244,6 +256,37 @@ def test_typed_reset_and_model_mapping_contract():
     assert "if success and spec is not None" in reset_manager
     assert '"/panda_hand_controller/gripper_cmd"' in reset_manager
     assert "GetPhysicalGraspState.Request.COMMAND_RESET" in reset_manager
+
+
+def test_typed_rgbd_interfaces_and_single_camera_config():
+    message = (INTERFACES / "msg" / "SceneObjectEstimate.msg").read_text()
+    service = (INTERFACES / "srv" / "EstimateScene.srv").read_text()
+    result = (INTERFACES / "msg" / "EpisodeResult.msg").read_text()
+    camera = yaml.safe_load(
+        (PERCEPTION / "config" / "perception.yaml").read_text()
+    )["camera"]
+    launch = (ROOT / "launch" / "panda_gz.launch.py").read_text()
+    for field in (
+        "string object_id",
+        "geometry_msgs/PoseWithCovariance pose",
+        "float64 confidence",
+        "uint32 valid_pixel_count",
+    ):
+        assert field in message
+    assert "string[] required_object_ids" in service
+    assert "SceneObjectEstimate[] estimates" in service
+    for field in (
+        "string pose_source",
+        "bool perception_success",
+        "float64 perception_latency_sec",
+        "float64 object_position_error_m",
+    ):
+        assert field in result
+    assert camera["width"] == 640
+    assert camera["height"] == 480
+    assert camera["update_rate_hz"] == 20.0
+    assert "perception.yaml" in launch
+    assert "camera_config=camera_config" in launch
 
 
 def test_scene_defaults_are_task_semantic_points():

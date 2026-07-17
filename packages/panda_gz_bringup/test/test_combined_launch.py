@@ -98,6 +98,9 @@ def test_combined_launch_description_generates_when_ros_is_available(monkeypatch
         "output_path",
         "physics_model_validated",
         "readiness_timeout_sec",
+        "pose_source",
+        "perception_timeout_sec",
+        "use_perception_debug",
     } <= argument_names
 
 
@@ -141,5 +144,8 @@ def test_gazebo_batch_wrapper_is_fail_closed_and_assisted_only():
         "output_path",
         "summary_path",
         "readiness_timeout_sec",
+        "pose_source",
+        "perception_timeout_sec",
+        "use_perception_debug",
     } <= declared_arguments
     assert 'DeclareLaunchArgument("grasp_mode"' not in source

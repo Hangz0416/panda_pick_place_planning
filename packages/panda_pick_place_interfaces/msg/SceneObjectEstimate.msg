@@ -1,0 +1,5 @@
+std_msgs/Header header
+string object_id
+geometry_msgs/PoseWithCovariance pose
+float64 confidence
+uint32 valid_pixel_count

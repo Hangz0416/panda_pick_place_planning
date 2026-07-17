@@ -10,6 +10,7 @@ from controller_manager_msgs.srv import ListControllers
 from nav_msgs.msg import Odometry
 from panda_pick_place_interfaces.action import PlanExecuteMotion
 from panda_pick_place_interfaces.srv import (
+    EstimateScene,
     GetExecutionCollisionState,
     GetPhysicalGraspState,
     RemoveWorldObject,
@@ -30,7 +31,10 @@ from rclpy.qos import (
 from ros_gz_interfaces.srv import ControlWorld, SetEntityPose
 from rosgraph_msgs.msg import Clock
 from sensor_msgs.msg import JointState
+from sensor_msgs.msg import CameraInfo, Image
 from std_srvs.srv import Trigger
+from tf2_ros import Buffer, TransformListener
+from rclpy.time import Time
 
 
 REQUIRED_CONTROLLERS = frozenset(
@@ -62,6 +66,7 @@ class StackReadyGate(Node):
         self.declare_parameter("status_period_sec", 2.0)
         self.declare_parameter("readiness_timeout_sec", 120.0)
         self.declare_parameter("controller_query_timeout_sec", 2.0)
+        self.declare_parameter("pose_source", "ground_truth")
 
         self.ready_event = threading.Event()
         self.terminal_event = threading.Event()
@@ -70,6 +75,9 @@ class StackReadyGate(Node):
         self._clock_seen = False
         self._joint_state_seen = False
         self._cube_odometry_seen = False
+        self._color_seen = False
+        self._depth_seen = False
+        self._camera_info_seen = False
         self._controller_states: dict[str, str] = {}
         self._controller_future = None
         self._controller_requested_at: float | None = None
@@ -78,6 +86,32 @@ class StackReadyGate(Node):
         self.create_subscription(
             Clock, "/clock", self._on_clock, CLOCK_QOS
         )
+        self._require_perception = (
+            str(self.get_parameter("pose_source").value) == "rgbd"
+        )
+        self._tf_buffer = None
+        self._tf_listener = None
+        if self._require_perception:
+            self.create_subscription(
+                Image,
+                "/panda_perception/color/image_raw",
+                lambda _message: setattr(self, "_color_seen", True),
+                qos_profile_sensor_data,
+            )
+            self.create_subscription(
+                Image,
+                "/panda_perception/depth/image_raw",
+                lambda _message: setattr(self, "_depth_seen", True),
+                qos_profile_sensor_data,
+            )
+            self.create_subscription(
+                CameraInfo,
+                "/panda_perception/camera_info",
+                lambda _message: setattr(self, "_camera_info_seen", True),
+                qos_profile_sensor_data,
+            )
+            self._tf_buffer = Buffer()
+            self._tf_listener = TransformListener(self._tf_buffer, self)
         self.create_subscription(
             JointState,
             "/joint_states",
@@ -125,6 +159,10 @@ class StackReadyGate(Node):
         if str(self.get_parameter("grasp_mode").value) == "physics":
             clients["physical_grasp_state"] = self.create_client(
                 GetPhysicalGraspState, "/panda_gz/get_physical_grasp_state"
+            )
+        if self._require_perception:
+            clients["estimate_scene"] = self.create_client(
+                EstimateScene, "/panda_perception/estimate_scene"
             )
         self._service_clients = clients
         self._controller_client = self.create_client(
@@ -179,6 +217,17 @@ class StackReadyGate(Node):
             missing.append("joint_states")
         if not self._cube_odometry_seen:
             missing.append("cube_odometry")
+        if self._require_perception:
+            if not self._color_seen:
+                missing.append("perception_color")
+            if not self._depth_seen:
+                missing.append("perception_depth")
+            if not self._camera_info_seen:
+                missing.append("perception_camera_info")
+            if self._tf_buffer is None or not self._tf_buffer.can_transform(
+                "world", "overhead_camera_optical_frame", Time()
+            ):
+                missing.append("tf:world->overhead_camera_optical_frame")
         inactive = sorted(
             controller
             for controller in REQUIRED_CONTROLLERS

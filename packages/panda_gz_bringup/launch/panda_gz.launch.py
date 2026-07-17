@@ -22,6 +22,7 @@ from launch.substitutions import (
 )
 from launch_ros.actions import Node
 import xacro
+import yaml
 
 from panda_gz_bringup.model_validation import (
     audit_model,
@@ -54,6 +55,12 @@ def _launch_setup(context):
     bridge = package_share / "config" / "bridge.yaml"
     grasp = package_share / "config" / "grasp.yaml"
     scene_config = package_share / "config" / f"scene_{scene}.yaml"
+    perception_share = Path(get_package_share_directory("panda_perception"))
+    perception_config_path = perception_share / "config" / "perception.yaml"
+    perception_config = yaml.safe_load(
+        perception_config_path.read_text(encoding="utf-8")
+    )
+    camera_config = perception_config["camera"]
     robot_xacro = (
         Path(get_package_share_directory("panda_moveit_config"))
         / "config"
@@ -88,7 +95,9 @@ def _launch_setup(context):
     ).toxml()
     robot_sdf = convert_urdf_to_sdf(robot_description)
     audit_model(robot_description, robot_sdf)
-    world = compose_world_with_deferred_control(base_world, robot_sdf)
+    world = compose_world_with_deferred_control(
+        base_world, robot_sdf, camera_config=camera_config
+    )
     gz_args = f"{'-s ' if headless else ''}-r -v 3 {world}"
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -160,6 +169,34 @@ def _launch_setup(context):
         name="panda_gz_entity_pose_bridge",
         output="screen",
         parameters=[{"world_name": "panda_pick_place"}],
+    )
+    camera_position = [str(value) for value in camera_config["position"]]
+    camera_rpy = [str(value) for value in camera_config["rpy"]]
+    optical_rpy = [
+        str(value) for value in camera_config["optical_rpy_from_link"]
+    ]
+    camera_world_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="overhead_camera_world_tf",
+        arguments=[
+            "--x", camera_position[0], "--y", camera_position[1],
+            "--z", camera_position[2], "--roll", camera_rpy[0],
+            "--pitch", camera_rpy[1], "--yaw", camera_rpy[2],
+            "--frame-id", str(camera_config["world_frame"]),
+            "--child-frame-id", str(camera_config["link_name"]),
+        ],
+    )
+    camera_optical_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="overhead_camera_optical_tf",
+        arguments=[
+            "--roll", optical_rpy[0], "--pitch", optical_rpy[1],
+            "--yaw", optical_rpy[2],
+            "--frame-id", str(camera_config["link_name"]),
+            "--child-frame-id", str(camera_config["optical_frame"]),
+        ],
     )
 
     spawners = []
@@ -262,6 +299,8 @@ def _launch_setup(context):
         bridge_topics,
         bridge_control,
         entity_pose_bridge,
+        camera_world_tf,
+        camera_optical_tf,
         control_loader,
         start_controllers,
         *managers,
