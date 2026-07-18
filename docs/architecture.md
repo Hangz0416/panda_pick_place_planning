@@ -21,6 +21,8 @@ ScenePoseProvider
         v
 PickPlaceRunner
         |
+        +--> GraspPoseGenerator --> planning-only feasibility --> deterministic selection
+        |
         +--> PyBulletBackend --> IK / Linear / RRT-Connect / PyBullet
         |
         +--> MoveItBackend --> PlanExecuteMotion Action --> C++ MoveIt bridge
@@ -42,6 +44,7 @@ evaluator_node --> JSONL
 | 位姿源协议与实现 | `core/scene_pose_provider.py` |
 | Backend 协议 | `core/backends/base.py` |
 | 抓放状态机 | `core/pick_place_fsm.py` |
+| 抓取候选生成与排序 | `core/grasp_pose.py` |
 | PyBullet 后端 | `core/backends/pybullet.py` |
 | MoveIt Python 后端 | `core/backends/moveit.py` |
 | Linear / RRT-Connect | `core/planners/linear.py` / `core/planners/rrt_connect.py` |
@@ -61,9 +64,13 @@ C++ bridge，Gazebo 世界管理集中在 `panda_gz_bringup`。
 ## 状态机
 
 ```text
-RESET -> PERCEPTION -> PRE_GRASP -> GRASP -> LIFT -> TRANSFER -> PLACE -> RETREAT -> DONE
-  |        |          |          |        |          |        |          |
-  +--------+----------+----------+--------+----------+--------+----------+--> FAILED
+RESET -> PERCEPTION -> GRASP_SELECTION -> PRE_GRASP -> GRASP -> LIFT
+  |        |               |              |          |        |
+  +--------+---------------+--------------+----------+--------+--> FAILED
+
+LIFT -> TRANSFER -> PLACE -> RETREAT -> DONE
+          |          |         |
+          +----------+---------+--> FAILED
 ```
 
 每次 `move_to_pose` 返回 `BackendMotionReport`。状态机负责失败阶段和任务语义，backend
@@ -96,7 +103,12 @@ ScenePoseProvider
 `- RGBDScenePoseProvider     # 调用类型化 EstimateScene 服务
 ```
 
-`panda_perception` 对彩色/深度图做近似同步，HSV 分割红色方块、绿色目标区和蓝色障碍物，
-再使用 CameraInfo 反投影、中值/MAD 过滤和 TF2 转到 `world`。服务只使用请求到达后的新帧，
-避免跨 episode 缓存泄漏。两种 provider 输出相同的世界坐标对象估计，状态机和 backend
-不因视觉算法而分叉；视觉模式下真值只用于 reset 和误差评测。
+`panda_perception` 对彩色/深度图做近似同步，HSV 分割红色工件、绿色目标区和蓝色障碍物，
+再使用 CameraInfo 反投影、中值/MAD 过滤和 TF2 转到 `world`。矩形工件的有效 world XY
+点云通过二维 PCA 得到主轴 yaw，并以特征值比拒绝方向歧义。服务只使用请求到达后的新帧，
+避免跨 episode 缓存泄漏。
+
+`GraspPoseGenerator` 对方块保留原固定顶抓，对矩形工件生成 yaw 与 yaw+π 两个对称候选。
+Backend 的 `check_pose_feasibility` 只规划、不执行，筛选出可行候选并按 pre-grasp 关节路径
+长度、候选序号确定性排序。选中朝向贯穿 pre-grasp、grasp、lift、transfer、place 和 retreat；
+视觉模式下真值只用于 reset 与误差评测。

@@ -8,6 +8,7 @@
 | MoveIt mock | 独立阶段 planning-only | `results/v2/moveit_mock_final/` |
 | Gazebo assisted | MoveIt 规划、控制器执行和约束辅助抓放 | `results/v2/gazebo_assisted_final/` |
 | Gazebo RGB-D assisted | RGB-D 位置估计驱动 MoveIt/Gazebo 闭环 | `results/runs/gazebo_rgbd/` |
+| Gazebo RGB-D grasp pose | 矩形工件 yaw 估计、候选筛选与 assisted 闭环 | `results/runs/gazebo_rgbd_grasp_pose/` |
 | 历史 PyBullet 冻结数据 | 保留原始哈希的早期基线 | `baselines/v0.1-pybullet-baseline/` |
 | 失败证据 | 用于定位问题，不混入最终汇总 | `results/v2/*failed_attempt*/` |
 
@@ -80,6 +81,48 @@ clear/obstacle 的关键 transfer 平均规划时间分别为 25.71 ms 和 33.93
 0.792 rad 和 2.142 rad；平均最终 XY 放置误差为 2.10 mm 和 2.12 mm。全部记录均完成
 release，碰撞率为 0%，没有 PlanningScene 同步错误或未分类 `runtime_error`。结果目录中的
 summary、环境信息、SVG 报告和 artifact manifest 均由原始 JSONL 重算或哈希生成。
+
+## Gazebo RGB-D grasp pose
+
+新增工件保持内部实体名 `cube/cube_link`，外形为 60×40×50 mm。yaw 由 task seed 在
+`[-π/2, π/2)` 内确定性生成；视觉节点对矩形工件的 world-XY 点云做二维 PCA，低特征值比
+返回 `orientation_ambiguous`。状态机根据估计 yaw 生成两个相差 π 的顶抓候选，以 MoveIt
+planning-only 检查可规划性与碰撞，按 pre-grasp 关节路径长度选择，筛选期间不执行轨迹。
+
+nominal 正式回归的原始记录位于
+`results/runs/gazebo_rgbd_grasp_pose/nominal_rgbd/`，clear 和 obstacle 各 50 个 episode。
+必需目标检测、抓取候选生成/筛选、规划、执行与任务在两组均为 50/50 成功；全部记录的
+感知、候选、跟踪、放置与碰撞字段完整。
+
+| 场景 | 任务结果 | 工件位置误差均值 / P95 | yaw 误差均值 / P95 | 感知耗时均值 / P95 | 候选路径 P95 |
+| --- | --- | ---: | ---: | ---: | ---: |
+| clear | 50/50 | 2.55 / 4.16 mm | 1.44° / 3.28° | 54.81 / 130.63 ms | 3.218 rad |
+| obstacle | 50/50 | 1.74 / 2.50 mm | 2.20° / 4.94° | 65.57 / 163.45 ms | 3.764 rad |
+
+clear/obstacle 的关键 transfer 平均规划时间为 26.94 ms 和 35.22 ms，平均关节路径长度为
+0.890 rad 和 2.303 rad，平均最终 XY 放置误差为 2.29 mm 和 2.94 mm。两组无无效碰撞、
+PlanningScene 同步错误或未分类 `runtime_error`。
+
+同一 `(scene, task_seed)` 的 ground-truth 对照位于 `nominal_ground_truth/`：clear 为 50/50，
+obstacle 为 47/50，3 条均明确分类为 `invalid_motion_plan`。两组覆盖经
+`paired_nominal_report/` 严格配对审计；该差异受 OMPL 采样和目标位姿细微变化影响，不能解释为
+“视觉比真值更准确”。
+
+第一次 nominal RGB-D 正式尝试中，单一 seeded IK 在 obstacle 的 PLACE 阶段产生 11 条
+`GOAL_STATE_INVALID`，原始记录保存在 `nominal_rgbd_failed_attempt_single_ik/`。修复将该
+MoveIt error code 映射为稳定失败类型，并只在此错误出现时、原 3 秒预算的剩余时间内切换一次
+pose-sampling IK；不执行试探轨迹，也不对其他规划错误扩大重试。固定任务重跑后 obstacle 从
+39/50 恢复到 50/50。
+
+`combined` 扰动结果位于 `combined_rgbd/`，clear/obstacle 各 20 个 episode，均完整成功。
+两组工件位置误差 P95 分别为 3.85 mm、2.83 mm，yaw 误差 P95 分别为 6.84°、6.59°，
+感知耗时 P95 分别为 132.25 ms、144.94 ms。`low_light`、`rgb_noise`、`depth_dropout` 与
+`combined` 均由 `(episode_id, task_seed)` 确定，不代表真实相机域随机化或真机鲁棒性。
+
+旧方块兼容回归分别位于 `cube_ground_truth_quick/` 和 `cube_rgbd_quick/`。两种 pose source
+均完成 5 clear + 5 obstacle，全部任务成功；方块继续使用单个旧版固定朝向候选，不声明 yaw
+可观测性。两组也通过 `(scene, task_seed)` 配对覆盖检查，说明新增矩形姿态链路没有复制状态机
+或破坏原方块语义。
 
 ## 跨后端比较边界
 

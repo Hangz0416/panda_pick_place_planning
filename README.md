@@ -9,7 +9,9 @@
 
 - 在 PyBullet 中运行 Panda 桌面抓放，使用自研 Linear 或双向 RRT-Connect。
 - 通过 MoveIt 2 / OMPL 进行规划，管理 PlanningScene 和 AttachedCollisionObject。
-- 通过顶置 RGB-D 相机、OpenCV HSV 分割、深度反投影和 TF2 估计场景目标位置。
+- 通过顶置 RGB-D 相机、OpenCV HSV 分割、深度反投影和 TF2 估计场景目标位置；
+  对 `60×40×50 mm` 矩形工件的 world XY 点云做 PCA，估计平面 yaw。
+- 根据视觉 yaw 生成两个相差 π 的对称顶抓候选，使用 MoveIt planning-only 筛选后再执行。
 - 通过 `ros2_control` 在 Gazebo Fortress 执行视觉驱动轨迹，完成可重置的约束辅助抓放。
 - 记录规划、执行、放置误差、跟踪误差、碰撞与失败阶段。
 - 在 clear 与 obstacle 场景中进行单次演示或固定种子批量评测。
@@ -25,7 +27,8 @@ Gazebo RGB-D -> EstimateScene -> ScenePoseProvider
 ManipulationTask -----------------+
        |
        v
-PickPlaceRunner  (RESET -> PERCEPTION -> PRE_GRASP -> GRASP -> LIFT -> TRANSFER -> PLACE -> RETREAT)
+PickPlaceRunner  (RESET -> PERCEPTION -> GRASP_SELECTION -> PRE_GRASP -> GRASP
+                  -> LIFT -> TRANSFER -> PLACE -> RETREAT)
        |
        +---------------------------+
        |                           |
@@ -129,20 +132,22 @@ planning-only 只验证规划和 PlanningScene，结果保持 `not_executed`，�
 ### 3. MoveIt 2 + Gazebo 完整抓放
 
 ```bash
-ros2 launch panda_gz_bringup panda_moveit_gz.launch.py \
-  scene:=clear seed:=42 grasp_mode:=assisted \
-  pose_source:=rgbd headless:=false use_rviz:=false \
-  use_perception_debug:=true start_application:=true
+ros2 launch panda_gz_bringup panda_visual_pick_place.launch.py \
+  scene:=clear seed:=42 object_variant:=rect_prism \
+  pose_source:=rgbd perception_profile:=nominal \
+  headless:=false use_rviz:=true
 ```
 
 将 `scene:=clear` 替换为 `scene:=obstacle` 即可观察障碍绕行。readiness gate 会在
 `/clock`、相机图像、CameraInfo、TF、关节/方块状态、控制器、Service 和 Action 都就绪后
 才启动任务。`pose_source:=ground_truth` 保留为 oracle 回归；视觉模式的运动目标与
-PlanningScene 均来自 `EstimateScene`，任务真值只用于 reset 和误差评测。
+PlanningScene 均来自 `EstimateScene`，任务真值只用于 reset 和误差评测。将
+`object_variant:=rect_prism` 改为 `cube` 可回归原方块；矩形工件 yaw 由 task seed
+确定性生成。
 
 相机发布 `/panda_perception/color/image_raw`、`depth/image_raw` 和 `camera_info`；调试叠加图
-发布到 `/panda_perception/debug/overlay`。当前方法估计轴对齐方块、目标区和障碍物的中心位置，
-不宣称通用六自由度位姿识别。
+发布到 `/panda_perception/debug_overlay`。当前方法估计已知尺寸物体的位置，并只对矩形工件
+估计绕 world Z 的平面方向；不宣称通用六自由度位姿识别。
 
 ## 批量评测
 
@@ -170,9 +175,10 @@ Gazebo RGB-D assisted：
 ```bash
 ros2 launch panda_gz_bringup gazebo_batch.launch.py \
   episodes_per_scene:=5 seed:=42 scenes_csv:=clear,obstacle \
-  pose_source:=rgbd headless:=true use_rviz:=false \
-  output_path:=results/runs/gazebo_rgbd/episodes.jsonl \
-  summary_path:=results/runs/gazebo_rgbd/summary.json
+  object_variant:=rect_prism pose_source:=rgbd \
+  perception_profile:=nominal headless:=true use_rviz:=false \
+  output_path:=results/runs/gazebo_rgbd_grasp_pose/episodes.jsonl \
+  summary_path:=results/runs/gazebo_rgbd_grasp_pose/summary.json
 ```
 
 `results/runs/` 为新实验的统一输出位置，默认不提交 Git，避免覆盖已审计数据。
@@ -224,6 +230,25 @@ obstacle / Linear 是专门构造的直连受阻任务，不表示 Linear 在所
 XY 放置误差分别为 2.10 mm 和 2.12 mm。该结果只说明固定颜色、已知尺寸、轴对齐物体的
 Gazebo assisted 视觉闭环，不代表开放场景感知、物理夹持或真机表现。
 
+### 矩形工件 yaw 与抓取候选正式回归
+
+固定主种子 42，`rect_prism + RGB-D + nominal` 在 clear/obstacle 各运行 50 个完整 assisted
+episode。两组必需目标检测、候选筛选、规划和任务均为 50/50 成功，未出现无效碰撞、
+PlanningScene 同步错误或未分类 `runtime_error`。
+
+| 场景 | 工件位置误差 P95 | yaw 误差 P95 | 感知耗时 P95 | 候选路径代价 P95 | 最终 XY 误差均值 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| clear | 4.16 mm | 3.28° | 130.63 ms | 3.218 rad | 2.29 mm |
+| obstacle | 2.50 mm | 4.94° | 163.45 ms | 3.764 rad | 2.94 mm |
+
+`combined` 合成扰动另运行 20 clear + 20 obstacle：两组任务均完成，工件位置误差 P95
+最大为 3.85 mm，yaw 误差 P95 最大为 6.84°。这里的 `combined` 是确定性低亮度、RGB
+高斯噪声和深度丢失组合，不代表真实相机域随机化。
+
+原始 JSONL、summary、SVG 报告、环境记录与 SHA256 manifest 分别位于
+`results/runs/gazebo_rgbd_grasp_pose/nominal_rgbd/` 和 `combined_rgbd/`。同任务
+ground-truth 对照与 RGB-D 数据已通过 `(scene, task_seed)` 配对覆盖审计。
+
 ## 成功判据与指标
 
 `task_success` 同时要求：方块已释放，XY 误差不超过 40 mm，中心高度误差不超过
@@ -231,7 +256,8 @@ Gazebo assisted 视觉闭环，不代表开放场景感知、物理夹持或真�
 碰撞观测可用。
 
 `EpisodeResult` 记录 backend、simulator、planner、seed、pose source、感知耗时与位置误差、各状态规划/执行时间、
-关节路径长度、轨迹点、跟踪误差、放置误差、物体速度、attach/release、碰撞和失败分类。
+物体 yaw 误差、候选数量与筛选代价、关节路径长度、轨迹点、跟踪误差、放置误差、
+物体速度、attach/release、碰撞和失败分类。
 缺失观测使用 `null`/NaN，不会被冒充为安全结果。
 
 ## 测试
@@ -258,7 +284,8 @@ colcon test-result --verbose
 ## 已知边界
 
 - 抓取使用 assisted 约束，不是纯接触物理抓取。
-- RGB-D 方法依赖已知颜色和尺寸，只估计轴对齐目标中心位置；未做相机标定、YOLO 或通用 6D 位姿。
+- RGB-D 方法依赖已知颜色和尺寸；矩形工件只估计平面位置与 yaw，方块和圆形目标区不声明
+  可观测方向；未做相机标定、YOLO 或通用 6D 位姿。
 - 没有真机部署，不将仿真结果外推到真实硬件。
 - `physics_model_validated` 保持为 false，物理抓取模式 fail-closed。
 - ROS 2 Humble 中的 MoveIt 2.5.9 在任务和结果写入后，整套系统退出时可能在

@@ -5,7 +5,8 @@
 引用稳定，不需要在简历中讲版本迁移。
 
 面试时需要主动说清：Gazebo 使用门控 DetachableJoint 的 assisted grasp，不是 physics
-grasp；RGB-D 只做已知颜色、已知尺寸、轴对齐目标的位置估计；结果不外推为真机成功率。
+grasp；RGB-D 依赖已知颜色和尺寸，矩形工件只估计平面位置与绕 Z 轴方向，不是通用 6D
+位姿估计；结果不外推为真机成功率。
 
 ## 当前可直接使用的简历项目经历
 
@@ -24,12 +25,17 @@ grasp；RGB-D 只做已知颜色、已知尺寸、轴对齐目标的位置估计
   attach/detach；接入 Gazebo Fortress 与 `gz_ros2_control`，完成控制器驱动、确定性重置
   和约束辅助抓放，clear/obstacle 平均规划时间为 23.77 ms 和 33.41 ms。
 - 增加 Gazebo 顶置 RGB-D 相机与 OpenCV 感知节点，通过近似时间同步、HSV 分割、深度反投影、
-  中值/MAD 过滤和 TF2 估计方块、目标区及障碍物中心；抽象 `ScenePoseProvider`，使真值 oracle
-  与 RGB-D 位姿源复用同一状态机，并对视觉模式建立防真值泄漏测试；视觉闭环中方块、目标区
-  和障碍物位置误差 P95 分别不超过 4.07 mm、3.35 mm 和 2.31 mm。
+  中值/MAD 过滤和 TF2 估计工件、目标区及障碍物位置；对矩形工件 world-XY 点云执行 PCA
+  估计 yaw，并依据特征值比拒绝方向不可观测的目标。
+- 根据视觉 yaw 生成两个相差 π 的对称顶抓候选，调用 MoveIt planning-only 逐个检查碰撞与
+  可规划性，再按预抓取关节路径长度确定性选择；运动目标与 PlanningScene 均来自视觉结果，
+  并通过防真值泄漏测试保证任务真值只用于 reset 和离线误差评测。
+- 在固定种子 nominal 视觉回归中，矩形工件位置与 yaw 误差 P95 分别不超过 4.16 mm 和
+  4.94°，感知耗时 P95 不超过 163.5 ms；在低亮度、RGB 噪声和深度丢失组合扰动下，位置与
+  yaw 误差 P95 分别不超过 3.85 mm 和 6.84°。
 - 建立 IK、规划、碰撞、抓取、执行、场景同步和放置失败分类；针对 PyBullet IK 可运动关节
-  映射、固定关节连杆伪自碰撞及 Gazebo 夹爪 `stalled` 问题，分别完成参数映射、刚性组件
-  内部接触过滤和带门控回滚的抓取事务修复。
+  映射、固定关节连杆伪自碰撞、Gazebo 夹爪 `stalled` 及 MoveIt seeded IK 无效目标问题，
+  分别完成参数映射、刚性组件内部接触过滤、带门控回滚的抓取事务和预算内 IK 分支回退。
 
 简历可以写“Gazebo assisted 闭环完成”，不能写“完成物理抓取”。实验结果只限于
 当前固定仿真任务分布。
@@ -61,14 +67,20 @@ Gazebo 中的 grasp 是位姿与实测夹爪宽度门控后的 DetachableJoint �
 限定为 assisted 规划控制闭环，不会混写成 physics grasp。
 视觉部分使用顶置 RGB-D：HSV 分割场景目标，利用深度和内参反投影，再经 TF2 转到 world。
 `ScenePoseProvider` 保证视觉结果直接驱动运动目标和 PlanningScene；任务真值只负责 reset 与
-离线误差统计，因此不会出现视觉模式偷偷读取真值的问题。
+离线误差统计，因此不会出现视觉模式偷偷读取真值的问题。矩形工件的 world-XY 点云通过 PCA
+估计平面 yaw；状态机生成两个 π 对称候选，以 planning-only 检查后选择关节路径较短的候选，
+筛选过程不会让机械臂运动。
+正式 nominal 回归中，矩形工件位置误差 P95 最差为 4.16 mm，yaw 误差 P95 最差为 4.94°；
+组合传感器扰动下两项 P95 最差为 3.85 mm 和 6.84°。这些数字只描述当前已知颜色、尺寸与
+顶置相机的 Gazebo assisted 分布，不外推到开放场景或真机。
 
 ## 代码流程
 
 ### 1. 任务生成与类型化通信
 
 1. packages/panda_pick_place_planning/.../core/tasks.py 根据 task seed 生成物体和目标位置。
-2. TaskSpec 记录 planner、planner seed、scene、backend、simulator 和 grasp_mode。
+2. TaskSpec 记录 planner、planner seed、scene、backend、simulator、grasp_mode、object variant、
+   确定性 object yaw 和感知扰动 profile。
 3. task_generator_node.py 将 TaskSpec 转成 ManipulationTask，发布 /manipulation_task。
 4. manipulation_node.py 校验 task.backend 与节点 backend 一致，再交给共享 PickPlaceRunner。
 5. evaluator_node.py 订阅类型化 EpisodeResult，转换为 Python schema 后追加写入 JSONL。
@@ -82,6 +94,7 @@ PickPlaceRunner.run() 的状态顺序是：
 ~~~text
 RESET
   → PERCEPTION：等待 reset 后新 RGB-D 帧并估计 world 坐标对象中心
+  → GRASP_SELECTION：生成 π 对称候选，planning-only 筛选并确定抓取朝向
   → PRE_GRASP：到物体上方，再下降到抓取位姿
   → GRASP：闭合夹爪并请求后端确认 attach
   → LIFT：携物抬升
@@ -130,12 +143,13 @@ Python FSM 使用两线程 MultiThreadedExecutor；长任务订阅和后端 Acti
 2. `SceneEstimatorNode` 用 ApproximateTimeSynchronizer 配对 RGB/depth；每次 EstimateScene
    请求记住当前帧代数，只接受请求之后到达的新同步帧。
 3. `HSVSceneDetector` 取最大连通域，进行面积过滤；有效深度先裁剪范围，再通过中值和 MAD
-   剔除异常值。
+   剔除异常值。矩形工件对 world-XY 点云做二维 PCA，由主特征向量估计 yaw；特征值比低于
+   阈值时返回 `orientation_ambiguous`，不伪造方向。
 4. 像素通过 `(u-cx)z/fx, (v-cy)z/fy, z` 反投影到光学坐标系，再使用 TF2 转到 world；
    已知顶面高度用于换算轴对齐物体中心高度。
-5. `RGBDScenePoseProvider` 将类型化服务结果转换为统一 `SceneEstimate`。FSM 的 pre-grasp、
-   transfer 和 MoveIt PlanningScene 使用这些估计；原始 TaskSpec 只传给 Gazebo reset，并用于
-   计算 object/target/obstacle position error。
+5. `RGBDScenePoseProvider` 将类型化服务结果转换为统一 `SceneEstimate`。FSM 的抓取候选、
+   pre-grasp、transfer 和 MoveIt PlanningScene 使用这些估计；原始 TaskSpec 只传给 Gazebo
+   reset，并用于计算 position/yaw error。
 6. obstacle 场景缺障碍物立即返回 `obstacle_not_detected`，clear 场景不要求障碍物。任何感知
    失败都停在 PERCEPTION，不继续规划或执行。
 
@@ -170,9 +184,10 @@ mock ros2_control 的 GenericSystem 可以验证：
    service/action 全部就绪，才允许启动共享 FSM。
 4. typed ResetEpisode 暂停世界、请求 detach、按任务 seed reset model、用轨迹控制器回 home、
    校验关节位置/速度、再次设置方块/目标/障碍物后恢复。
-5. 抓取前先保持 76 mm 总开度；45° 手爪下 50 mm 方块的平面对角线约为 70.7 mm，因此可避免
-   方块与手指互穿。
-6. AssistedGraspManager 同时检查手—物相对位置、姿态、距离与夹爪宽度。
+5. 抓取前保持 76 mm 总开度；方块沿用原固定朝向，60×40 mm 矩形工件则根据视觉 yaw 对齐
+   抓取朝向，避免 attach 前手指与工件互穿。
+6. AssistedGraspManager 同时检查手—物相对位置、姿态、距离与夹爪宽度；姿态误差按夹爪
+   π 对称性归一化。
 7. Gazebo 确认 DetachableJoint attached 后，MoveItBackend 才添加
    AttachedCollisionObject；失败则回滚 detach。
 8. 类型化碰撞服务只有在机器人接触、方块接触和方块位姿都可用后才允许成功判定。
@@ -201,7 +216,8 @@ MoveItBackend 也不会伪造 attach 成功。
 ### 1. 这个项目现在到底完成到什么程度？
 
 回答要点：PyBullet 算法基线、MoveIt planning-only 和 Gazebo assisted 均已验证；RGB-D
-感知已经通过 `ScenePoseProvider` 接入同一状态机，视觉结果驱动运动目标和 PlanningScene。
+感知已经通过 `ScenePoseProvider` 接入同一状态机，矩形工件 PCA yaw 估计和 MoveIt 抓取候选
+筛选也进入同一闭环，视觉结果驱动运动目标和 PlanningScene。
 当前边界是未完成 physics grasp、真机和通用 6D 位姿，Humble `move_group` 在结果落盘后的
 关闭析构存在已知段错误。
 
@@ -335,9 +351,10 @@ physics/真机；MoveIt 2.5.9 的批次关闭析构不干净；HSV 方法依赖�
 
 ### 23. 下一步你会按什么顺序推进？
 
-回答要点：当前先用配对任务比较 ground truth 与 RGB-D 的位姿误差和抓放结果，按感知失败
-类型改进阈值与遮挡鲁棒性；若岗位需要，再保持 `ScenePoseProvider` 接口不变，用 YOLO 替换
-颜色分割。仍不在 assisted 动力学边界上直接叠加强化学习。
+回答要点：先完成 nominal 和合成扰动下的位置/yaw、候选可行率与抓放结果评测，按
+`orientation_ambiguous`、检测失败和规划失败分别定位；若岗位需要，再保持
+`ScenePoseProvider` 接口不变，用 YOLO 替换颜色分割。仍不在 assisted 动力学边界上直接
+叠加强化学习。
 
 ### 24. 为什么当前不加入强化学习？
 
@@ -369,6 +386,36 @@ cube/obstacle PlanningScene 更新都读取 `SceneEstimate`。测试用故意偏
 误差来源和失败分类清楚；检测器被封装在 `EstimateScene` / `ScenePoseProvider` 后面，后续替换 YOLO
 不需要改 FSM、MoveIt 后端或结果 schema。不能把这套 HSV 结果描述成开放场景泛化能力。
 
+### 29. 如何从 RGB-D 点云估计矩形工件 yaw？
+
+回答要点：先把红色连通域的有效深度像素反投影到相机坐标，再通过 TF2 变换到 world；取
+world-XY 点云，去中心后计算 2×2 协方差矩阵并做特征分解。最大特征值对应的特征向量是长轴，
+`atan2(v_y, v_x)` 得到 yaw，最后归一化到 `[-π/2, π/2)`，因为矩形长轴没有正反方向。
+
+### 30. 为什么用特征值比，而不是任何轮廓都返回 yaw？
+
+回答要点：正方形或近圆目标的两个主方向方差接近，主轴会被像素和深度噪声任意翻转。用
+`lambda_max/lambda_min` 衡量方向可观测性，低于 1.25 返回 `orientation_ambiguous`，让 episode
+明确失败，而不是给 MoveIt 一个看似合法但没有物理意义的方向。
+
+### 31. 为什么矩形工件生成两个相差 π 的候选？
+
+回答要点：平行夹爪绕接近方向旋转 π 后具有相同几何抓取效果，但 Panda 当前关节状态、障碍物
+和关节限位会使两条到达路径不同。两个候选都做 planning-only，保留可规划且无碰撞的候选，
+再按预抓取关节路径长度选择；同分按候选序号，保证复现。
+
+### 32. 如何证明候选筛选没有让机械臂先试着动？
+
+回答要点：后端提供独立 `check_pose_feasibility`。MoveIt 复用 `PlanExecuteMotion.action`，但强制
+`execute=false`；PyBullet 只做 IK、关节限位和碰撞规划，不调用轨迹执行。测试断言 Action goal
+的 execute 字段为 false，并检查筛选前后关节状态不变。
+
+### 33. 合成传感器扰动的意义和边界是什么？
+
+回答要点：low_light、RGB 高斯噪声、深度 dropout 及 combined 由 episode id 和 task seed
+确定性生成，目的是检查感知链路的退化趋势和失败分类，不改变任务真值。它们不是相机标定、
+真实域随机化或 sim-to-real 证据，因此只能报告为合成扰动鲁棒性实验。
+
 ## 面试前自查清单
 
 - 能画出统一 FSM、两个 backend 和 MoveIt/Gazebo 的数据流。
@@ -380,6 +427,7 @@ cube/obstacle PlanningScene 更新都读取 `SceneEstimate`。测试用故意偏
 - 能区分 planning-only、mock execution、Gazebo execution 和 task_success。
 - 能解释 Gazebo/PlanningScene attach 的顺序与回滚。
 - 能解释 RGB-D 同步、反投影、TF2 变换，以及视觉模式为何没有真值泄漏。
+- 能手推二维 PCA yaw、解释特征值比和 π 对称，并说明候选筛选为何是 planning-only。
 - 能主动说出当前未交付的是 physics、真机、通用 6D 感知和干净 teardown。
 - 能从冻结 manifest 找到历史数据，并保证新结果写入 results/runs。
 - 能根据真实失败类型提出下一项实验，而不是先调成功率口径。
