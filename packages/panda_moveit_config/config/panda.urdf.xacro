@@ -6,6 +6,7 @@
     default="$(find panda_moveit_config)/config/initial_positions.yaml" />
   <xacro:arg name="controllers_file" default="" />
   <xacro:arg name="assisted_grasp" default="true" />
+  <xacro:arg name="workpiece_count" default="1" />
 
   <!-- This is the only Panda robot_description entry point for mock and Gazebo. -->
   <xacro:include filename="panda_description.urdf.xacro" />
@@ -58,6 +59,7 @@
     <xacro:panda_gz_ros2_control
       initial_positions_file="$(arg initial_positions_file)"
       controllers_file="$(arg controllers_file)"
-      assisted_grasp="$(arg assisted_grasp)" />
+      assisted_grasp="$(arg assisted_grasp)"
+      workpiece_count="$(arg workpiece_count)" />
   </xacro:if>
 </robot>

@@ -27,15 +27,16 @@ grasp；RGB-D 依赖已知颜色和尺寸，矩形工件只估计平面位置与
 - 增加 Gazebo 顶置 RGB-D 相机与 OpenCV 感知节点，通过近似时间同步、HSV 分割、深度反投影、
   中值/MAD 过滤和 TF2 估计工件、目标区及障碍物位置；对矩形工件 world-XY 点云执行 PCA
   估计 yaw，并依据特征值比拒绝方向不可观测的目标。
-- 根据视觉 yaw 生成两个相差 π 的对称顶抓候选，调用 MoveIt planning-only 逐个检查碰撞与
-  可规划性，再按预抓取关节路径长度确定性选择；运动目标与 PlanningScene 均来自视觉结果，
-  并通过防真值泄漏测试保证任务真值只用于 reset 和离线误差评测。
-- 在固定种子 nominal 视觉回归中，矩形工件位置与 yaw 误差 P95 分别不超过 4.16 mm 和
-  4.94°，感知耗时 P95 不超过 163.5 ms；在低亮度、RGB 噪声和深度丢失组合扰动下，位置与
-  yaw 误差 P95 分别不超过 3.85 mm 和 6.84°。
+- 对三个矩形工件分别生成两个相差 π 的对称顶抓候选，调用 MoveIt planning-only 联合检查
+  碰撞与可规划性，以“预抓取关节路径长度 + 置信度惩罚”确定性选择工件和姿态；运动目标与
+  PlanningScene 均来自视觉结果，并通过防真值泄漏测试保证真值只用于 reset 和离线评测。
+- 在固定种子 nominal 三工件视觉回归中，完整检测、联合选择和 assisted 任务成功率均为
+  100%，选中工件位置与 yaw 误差 P95 分别不超过 5.15 mm 和 4.76°；在低亮度、RGB 噪声
+  和深度丢失组合扰动下，两项 P95 分别不超过 4.34 mm 和 7.56°，未选工件无可测位移。
 - 建立 IK、规划、碰撞、抓取、执行、场景同步和放置失败分类；针对 PyBullet IK 可运动关节
   映射、固定关节连杆伪自碰撞、Gazebo 夹爪 `stalled` 及 MoveIt seeded IK 无效目标问题，
-  分别完成参数映射、刚性组件内部接触过滤、带门控回滚的抓取事务和预算内 IK 分支回退。
+  分别完成参数映射、刚性组件内部接触过滤、带门控回滚的抓取事务和预算内 IK 分支回退；
+  进一步定位失败 episode 遗留 AttachedCollisionObject 的跨 episode 污染，改为全工件清理。
 
 简历可以写“Gazebo assisted 闭环完成”，不能写“完成物理抓取”。实验结果只限于
 当前固定仿真任务分布。
@@ -68,11 +69,12 @@ Gazebo 中的 grasp 是位姿与实测夹爪宽度门控后的 DetachableJoint �
 视觉部分使用顶置 RGB-D：HSV 分割场景目标，利用深度和内参反投影，再经 TF2 转到 world。
 `ScenePoseProvider` 保证视觉结果直接驱动运动目标和 PlanningScene；任务真值只负责 reset 与
 离线误差统计，因此不会出现视觉模式偷偷读取真值的问题。矩形工件的 world-XY 点云通过 PCA
-估计平面 yaw；状态机生成两个 π 对称候选，以 planning-only 检查后选择关节路径较短的候选，
-筛选过程不会让机械臂运动。
-正式 nominal 回归中，矩形工件位置误差 P95 最差为 4.16 mm，yaw 误差 P95 最差为 4.94°；
-组合传感器扰动下两项 P95 最差为 3.85 mm 和 6.84°。这些数字只描述当前已知颜色、尺寸与
-顶置相机的 Gazebo assisted 分布，不外推到开放场景或真机。
+估计平面 yaw；三个实例按 world X/Y 稳定编号，状态机为每个方向有效工件生成两个 π 对称候选，
+以 planning-only 联合检查后选择路径短且置信度高的工件与姿态，筛选过程不会让机械臂运动。
+正式三工件 nominal 回归中，完整检测、联合选择和任务成功率均为 100%，选中工件位置误差
+P95 最差为 5.15 mm，yaw 误差 P95 最差为 4.76°；组合传感器扰动下两项 P95 最差为
+4.34 mm 和 7.56°。三个实例都曾被选中，未选工件无可测位移。这些数字只描述当前已知颜色、
+尺寸与顶置相机的 Gazebo assisted 分布，不外推到开放场景或真机。
 
 ## 代码流程
 
@@ -94,7 +96,7 @@ PickPlaceRunner.run() 的状态顺序是：
 ~~~text
 RESET
   → PERCEPTION：等待 reset 后新 RGB-D 帧并估计 world 坐标对象中心
-  → GRASP_SELECTION：生成 π 对称候选，planning-only 筛选并确定抓取朝向
+  → GRASP_SELECTION：为全部工件生成 π 对称候选，联合筛选工件与抓取朝向
   → PRE_GRASP：到物体上方，再下降到抓取位姿
   → GRASP：闭合夹爪并请求后端确认 attach
   → LIFT：携物抬升
@@ -142,14 +144,14 @@ Python FSM 使用两线程 MultiThreadedExecutor；长任务订阅和后端 Acti
    `world → overhead_camera_link → overhead_camera_optical_frame`。
 2. `SceneEstimatorNode` 用 ApproximateTimeSynchronizer 配对 RGB/depth；每次 EstimateScene
    请求记住当前帧代数，只接受请求之后到达的新同步帧。
-3. `HSVSceneDetector` 取最大连通域，进行面积过滤；有效深度先裁剪范围，再通过中值和 MAD
-   剔除异常值。矩形工件对 world-XY 点云做二维 PCA，由主特征向量估计 yaw；特征值比低于
-   阈值时返回 `orientation_ambiguous`，不伪造方向。
+3. `HSVSceneDetector` 提取全部满足面积阈值的红色连通域；有效深度先裁剪范围，再通过中值和
+   MAD 剔除异常值。矩形工件对 world-XY 点云做二维 PCA，由主特征向量估计 yaw；特征值比
+   低于阈值时返回 `orientation_ambiguous`，该实例仍作为障碍物但不生成候选。
 4. 像素通过 `(u-cx)z/fx, (v-cy)z/fy, z` 反投影到光学坐标系，再使用 TF2 转到 world；
    已知顶面高度用于换算轴对齐物体中心高度。
-5. `RGBDScenePoseProvider` 将类型化服务结果转换为统一 `SceneEstimate`。FSM 的抓取候选、
-   pre-grasp、transfer 和 MoveIt PlanningScene 使用这些估计；原始 TaskSpec 只传给 Gazebo
-   reset，并用于计算 position/yaw error。
+5. 连通域转换到 world 后按 X、再按 Y 排序为 `workpiece_0..2`，不读取任务真值；
+   `RGBDScenePoseProvider` 将类型化服务结果转换为统一 `SceneEstimate`。FSM 的抓取候选、
+   pre-grasp、transfer 和 PlanningScene 使用全部估计；TaskSpec 只传给 reset，并用于离线误差。
 6. obstacle 场景缺障碍物立即返回 `obstacle_not_detected`，clear 场景不要求障碍物。任何感知
    失败都停在 PERCEPTION，不继续规划或执行。
 
@@ -180,16 +182,16 @@ mock ros2_control 的 GenericSystem 可以验证：
 1. `panda_moveit_gz.launch.py` 是已有单入口；它复用共享 Panda Xacro 的 `hardware_type:=gz`，
    只创建一份 robot_state_publisher/controller manager，并组合 move_group、bridge 与应用节点。
 2. gz_ros2_control 暴露 7 轴 trajectory controller、gripper controller 与 joint state。
-3. readiness gate 等待 `/clock`、关节状态、方块 odometry、三个 active controller 和必要
+3. readiness gate 等待 `/clock`、关节状态、三工件 odometry、三个 active controller 和必要
    service/action 全部就绪，才允许启动共享 FSM。
-4. typed ResetEpisode 暂停世界、请求 detach、按任务 seed reset model、用轨迹控制器回 home、
-   校验关节位置/速度、再次设置方块/目标/障碍物后恢复。
+4. typed ResetEpisode 暂停世界、detach 全部工件、按任务 seed reset 三组 pose/yaw、用轨迹
+   控制器回 home，校验关节、实体位置和速度后恢复。
 5. 抓取前保持 76 mm 总开度；方块沿用原固定朝向，60×40 mm 矩形工件则根据视觉 yaw 对齐
    抓取朝向，避免 attach 前手指与工件互穿。
 6. AssistedGraspManager 同时检查手—物相对位置、姿态、距离与夹爪宽度；姿态误差按夹爪
    π 对称性归一化。
-7. Gazebo 确认 DetachableJoint attached 后，MoveItBackend 才添加
-   AttachedCollisionObject；失败则回滚 detach。
+7. Gazebo 确认所选工件对应的 DetachableJoint attached 后，MoveItBackend 才移除该 world
+   object 并添加 AttachedCollisionObject；另两个工件始终留在 PlanningScene，失败则回滚。
 8. 类型化碰撞服务只有在机器人接触、方块接触和方块位姿都可用后才允许成功判定。
 9. 释放时先 detach Gazebo，再 detach PlanningScene；等待方块稳定后读取实际位姿并重新加入
    MoveIt world，最后规划 retreat。
@@ -401,20 +403,39 @@ world-XY 点云，去中心后计算 2×2 协方差矩阵并做特征分解。�
 ### 31. 为什么矩形工件生成两个相差 π 的候选？
 
 回答要点：平行夹爪绕接近方向旋转 π 后具有相同几何抓取效果，但 Panda 当前关节状态、障碍物
-和关节限位会使两条到达路径不同。两个候选都做 planning-only，保留可规划且无碰撞的候选，
-再按预抓取关节路径长度选择；同分按候选序号，保证复现。
+和关节限位会使两条到达路径不同。两个候选的 pre-grasp 和实际 grasp 目标都做 planning-only，
+保留两者均可规划且无碰撞的候选，再按预抓取关节路径长度选择；同分按序号保证复现。
 
 ### 32. 如何证明候选筛选没有让机械臂先试着动？
 
-回答要点：后端提供独立 `check_pose_feasibility`。MoveIt 复用 `PlanExecuteMotion.action`，但强制
-`execute=false`；PyBullet 只做 IK、关节限位和碰撞规划，不调用轨迹执行。测试断言 Action goal
-的 execute 字段为 false，并检查筛选前后关节状态不变。
+回答要点：后端提供独立 `check_pose_feasibility`。MoveIt 对 pre-grasp 和 grasp 两个目标复用
+`PlanExecuteMotion.action`，但强制 `execute=false`；PyBullet 只做 IK、关节限位和碰撞规划，
+不调用轨迹执行。测试断言 Action goal 的 execute 字段为 false，并检查筛选前后关节状态不变。
 
 ### 33. 合成传感器扰动的意义和边界是什么？
 
 回答要点：low_light、RGB 高斯噪声、深度 dropout 及 combined 由 episode id 和 task seed
 确定性生成，目的是检查感知链路的退化趋势和失败分类，不改变任务真值。它们不是相机标定、
 真实域随机化或 sim-to-real 证据，因此只能报告为合成扰动鲁棒性实验。
+
+### 34. 三个外观相同的工件如何保持实例编号稳定？
+
+回答要点：检测端先独立估计每个连通域的 world 坐标，再按 X、Y 排序生成
+`workpiece_0..2`，不使用任务真值。任务生成时保证工件中心间距并采用同样的几何排序，使正常
+噪声不会交换实例；离线误差使用最小总代价匹配，不参与在线编号或选择。
+
+### 35. 为什么选择分数同时包含路径长度和置信度？
+
+回答要点：只按置信度可能选到运动代价很高的工件，只按路径长度又会忽略较不可靠的视觉估计。
+当前分数是可解释的工程启发式：`pre_grasp_path_length + (1-confidence)`，先剔除不可规划和
+碰撞候选，再确定性排序。它只在当前候选集合内最优，不是全局任务规划最优。
+
+### 36. 如何保证抓到的就是规划时选中的工件？
+
+回答要点：选择完成后调用 `select_manipulation_object(object_id)` 锁定身份；assisted manager、
+对应 DetachableJoint topic、碰撞监控、Gazebo odometry 和 MoveIt AttachedCollisionObject 都按
+同一个 ID 路由。实际 attached ID 不一致会返回 `selected_attachment_mismatch` 并回滚，不会
+把“抓错物体”统计为成功。
 
 ## 面试前自查清单
 

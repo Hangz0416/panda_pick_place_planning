@@ -1,0 +1,12 @@
+string object_id
+bool position_valid
+bool orientation_valid
+float64 confidence
+float64 position_error_m
+float64 yaw_error_rad
+uint32 candidate_count
+uint32 feasible_candidate_count
+float64 best_path_length_rad
+float64 selection_score
+bool selected
+string failure_type

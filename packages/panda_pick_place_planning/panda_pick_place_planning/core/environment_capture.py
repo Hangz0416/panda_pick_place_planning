@@ -62,10 +62,20 @@ def git_state(repo: Path) -> dict[str, object]:
     return {
         "commit": commit,
         "branch": branch,
-        "dirty": bool(status),
+        "dirty": source_status_dirty(status or ""),
         "source_tree_sha256": source_hash,
         "source_file_count": source_file_count,
     }
+
+
+def source_status_dirty(status: str) -> bool:
+    """Ignore generated evidence while detecting uncommitted source changes."""
+    for line in status.splitlines():
+        path = line[3:] if len(line) > 3 else line
+        path = path.rsplit(" -> ", 1)[-1]
+        if not path.startswith("results/") and not path.startswith("docs/media/"):
+            return True
+    return False
 
 
 def source_tree_hash(repo: Path) -> tuple[str, int]:
@@ -113,6 +123,7 @@ def capture_environment(
     simulator: str,
     *,
     object_variant: str = "cube",
+    workpiece_count: int = 1,
     pose_source: str = "rgbd",
     perception_profile: str = "nominal",
 ) -> dict:
@@ -121,6 +132,10 @@ def capture_environment(
         raise ValueError(f"unsupported simulator: {simulator}")
     if object_variant not in {"cube", "rect_prism"}:
         raise ValueError(f"unsupported object variant: {object_variant}")
+    if workpiece_count not in {1, 3}:
+        raise ValueError(f"unsupported workpiece count: {workpiece_count}")
+    if workpiece_count == 3 and object_variant != "rect_prism":
+        raise ValueError("three workpieces require object_variant=rect_prism")
     if pose_source not in {"ground_truth", "rgbd"}:
         raise ValueError(f"unsupported pose source: {pose_source}")
     if perception_profile not in {
@@ -158,6 +173,7 @@ def capture_environment(
             "task_seed_base": 42,
             "grasp_mode": "assisted",
             "object_variant": object_variant,
+            "workpiece_count": workpiece_count,
             "pose_source": pose_source,
             "perception_profile": perception_profile,
             "physics_model_validated": False,
@@ -187,6 +203,9 @@ def main(args=None) -> int:
         "--object-variant", choices=("cube", "rect_prism"), default="cube"
     )
     parser.add_argument(
+        "--workpiece-count", type=int, choices=(1, 3), default=1
+    )
+    parser.add_argument(
         "--pose-source", choices=("ground_truth", "rgbd"), default="rgbd"
     )
     parser.add_argument(
@@ -206,6 +225,7 @@ def main(args=None) -> int:
         parsed.repo.resolve(),
         parsed.simulator,
         object_variant=parsed.object_variant,
+        workpiece_count=parsed.workpiece_count,
         pose_source=parsed.pose_source,
         perception_profile=parsed.perception_profile,
     )

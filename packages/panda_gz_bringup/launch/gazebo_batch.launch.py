@@ -19,6 +19,11 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
+from panda_pick_place_planning.core.run_status import (
+    record_teardown_exit,
+    write_readiness_failure,
+)
+
 
 def _launch_setup(_context):
     bringup_share = Path(get_package_share_directory("panda_gz_bringup"))
@@ -37,6 +42,7 @@ def _launch_setup(_context):
     perception_timeout = LaunchConfiguration("perception_timeout_sec")
     use_perception_debug = LaunchConfiguration("use_perception_debug")
     object_variant = LaunchConfiguration("object_variant")
+    workpiece_count = LaunchConfiguration("workpiece_count")
     perception_profile = LaunchConfiguration("perception_profile")
 
     stack = IncludeLaunchDescription(
@@ -46,6 +52,7 @@ def _launch_setup(_context):
         launch_arguments={
             "scene": "clear",
             "object_variant": object_variant,
+            "workpiece_count": workpiece_count,
             "seed": seed,
             "grasp_mode": "assisted",
             "headless": headless,
@@ -90,6 +97,7 @@ def _launch_setup(_context):
             "simulator": "gazebo",
             "grasp_mode": "assisted",
             "object_variant": object_variant,
+            "workpiece_count": workpiece_count,
             "use_gazebo": "true",
             "moveit_execute": "true",
             "moveit_command_gripper": "true",
@@ -105,10 +113,22 @@ def _launch_setup(_context):
         if event.returncode == 0:
             return [LogInfo(msg="Panda stack ready; starting assisted batch"), batch]
         reason = f"Panda batch readiness gate failed with code {event.returncode}"
+        write_readiness_failure(
+            output_path.perform(_launch_context),
+            exit_code=int(event.returncode or 1),
+        )
         return [
             LogInfo(msg=f"ERROR: {reason}; batch will not start"),
             EmitEvent(event=Shutdown(reason=reason)),
         ]
+
+    def record_abnormal_teardown(event, launch_context):
+        record_teardown_exit(
+            output_path.perform(launch_context),
+            process_name=event.process_name,
+            returncode=int(event.returncode),
+        )
+        return []
 
     return [
         stack,
@@ -118,6 +138,9 @@ def _launch_setup(_context):
                 target_action=gate,
                 on_exit=start_batch_if_ready,
             )
+        ),
+        RegisterEventHandler(
+            OnProcessExit(on_exit=record_abnormal_teardown)
         ),
     ]
 
@@ -158,6 +181,9 @@ def generate_launch_description() -> LaunchDescription:
                 "object_variant",
                 default_value="rect_prism",
                 choices=["cube", "rect_prism"],
+            ),
+            DeclareLaunchArgument(
+                "workpiece_count", default_value="3", choices=["1", "3"]
             ),
             DeclareLaunchArgument(
                 "perception_profile",

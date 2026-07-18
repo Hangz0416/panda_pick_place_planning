@@ -7,7 +7,7 @@ import math
 from typing import Sequence
 
 from panda_pick_place_planning.core.planners.base import path_length
-from panda_pick_place_planning.core.schemas import SceneObjectEstimate
+from panda_pick_place_planning.core.schemas import ObjectSelectionMetric, SceneObjectEstimate
 
 
 @dataclass(frozen=True)
@@ -19,6 +19,8 @@ class GraspPoseCandidate:
     pre_grasp_position: tuple[float, float, float]
     grasp_position: tuple[float, float, float]
     retreat_position: tuple[float, float, float]
+    object_id: str = "cube"
+    perception_confidence: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -28,6 +30,11 @@ class GraspSelection:
     candidate_count: int = 0
     path_length_rad: float | None = None
     failure_type: str = ""
+    feasible_candidate_count: int = 0
+    selected_object_id: str = ""
+    selection_score: float | None = None
+    object_metrics: tuple[ObjectSelectionMetric, ...] = ()
+    feasible_candidate_keys: tuple[tuple[str, int], ...] = ()
 
 
 class GraspPoseGenerator:
@@ -76,6 +83,8 @@ class GraspPoseGenerator:
                     pre_grasp_position=(x_value, y_value, float(hover_height)),
                     grasp_position=(x_value, y_value, float(grasp_height)),
                     retreat_position=(x_value, y_value, float(hover_height)),
+                    object_id=estimate.object_id,
+                    perception_confidence=estimate.confidence,
                 )
             )
         return candidates
@@ -89,32 +98,89 @@ def select_feasible_grasp(
     seed: int,
     timeout_sec: float,
 ) -> GraspSelection:
-    """Plan to every pre-grasp without execution and choose the shortest path."""
+    """Check pre-grasp and grasp goals without execution, then rank candidates."""
     feasible = []
     collision_failures = 0
-    for candidate in candidates:
+    per_object: dict[str, dict[str, object]] = {}
+    for candidate_number, candidate in enumerate(candidates):
+        metric = per_object.setdefault(
+            candidate.object_id,
+            {
+                "confidence": candidate.perception_confidence,
+                "candidate_count": 0,
+                "feasible_count": 0,
+                "best_path": None,
+                "best_score": None,
+            },
+        )
+        metric["candidate_count"] = int(metric["candidate_count"]) + 1
         report = backend.check_pose_feasibility(
             candidate.pre_grasp_position,
             candidate.orientation_xyzw,
             planner=planner,
-            seed=seed + candidate.index,
+            seed=seed + candidate_number,
             timeout_sec=timeout_sec,
         )
         if not report.success:
             if "collision" in str(report.failure_type):
                 collision_failures += 1
             continue
+        grasp_report = backend.check_pose_feasibility(
+            candidate.grasp_position,
+            candidate.orientation_xyzw,
+            planner=planner,
+            seed=seed + len(candidates) + candidate_number,
+            timeout_sec=timeout_sec,
+        )
+        if not grasp_report.success:
+            if "collision" in str(grasp_report.failure_type):
+                collision_failures += 1
+            continue
         length = report.path_length_rad
         if length is None:
             length = path_length(report.plan_result.path)
-        feasible.append((float(length), candidate.index, candidate))
+        score = float(length) + 1.0 * (1.0 - candidate.perception_confidence)
+        metric["feasible_count"] = int(metric["feasible_count"]) + 1
+        if metric["best_score"] is None or score < float(metric["best_score"]):
+            metric["best_path"] = float(length)
+            metric["best_score"] = score
+        feasible.append(
+            (score, candidate.object_id, candidate.index, float(length), candidate)
+        )
+    object_metrics = tuple(
+        ObjectSelectionMetric(
+            object_id=object_id,
+            confidence=float(values["confidence"]),
+            candidate_count=int(values["candidate_count"]),
+            feasible_candidate_count=int(values["feasible_count"]),
+            best_path_length_rad=values["best_path"],
+            selection_score=values["best_score"],
+            selected=False,
+        )
+        for object_id, values in sorted(per_object.items())
+    )
     if feasible:
-        length, _, candidate = min(feasible, key=lambda item: (item[0], item[1]))
+        score, object_id, _, length, candidate = min(
+            feasible, key=lambda item: (item[0], item[1], item[2])
+        )
+        object_metrics = tuple(
+            ObjectSelectionMetric(
+                **{**metric.__dict__, "selected": metric.object_id == object_id}
+            )
+            for metric in object_metrics
+        )
         return GraspSelection(
             True,
             candidate=candidate,
             candidate_count=len(candidates),
             path_length_rad=length,
+            feasible_candidate_count=len(feasible),
+            selected_object_id=object_id,
+            selection_score=score,
+            object_metrics=object_metrics,
+            feasible_candidate_keys=tuple(
+                (item[4].object_id, item[4].index) for item in feasible
+            ),
         )
     failure = (
         "all_grasp_candidates_in_collision"
@@ -125,6 +191,8 @@ def select_feasible_grasp(
         False,
         candidate_count=len(candidates),
         failure_type=failure,
+        feasible_candidate_count=0,
+        object_metrics=object_metrics,
     )
 
 

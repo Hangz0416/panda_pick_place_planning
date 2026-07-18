@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="378" viewBox="0 0 1500 378" role="img" aria-labelledby="chart-title">
+<title id="chart-title">Panda multi-object ground-truth nominal — Full episode failure counts</title>
+<style>
+text { font-family: Inter, "Noto Sans", "DejaVu Sans", sans-serif; fill: #263238; }
+.chart-title { font-size: 24px; font-weight: 700; }
+.chart-subtitle { font-size: 13px; fill: #52606D; }
+.legend-label, .tick-label { font-size: 12px; }
+.axis-label { font-size: 13px; font-weight: 600; }
+.group-label { font-size: 12px; font-weight: 600; }
+.value-label, .na-label { font-size: 11px; }
+.na-label, .empty-label { fill: #6B7785; font-style: italic; }
+.segment-label { fill: #FFFFFF; font-size: 11px; font-weight: 700; }
+.footer { font-size: 11px; fill: #6B7785; }
+</style>
+<rect width="1500" height="378" fill="#FFFFFF"/>
+<text class="chart-title" x="32" y="38">Panda multi-object ground-truth nominal — Full episode failure counts</text>
+<text class="chart-subtitle" x="32" y="64">Task-failure episodes by persisted failure_type; successful episodes are excluded.</text>
+<line x1="32" y1="72" x2="1468" y2="72" stroke="#D9E1E8"/>
+<text class="empty-label" x="560" y="105">No failure episodes recorded.</text>
+<line x1="560.00" y1="153" x2="560.00" y2="273" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="560.00" y="295" text-anchor="middle">0</text>
+<line x1="720.00" y1="153" x2="720.00" y2="273" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="720.00" y="295" text-anchor="middle">0</text>
+<line x1="880.00" y1="153" x2="880.00" y2="273" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="880.00" y="295" text-anchor="middle">0</text>
+<line x1="1040.00" y1="153" x2="1040.00" y2="273" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1040.00" y="295" text-anchor="middle">1</text>
+<line x1="1200.00" y1="153" x2="1200.00" y2="273" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1200.00" y="295" text-anchor="middle">1</text>
+<line x1="1360.00" y1="153" x2="1360.00" y2="273" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1360.00" y="295" text-anchor="middle">1</text>
+<line x1="560" y1="273" x2="1360" y2="273" stroke="#52606D"/>
+<text class="axis-label" x="960.00" y="321" text-anchor="middle">failure episodes</text>
+<text class="group-label" x="546" y="175" text-anchor="end">ground_truth · moveit/gazebo · clear · RRTConnectkConfigDefault · ground_truth · rect_prism</text>
+<text class="na-label" x="567" y="178">0 failures</text>
+<text class="group-label" x="546" y="223" text-anchor="end">ground_truth · moveit/gazebo · obstacle · RRTConnectkConfigDefault · ground_truth · rect_prism</text>
+<text class="na-label" x="567" y="226">0 failures</text>
+<text class="footer" x="1468" y="360" text-anchor="end">Recorded data only · N/A = not reported or not applicable</text>
+</svg>

@@ -45,7 +45,7 @@
 
   <xacro:macro
     name="panda_gz_ros2_control"
-    params="initial_positions_file controllers_file assisted_grasp">
+    params="initial_positions_file controllers_file assisted_grasp workpiece_count">
     <xacro:property
       name="initial_positions"
       value="${xacro.load_yaml(initial_positions_file)['initial_positions']}" />
@@ -121,18 +121,25 @@
     <!-- Fortress keeps ignition-gazebo plugin filenames; this is modern
          Gazebo Sim and never gazebo_ros2_control / Gazebo Classic. -->
     <xacro:if value="${assisted_grasp}">
+      <xacro:macro name="detachable_workpiece" params="suffix child_model child_link">
       <gazebo>
         <plugin
           filename="libignition-gazebo-detachable-joint-system.so"
           name="ignition::gazebo::systems::DetachableJoint">
           <parent_link>panda_hand</parent_link>
-          <child_model>cube</child_model>
-          <child_link>cube_link</child_link>
-          <detach_topic>/panda/detachable_joint/detach</detach_topic>
-          <attach_topic>/panda/detachable_joint/attach</attach_topic>
-          <output_topic>/panda/detachable_joint/state</output_topic>
+          <child_model>${child_model}</child_model>
+          <child_link>${child_link}</child_link>
+          <detach_topic>/panda/detachable_joint${suffix}/detach</detach_topic>
+          <attach_topic>/panda/detachable_joint${suffix}/attach</attach_topic>
+          <output_topic>/panda/detachable_joint${suffix}/state</output_topic>
         </plugin>
       </gazebo>
+      </xacro:macro>
+      <xacro:detachable_workpiece suffix="" child_model="cube" child_link="cube_link" />
+      <xacro:if value="${int(workpiece_count) == 3}">
+        <xacro:detachable_workpiece suffix="_1" child_model="cube_1" child_link="cube_1_link" />
+        <xacro:detachable_workpiece suffix="_2" child_model="cube_2" child_link="cube_2_link" />
+      </xacro:if>
     </xacro:if>
     <gazebo reference="panda_leftfinger"><mu1>1.2</mu1><mu2>1.2</mu2></gazebo>
     <gazebo reference="panda_rightfinger"><mu1>1.2</mu1><mu2>1.2</mu2></gazebo>

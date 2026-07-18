@@ -1,0 +1,433 @@
+{
+  "schema_version": 5,
+  "total_episodes": 100,
+  "groups": {
+    "clear/rrt_connect": {
+      "episodes": 50,
+      "top_level_motion_metric_scope": "critical_transfer_motion",
+      "planning_success_rate": 1.0,
+      "execution_success_rate": 1.0,
+      "task_success_rate": 1.0,
+      "collision_episode_rate": 0.0,
+      "avg_planning_time_sec": 0.027328,
+      "avg_top_level_planning_time_sec": 0.027328,
+      "median_planning_time_sec": 0.027564,
+      "p95_planning_time_sec": 0.038302,
+      "avg_execution_time_sec": 14.55954,
+      "avg_path_length_rad": 1.179302,
+      "avg_top_level_path_length_rad": 1.179302,
+      "median_path_length_rad": 1.001972,
+      "avg_final_xy_error_m": 0.002619,
+      "avg_final_z_error_m": 1e-06,
+      "avg_final_object_speed_mps": 0.0,
+      "avg_trajectory_points": 30.74,
+      "avg_max_joint_tracking_error_rad": 0.053753,
+      "pose_source": "rgbd",
+      "object_variant": "rect_prism",
+      "perception_profile": "nominal",
+      "perception_success_rate": 1.0,
+      "avg_perception_latency_sec": 0.068738,
+      "median_perception_latency_sec": 0.058202,
+      "p95_perception_latency_sec": 0.130436,
+      "object_position_error_m": {
+        "samples": 50,
+        "mean": 0.002819,
+        "median": 0.003044,
+        "p95": 0.00485
+      },
+      "target_position_error_m": {
+        "samples": 50,
+        "mean": 0.002174,
+        "median": 0.002247,
+        "p95": 0.00302
+      },
+      "obstacle_position_error_m": {
+        "samples": 0,
+        "mean": null,
+        "median": null,
+        "p95": null
+      },
+      "avg_minimum_perception_confidence": 0.960857,
+      "object_yaw_error_rad": {
+        "samples": 50,
+        "mean": 0.028523,
+        "median": 0.028838,
+        "p95": 0.050268
+      },
+      "grasp_selection_success_rate": 1.0,
+      "grasp_selection_latency_sec": {
+        "samples": 50,
+        "mean": 0.267221,
+        "median": 0.261692,
+        "p95": 0.314016
+      },
+      "avg_grasp_candidate_count": 6,
+      "selected_grasp_path_length_rad": {
+        "samples": 50,
+        "mean": 1.777459,
+        "median": 1.704291,
+        "p95": 2.550848
+      },
+      "complete_workpiece_detection_rate": 1.0,
+      "target_selection_success_rate": 1.0,
+      "target_selection_latency_sec": {
+        "samples": 50,
+        "mean": 0.267221,
+        "median": 0.261692,
+        "p95": 0.314016
+      },
+      "selected_object_position_error_m": {
+        "samples": 50,
+        "mean": 0.002819,
+        "median": 0.003044,
+        "p95": 0.00485
+      },
+      "selected_object_yaw_error_rad": {
+        "samples": 50,
+        "mean": 0.028523,
+        "median": 0.028838,
+        "p95": 0.050268
+      },
+      "selected_object_score": {
+        "samples": 50,
+        "mean": 1.795516,
+        "median": 1.704291,
+        "p95": 2.558705
+      },
+      "avg_total_candidate_count": 6,
+      "avg_feasible_candidate_count": 6,
+      "max_nonselected_displacement_m": {
+        "samples": 50,
+        "mean": 0.0,
+        "median": 0.0,
+        "p95": 0.0
+      },
+      "failure_counts": {
+        "success": 50
+      }
+    },
+    "obstacle/rrt_connect": {
+      "episodes": 50,
+      "top_level_motion_metric_scope": "critical_transfer_motion",
+      "planning_success_rate": 0.74,
+      "execution_success_rate": 0.74,
+      "task_success_rate": 0.74,
+      "collision_episode_rate": 0.0,
+      "avg_planning_time_sec": 0.778429,
+      "avg_top_level_planning_time_sec": 0.778429,
+      "median_planning_time_sec": 0.037167,
+      "p95_planning_time_sec": 3.140054,
+      "avg_execution_time_sec": 14.411133,
+      "avg_path_length_rad": 2.957973,
+      "avg_top_level_path_length_rad": 2.957973,
+      "median_path_length_rad": 2.731783,
+      "avg_final_xy_error_m": 0.123786,
+      "avg_final_z_error_m": 0.003284,
+      "avg_final_object_speed_mps": 5.4e-05,
+      "avg_trajectory_points": 59.96,
+      "avg_max_joint_tracking_error_rad": 0.053728,
+      "pose_source": "rgbd",
+      "object_variant": "rect_prism",
+      "perception_profile": "nominal",
+      "perception_success_rate": 1.0,
+      "avg_perception_latency_sec": 0.065892,
+      "median_perception_latency_sec": 0.058272,
+      "p95_perception_latency_sec": 0.118285,
+      "object_position_error_m": {
+        "samples": 50,
+        "mean": 0.002269,
+        "median": 0.002147,
+        "p95": 0.003651
+      },
+      "target_position_error_m": {
+        "samples": 50,
+        "mean": 0.002058,
+        "median": 0.002107,
+        "p95": 0.002809
+      },
+      "obstacle_position_error_m": {
+        "samples": 50,
+        "mean": 0.0023,
+        "median": 0.0023,
+        "p95": 0.002306
+      },
+      "avg_minimum_perception_confidence": 0.991543,
+      "object_yaw_error_rad": {
+        "samples": 50,
+        "mean": 0.03318,
+        "median": 0.02572,
+        "p95": 0.088636
+      },
+      "grasp_selection_success_rate": 1.0,
+      "grasp_selection_latency_sec": {
+        "samples": 50,
+        "mean": 0.298335,
+        "median": 0.295319,
+        "p95": 0.35333
+      },
+      "avg_grasp_candidate_count": 6,
+      "selected_grasp_path_length_rad": {
+        "samples": 50,
+        "mean": 1.88641,
+        "median": 1.893105,
+        "p95": 2.610105
+      },
+      "complete_workpiece_detection_rate": 1.0,
+      "target_selection_success_rate": 1.0,
+      "target_selection_latency_sec": {
+        "samples": 50,
+        "mean": 0.298335,
+        "median": 0.295319,
+        "p95": 0.35333
+      },
+      "selected_object_position_error_m": {
+        "samples": 50,
+        "mean": 0.002269,
+        "median": 0.002147,
+        "p95": 0.003651
+      },
+      "selected_object_yaw_error_rad": {
+        "samples": 50,
+        "mean": 0.03318,
+        "median": 0.02572,
+        "p95": 0.088636
+      },
+      "selected_object_score": {
+        "samples": 50,
+        "mean": 1.891096,
+        "median": 1.904534,
+        "p95": 2.610105
+      },
+      "avg_total_candidate_count": 6,
+      "avg_feasible_candidate_count": 6,
+      "max_nonselected_displacement_m": {
+        "samples": 50,
+        "mean": 0.0,
+        "median": 0.0,
+        "p95": 0.0
+      },
+      "failure_counts": {
+        "success": 37,
+        "invalid_motion_plan": 1,
+        "goal_state_invalid": 12
+      }
+    }
+  },
+  "backend_groups": {
+    "moveit/gazebo/clear/RRTConnectkConfigDefault": {
+      "episodes": 50,
+      "top_level_motion_metric_scope": "critical_transfer_motion",
+      "planning_success_rate": 1.0,
+      "execution_success_rate": 1.0,
+      "task_success_rate": 1.0,
+      "collision_episode_rate": 0.0,
+      "avg_planning_time_sec": 0.027328,
+      "avg_top_level_planning_time_sec": 0.027328,
+      "median_planning_time_sec": 0.027564,
+      "p95_planning_time_sec": 0.038302,
+      "avg_execution_time_sec": 14.55954,
+      "avg_path_length_rad": 1.179302,
+      "avg_top_level_path_length_rad": 1.179302,
+      "median_path_length_rad": 1.001972,
+      "avg_final_xy_error_m": 0.002619,
+      "avg_final_z_error_m": 1e-06,
+      "avg_final_object_speed_mps": 0.0,
+      "avg_trajectory_points": 30.74,
+      "avg_max_joint_tracking_error_rad": 0.053753,
+      "pose_source": "rgbd",
+      "object_variant": "rect_prism",
+      "perception_profile": "nominal",
+      "perception_success_rate": 1.0,
+      "avg_perception_latency_sec": 0.068738,
+      "median_perception_latency_sec": 0.058202,
+      "p95_perception_latency_sec": 0.130436,
+      "object_position_error_m": {
+        "samples": 50,
+        "mean": 0.002819,
+        "median": 0.003044,
+        "p95": 0.00485
+      },
+      "target_position_error_m": {
+        "samples": 50,
+        "mean": 0.002174,
+        "median": 0.002247,
+        "p95": 0.00302
+      },
+      "obstacle_position_error_m": {
+        "samples": 0,
+        "mean": null,
+        "median": null,
+        "p95": null
+      },
+      "avg_minimum_perception_confidence": 0.960857,
+      "object_yaw_error_rad": {
+        "samples": 50,
+        "mean": 0.028523,
+        "median": 0.028838,
+        "p95": 0.050268
+      },
+      "grasp_selection_success_rate": 1.0,
+      "grasp_selection_latency_sec": {
+        "samples": 50,
+        "mean": 0.267221,
+        "median": 0.261692,
+        "p95": 0.314016
+      },
+      "avg_grasp_candidate_count": 6,
+      "selected_grasp_path_length_rad": {
+        "samples": 50,
+        "mean": 1.777459,
+        "median": 1.704291,
+        "p95": 2.550848
+      },
+      "complete_workpiece_detection_rate": 1.0,
+      "target_selection_success_rate": 1.0,
+      "target_selection_latency_sec": {
+        "samples": 50,
+        "mean": 0.267221,
+        "median": 0.261692,
+        "p95": 0.314016
+      },
+      "selected_object_position_error_m": {
+        "samples": 50,
+        "mean": 0.002819,
+        "median": 0.003044,
+        "p95": 0.00485
+      },
+      "selected_object_yaw_error_rad": {
+        "samples": 50,
+        "mean": 0.028523,
+        "median": 0.028838,
+        "p95": 0.050268
+      },
+      "selected_object_score": {
+        "samples": 50,
+        "mean": 1.795516,
+        "median": 1.704291,
+        "p95": 2.558705
+      },
+      "avg_total_candidate_count": 6,
+      "avg_feasible_candidate_count": 6,
+      "max_nonselected_displacement_m": {
+        "samples": 50,
+        "mean": 0.0,
+        "median": 0.0,
+        "p95": 0.0
+      },
+      "failure_counts": {
+        "success": 50
+      }
+    },
+    "moveit/gazebo/obstacle/RRTConnectkConfigDefault": {
+      "episodes": 50,
+      "top_level_motion_metric_scope": "critical_transfer_motion",
+      "planning_success_rate": 0.74,
+      "execution_success_rate": 0.74,
+      "task_success_rate": 0.74,
+      "collision_episode_rate": 0.0,
+      "avg_planning_time_sec": 0.778429,
+      "avg_top_level_planning_time_sec": 0.778429,
+      "median_planning_time_sec": 0.037167,
+      "p95_planning_time_sec": 3.140054,
+      "avg_execution_time_sec": 14.411133,
+      "avg_path_length_rad": 2.957973,
+      "avg_top_level_path_length_rad": 2.957973,
+      "median_path_length_rad": 2.731783,
+      "avg_final_xy_error_m": 0.123786,
+      "avg_final_z_error_m": 0.003284,
+      "avg_final_object_speed_mps": 5.4e-05,
+      "avg_trajectory_points": 59.96,
+      "avg_max_joint_tracking_error_rad": 0.053728,
+      "pose_source": "rgbd",
+      "object_variant": "rect_prism",
+      "perception_profile": "nominal",
+      "perception_success_rate": 1.0,
+      "avg_perception_latency_sec": 0.065892,
+      "median_perception_latency_sec": 0.058272,
+      "p95_perception_latency_sec": 0.118285,
+      "object_position_error_m": {
+        "samples": 50,
+        "mean": 0.002269,
+        "median": 0.002147,
+        "p95": 0.003651
+      },
+      "target_position_error_m": {
+        "samples": 50,
+        "mean": 0.002058,
+        "median": 0.002107,
+        "p95": 0.002809
+      },
+      "obstacle_position_error_m": {
+        "samples": 50,
+        "mean": 0.0023,
+        "median": 0.0023,
+        "p95": 0.002306
+      },
+      "avg_minimum_perception_confidence": 0.991543,
+      "object_yaw_error_rad": {
+        "samples": 50,
+        "mean": 0.03318,
+        "median": 0.02572,
+        "p95": 0.088636
+      },
+      "grasp_selection_success_rate": 1.0,
+      "grasp_selection_latency_sec": {
+        "samples": 50,
+        "mean": 0.298335,
+        "median": 0.295319,
+        "p95": 0.35333
+      },
+      "avg_grasp_candidate_count": 6,
+      "selected_grasp_path_length_rad": {
+        "samples": 50,
+        "mean": 1.88641,
+        "median": 1.893105,
+        "p95": 2.610105
+      },
+      "complete_workpiece_detection_rate": 1.0,
+      "target_selection_success_rate": 1.0,
+      "target_selection_latency_sec": {
+        "samples": 50,
+        "mean": 0.298335,
+        "median": 0.295319,
+        "p95": 0.35333
+      },
+      "selected_object_position_error_m": {
+        "samples": 50,
+        "mean": 0.002269,
+        "median": 0.002147,
+        "p95": 0.003651
+      },
+      "selected_object_yaw_error_rad": {
+        "samples": 50,
+        "mean": 0.03318,
+        "median": 0.02572,
+        "p95": 0.088636
+      },
+      "selected_object_score": {
+        "samples": 50,
+        "mean": 1.891096,
+        "median": 1.904534,
+        "p95": 2.610105
+      },
+      "avg_total_candidate_count": 6,
+      "avg_feasible_candidate_count": 6,
+      "max_nonselected_displacement_m": {
+        "samples": 50,
+        "mean": 0.0,
+        "median": 0.0,
+        "p95": 0.0
+      },
+      "failure_counts": {
+        "success": 37,
+        "invalid_motion_plan": 1,
+        "goal_state_invalid": 12
+      }
+    }
+  },
+  "batch_status": "complete",
+  "expected_episodes": 100,
+  "received_episodes": 100,
+  "evaluation_mode": "full_episode",
+  "planning_regression_successes": 87
+}

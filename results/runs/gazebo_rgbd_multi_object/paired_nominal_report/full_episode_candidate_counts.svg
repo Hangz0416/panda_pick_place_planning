@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="506" viewBox="0 0 1500 506" role="img" aria-labelledby="chart-title">
+<title id="chart-title">Panda multi-object paired nominal comparison — Multi-object candidate feasibility</title>
+<style>
+text { font-family: Inter, "Noto Sans", "DejaVu Sans", sans-serif; fill: #263238; }
+.chart-title { font-size: 24px; font-weight: 700; }
+.chart-subtitle { font-size: 13px; fill: #52606D; }
+.legend-label, .tick-label { font-size: 12px; }
+.axis-label { font-size: 13px; font-weight: 600; }
+.group-label { font-size: 12px; font-weight: 600; }
+.value-label, .na-label { font-size: 11px; }
+.na-label, .empty-label { fill: #6B7785; font-style: italic; }
+.segment-label { fill: #FFFFFF; font-size: 11px; font-weight: 700; }
+.footer { font-size: 11px; fill: #6B7785; }
+</style>
+<rect width="1500" height="506" fill="#FFFFFF"/>
+<text class="chart-title" x="32" y="38">Panda multi-object paired nominal comparison — Multi-object candidate feasibility</text>
+<text class="chart-subtitle" x="32" y="64">Mean generated and planning-feasible candidates per episode.</text>
+<line x1="32" y1="72" x2="1468" y2="72" stroke="#D9E1E8"/>
+<rect x="560.0" y="75" width="13" height="13" rx="2" fill="#0072B2"/>
+<text class="legend-label" x="580.0" y="86">Total</text>
+<rect x="960.0" y="75" width="13" height="13" rx="2" fill="#E69F00"/>
+<text class="legend-label" x="980.0" y="86">Feasible</text>
+<line x1="560.00" y1="145" x2="560.00" y2="401" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="560.00" y="423" text-anchor="middle">0</text>
+<line x1="720.00" y1="145" x2="720.00" y2="401" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="720.00" y="423" text-anchor="middle">2</text>
+<line x1="880.00" y1="145" x2="880.00" y2="401" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="880.00" y="423" text-anchor="middle">4</text>
+<line x1="1040.00" y1="145" x2="1040.00" y2="401" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1040.00" y="423" text-anchor="middle">6</text>
+<line x1="1200.00" y1="145" x2="1200.00" y2="401" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1200.00" y="423" text-anchor="middle">8</text>
+<line x1="1360.00" y1="145" x2="1360.00" y2="401" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1360.00" y="423" text-anchor="middle">10</text>
+<line x1="560" y1="401" x2="1360" y2="401" stroke="#52606D"/>
+<text class="axis-label" x="960.00" y="449" text-anchor="middle">candidate count</text>
+<text class="group-label" x="546" y="166.0" text-anchor="end">ground_truth · moveit/gazebo · clear · RRTConnectkConfigDefault · ground_truth · rect_prism</text>
+<rect x="560" y="145" width="480.00" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="1047.00" y="157" text-anchor="start" fill="#263238">6</text>
+<rect x="560" y="166" width="480.00" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="1047.00" y="178" text-anchor="start" fill="#263238">6</text>
+<text class="group-label" x="546" y="230.0" text-anchor="end">ground_truth · moveit/gazebo · obstacle · RRTConnectkConfigDefault · ground_truth · rect_prism</text>
+<rect x="560" y="209" width="480.00" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="1047.00" y="221" text-anchor="start" fill="#263238">6</text>
+<rect x="560" y="230" width="480.00" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="1047.00" y="242" text-anchor="start" fill="#263238">6</text>
+<text class="group-label" x="546" y="294.0" text-anchor="end">rgbd · moveit/gazebo · clear · RRTConnectkConfigDefault · rgbd · rect_prism</text>
+<rect x="560" y="273" width="480.00" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="1047.00" y="285" text-anchor="start" fill="#263238">6</text>
+<rect x="560" y="294" width="480.00" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="1047.00" y="306" text-anchor="start" fill="#263238">6</text>
+<text class="group-label" x="546" y="358.0" text-anchor="end">rgbd · moveit/gazebo · obstacle · RRTConnectkConfigDefault · rgbd · rect_prism</text>
+<rect x="560" y="337" width="480.00" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="1047.00" y="349" text-anchor="start" fill="#263238">6</text>
+<rect x="560" y="358" width="480.00" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="1047.00" y="370" text-anchor="start" fill="#263238">6</text>
+<text class="footer" x="1468" y="488" text-anchor="end">Recorded data only · N/A = not reported or not applicable</text>
+</svg>

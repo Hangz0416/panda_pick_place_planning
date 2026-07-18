@@ -1,7 +1,12 @@
 import json
 import unittest
 
-from panda_pick_place_planning.core.schemas import EpisodeResult, TaskSpec
+from panda_pick_place_planning.core.schemas import (
+    EpisodeResult,
+    ObjectSelectionMetric,
+    TaskSpec,
+    WorkpieceSpec,
+)
 
 
 class TaskSpecTest(unittest.TestCase):
@@ -121,7 +126,7 @@ class TaskSpecTest(unittest.TestCase):
         self.assertIsNone(payload["final_xy_error_m"])
         self.assertIsNone(payload["final_z_error_m"])
         self.assertIsNone(payload["final_object_speed_mps"])
-        self.assertEqual(payload["schema_version"], 4)
+        self.assertEqual(payload["schema_version"], 5)
         self.assertIsNone(payload["perception_latency_sec"])
 
     def test_schema_v3_preserves_visual_metrics(self):
@@ -189,6 +194,7 @@ class TaskSpecTest(unittest.TestCase):
             grasp_candidate_count=2,
             selected_grasp_yaw_rad=-0.3,
             selected_grasp_path_length_rad=1.2,
+            schema_version=4,
         )
 
         restored = EpisodeResult.from_json(base.to_json())
@@ -200,6 +206,81 @@ class TaskSpecTest(unittest.TestCase):
         self.assertAlmostEqual(restored.object_yaw_error_rad, 0.04)
         self.assertEqual(restored.grasp_candidate_count, 2)
         self.assertAlmostEqual(restored.selected_grasp_yaw_rad, -0.3)
+
+    def test_three_workpiece_task_round_trip(self):
+        workpieces = tuple(
+            WorkpieceSpec(
+                object_id=f"workpiece_{index}",
+                object_variant="rect_prism",
+                position=(0.46 + 0.11 * index, 0.2, 0.025),
+            )
+            for index in range(3)
+        )
+        task = TaskSpec(
+            episode_id=1,
+            task_seed=42,
+            planner="rrt_connect",
+            planner_seed=10042,
+            scene="clear",
+            object_position=workpieces[0].position,
+            target_position=(0.57, -0.2, 0.025),
+            backend="moveit",
+            simulator="gazebo",
+            object_variant="rect_prism",
+            workpieces=workpieces,
+        )
+
+        restored = TaskSpec.from_json(task.to_json())
+
+        self.assertEqual(restored, task)
+        self.assertEqual(restored.workpiece_count, 3)
+
+    def test_schema_v5_selection_metrics_round_trip(self):
+        base = EpisodeResult(
+            episode_id=1,
+            task_seed=2,
+            planner="rrt_connect",
+            planner_seed=3,
+            scene="clear",
+            planning_success=True,
+            planning_time_sec=0.1,
+            explored_nodes=1,
+            path_waypoints=2,
+            path_length_rad=0.3,
+            execution_sim_steps=1,
+            task_success=True,
+            collision_count=0,
+            failure_type="",
+            object_initial_position=(0.4, 0.2, 0.025),
+            object_final_position=(0.5, -0.2, 0.025),
+            target_position=(0.5, -0.2, 0.025),
+            detected_workpiece_count=3,
+            selected_object_id="workpiece_1",
+            target_selection_success=True,
+            target_selection_latency_sec=0.15,
+            selected_object_score=1.3,
+            total_candidate_count=6,
+            feasible_candidate_count=4,
+            selected_object_position_error_m=0.004,
+            selected_object_yaw_error_rad=0.03,
+            max_nonselected_displacement_m=0.002,
+            object_selection_metrics=(
+                ObjectSelectionMetric(
+                    object_id="workpiece_1",
+                    confidence=0.9,
+                    candidate_count=2,
+                    feasible_candidate_count=2,
+                    best_path_length_rad=1.2,
+                    selection_score=1.3,
+                    selected=True,
+                ),
+            ),
+        )
+
+        restored = EpisodeResult.from_json(base.to_json())
+
+        self.assertEqual(restored, base)
+        self.assertEqual(restored.schema_version, 5)
 
     def test_promotes_physical_and_collision_metrics_from_stages(self):
         result = EpisodeResult(

@@ -16,6 +16,7 @@ from panda_pick_place_interfaces.srv import (
     RemoveWorldObject,
     ResetEpisode,
     SetAttachedObject,
+    SetAssistedObject,
     UpsertWorldObject,
 )
 import rclpy
@@ -141,6 +142,9 @@ class StackReadyGate(Node):
             ),
             "detach_object": self.create_client(
                 Trigger, "/panda_gz/detach_object"
+            ),
+            "set_assisted_object": self.create_client(
+                SetAssistedObject, "/panda_gz/set_assisted_object"
             ),
             "execution_collision_state": self.create_client(
                 GetExecutionCollisionState,

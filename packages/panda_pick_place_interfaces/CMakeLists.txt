@@ -12,6 +12,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/StageMetric.msg"
   "msg/EpisodeResult.msg"
   "msg/SceneObjectEstimate.msg"
+  "msg/SceneObjectTask.msg"
+  "msg/ObjectSelectionMetric.msg"
   "action/PlanExecuteMotion.action"
   "srv/UpsertWorldObject.srv"
   "srv/RemoveWorldObject.srv"
@@ -20,6 +22,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/GetPhysicalGraspState.srv"
   "srv/GetExecutionCollisionState.srv"
   "srv/EstimateScene.srv"
+  "srv/SetAssistedObject.srv"
   DEPENDENCIES geometry_msgs moveit_msgs std_msgs
 )
 

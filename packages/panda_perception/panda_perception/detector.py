@@ -25,6 +25,9 @@ class Detection:
     yaw_variance: float = 0.0
     orientation_confidence: float = 1.0
     axis_uv: tuple[tuple[int, int], tuple[int, int]] | None = None
+    position_valid: bool = True
+    orientation_valid: bool = True
+    failure_type: str = ""
 
 
 class DetectionError(RuntimeError):
@@ -53,6 +56,7 @@ class HSVDepthDetector:
         noise_seed: int = 0,
         object_variant: str = "cube",
         perception_profile: str = "nominal",
+        expected_workpiece_count: int = 1,
     ) -> dict[str, Detection]:
         color = np.asarray(color_bgr)
         depth = np.asarray(depth_m, dtype=np.float32)
@@ -86,8 +90,15 @@ class HSVDepthDetector:
             valid = np.isfinite(noisy_depth) & (noisy_depth > 0.0)
             noisy_depth[valid] += rng.normal(0.0, sigma, int(np.count_nonzero(valid)))
         hsv = cv2.cvtColor(processed_color, cv2.COLOR_BGR2HSV)
+        if expected_workpiece_count not in {1, 3}:
+            raise DetectionError("unsupported_workpiece_count")
         detections = {}
-        for object_id in required_object_ids:
+        non_workpiece_ids = [
+            object_id
+            for object_id in required_object_ids
+            if object_id not in {"cube", "workpiece_0", "workpiece_1", "workpiece_2"}
+        ]
+        for object_id in non_workpiece_ids:
             object_config = self.config.objects.get(object_id)
             if object_config is None:
                 raise DetectionError("low_confidence")
@@ -102,7 +113,98 @@ class HSVDepthDetector:
                     object_id == "cube" and object_variant == "rect_prism"
                 ),
             )
+        if expected_workpiece_count == 1:
+            requested_id = next(
+                (
+                    value
+                    for value in required_object_ids
+                    if value in {"cube", "workpiece_0"}
+                ),
+                "cube",
+            )
+            detection = self._detect_one(
+                hsv,
+                noisy_depth,
+                intrinsics,
+                translation,
+                quaternion_xyzw,
+                self.config.objects["cube"],
+                require_orientation=(object_variant == "rect_prism"),
+            )
+            detections[requested_id] = Detection(
+                **{**detection.__dict__, "object_id": requested_id}
+            )
+        else:
+            if object_variant != "rect_prism":
+                raise DetectionError("unsupported_object_variant")
+            workpieces = self._detect_workpieces(
+                hsv,
+                noisy_depth,
+                intrinsics,
+                translation,
+                quaternion_xyzw,
+                expected_workpiece_count,
+            )
+            detections.update(workpieces)
         return detections
+
+    def _detect_workpieces(
+        self,
+        hsv: np.ndarray,
+        depth: np.ndarray,
+        intrinsics: Sequence[float],
+        translation: Sequence[float],
+        quaternion_xyzw: Sequence[float],
+        expected_count: int,
+    ) -> dict[str, Detection]:
+        config = self.config.objects["cube"]
+        mask = self._object_mask(hsv, config)
+        components = _components(mask, config.min_pixels)
+        if len(components) != expected_count:
+            raise DetectionError("object_count_mismatch")
+        estimated: list[Detection] = []
+        for component, area, centroid in components:
+            try:
+                detection = self._estimate_component(
+                    component,
+                    area,
+                    centroid,
+                    depth,
+                    intrinsics,
+                    translation,
+                    quaternion_xyzw,
+                    config,
+                    require_orientation=True,
+                )
+            except DetectionError as exc:
+                if exc.failure_type != "orientation_ambiguous":
+                    raise
+                detection = self._estimate_component(
+                    component,
+                    area,
+                    centroid,
+                    depth,
+                    intrinsics,
+                    translation,
+                    quaternion_xyzw,
+                    config,
+                    require_orientation=False,
+                )
+                detection = Detection(
+                    **{
+                        **detection.__dict__,
+                        "orientation_valid": False,
+                        "failure_type": "orientation_ambiguous",
+                    }
+                )
+            estimated.append(detection)
+        estimated.sort(key=lambda item: (item.position[0], item.position[1]))
+        return {
+            f"workpiece_{index}": Detection(
+                **{**item.__dict__, "object_id": f"workpiece_{index}"}
+            )
+            for index, item in enumerate(estimated)
+        }
 
     def _detect_one(
         self,
@@ -114,6 +216,21 @@ class HSVDepthDetector:
         config: ObjectConfig,
         require_orientation: bool,
     ) -> Detection:
+        mask = self._object_mask(hsv, config)
+        component, count, centroid = _largest_component(mask)
+        return self._estimate_component(
+            component,
+            count,
+            centroid,
+            depth,
+            intrinsics,
+            translation,
+            quaternion_xyzw,
+            config,
+            require_orientation,
+        )
+
+    def _object_mask(self, hsv: np.ndarray, config: ObjectConfig) -> np.ndarray:
         mask = np.zeros(hsv.shape[:2], dtype=np.uint8)
         for lower, upper in config.hsv_ranges:
             mask |= cv2.inRange(
@@ -126,7 +243,20 @@ class HSVDepthDetector:
         )
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-        component, count, centroid = _largest_component(mask)
+        return mask
+
+    def _estimate_component(
+        self,
+        component: np.ndarray,
+        count: int,
+        centroid: tuple[int, int],
+        depth: np.ndarray,
+        intrinsics: Sequence[float],
+        translation: Sequence[float],
+        quaternion_xyzw: Sequence[float],
+        config: ObjectConfig,
+        require_orientation: bool,
+    ) -> Detection:
         if count < config.min_pixels:
             raise DetectionError(f"{config.object_id}_not_detected")
         confidence = min(1.0, count / float(config.expected_pixels))
@@ -191,6 +321,21 @@ def _largest_component(mask: np.ndarray) -> tuple[np.ndarray, int, tuple[int, in
     component = np.where(labels == index, 255, 0).astype(np.uint8)
     centroid = tuple(int(round(value)) for value in centroids[index])
     return component, area, centroid
+
+
+def _components(
+    mask: np.ndarray, minimum_area: int
+) -> list[tuple[np.ndarray, int, tuple[int, int]]]:
+    count, labels, stats, centroids = cv2.connectedComponentsWithStats(mask)
+    values = []
+    for index in range(1, count):
+        area = int(stats[index, cv2.CC_STAT_AREA])
+        if area < int(minimum_area):
+            continue
+        component = np.where(labels == index, 255, 0).astype(np.uint8)
+        centroid = tuple(int(round(value)) for value in centroids[index])
+        values.append((component, area, centroid))
+    return values
 
 
 def normalize_symmetric_yaw(yaw_rad: float) -> float:

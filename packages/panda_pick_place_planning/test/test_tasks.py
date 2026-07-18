@@ -1,10 +1,31 @@
 import unittest
 import math
 
-from panda_pick_place_planning.core.tasks import generate_paired_tasks, generate_task
+from panda_pick_place_planning.core.tasks import (
+    generate_paired_tasks,
+    generate_task,
+)
 
 
 class TaskGenerationTest(unittest.TestCase):
+    def test_generates_three_deterministic_separated_workpieces(self):
+        options = {
+            "object_variant": "rect_prism",
+            "workpiece_count": 3,
+        }
+        first = generate_task(0, 42, "rrt_connect", "obstacle", **options)
+        second = generate_task(0, 42, "rrt_connect", "obstacle", **options)
+
+        self.assertEqual(first, second)
+        self.assertEqual(first.workpiece_count, 3)
+        self.assertEqual(
+            [item.object_id for item in first.workpieces],
+            ["workpiece_0", "workpiece_1", "workpiece_2"],
+        )
+        positions = [item.position for item in first.workpieces]
+        self.assertGreaterEqual(positions[1][0] - positions[0][0], 0.09)
+        self.assertGreaterEqual(positions[2][0] - positions[1][0], 0.09)
+
     def test_same_seed_generates_same_geometry(self):
         linear = generate_task(0, 42, "linear", "obstacle", planner_seed=99)
         rrt = generate_task(1, 42, "rrt_connect", "obstacle", planner_seed=99)

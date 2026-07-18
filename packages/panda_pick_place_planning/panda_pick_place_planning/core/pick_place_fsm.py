@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from enum import Enum
+from dataclasses import replace
+from itertools import permutations
 import math
 import time
 from typing import Any
@@ -74,6 +76,7 @@ class PickPlaceRunner:
         self._scene_estimate = None
         self._grasp_selection: GraspSelection | None = None
         self._grasp_selection_latency_sec: float | None = None
+        self._selected_object_id = "cube"
 
     def run(self, task: TaskSpec) -> EpisodeResult:
         self.state = PickPlaceState.RESET
@@ -83,6 +86,7 @@ class PickPlaceRunner:
         self._scene_estimate = None
         self._grasp_selection = None
         self._grasp_selection_latency_sec = None
+        self._selected_object_id = task.workpieces[0].object_id
         self.backend.reset(task)
         episode_start_steps = self.backend.simulation_steps
         episode_start_collisions = self.backend.collision_count
@@ -107,8 +111,12 @@ class PickPlaceRunner:
                 episode_start_collisions,
             )
         try:
-            object_position = scene_estimate.require("cube").position
             target_position = scene_estimate.require("target").position
+            workpiece_estimates = [
+                scene_estimate.require(item.object_id) for item in task.workpieces
+            ]
+            if any(not item.position_valid for item in workpiece_estimates):
+                raise ValueError("missing required estimate: workpiece_position_invalid")
             if task.scene == "obstacle":
                 scene_estimate.require("obstacle")
         except ValueError as exc:
@@ -116,7 +124,11 @@ class PickPlaceRunner:
             failure_type = (
                 f"{missing_id}_not_detected"
                 if missing_id in {"cube", "target", "obstacle"}
-                else "low_confidence"
+                else (
+                    missing_id
+                    if missing_id == "workpiece_position_invalid"
+                    else "object_count_mismatch"
+                )
             )
             return self._failure(
                 task,
@@ -151,20 +163,32 @@ class PickPlaceRunner:
         self.state = PickPlaceState.GRASP_SELECTION
         selection_started = time.perf_counter()
         try:
-            candidates = self.grasp_pose_generator.generate(
-                scene_estimate.require("cube"),
-                task.object_variant,
-                self.backend.downward_orientation(),
-                hover_height=self.backend.hover_height,
-                grasp_height=self.backend.grasp_height,
-            )
-            selection = select_feasible_grasp(
-                candidates,
-                self.backend,
-                planner=task.planner,
-                seed=task.planner_seed,
-                timeout_sec=3.0,
-            )
+            candidates = []
+            for workpiece in workpiece_estimates:
+                if not workpiece.orientation_valid:
+                    continue
+                candidates.extend(
+                    self.grasp_pose_generator.generate(
+                        workpiece,
+                        task.object_variant,
+                        self.backend.downward_orientation(),
+                        hover_height=self.backend.hover_height,
+                        grasp_height=self.backend.grasp_height,
+                    )
+                )
+            if not candidates:
+                selection = GraspSelection(
+                    False,
+                    failure_type="no_orientation_valid_workpiece",
+                )
+            else:
+                selection = select_feasible_grasp(
+                    candidates,
+                    self.backend,
+                    planner=task.planner,
+                    seed=task.planner_seed,
+                    timeout_sec=3.0,
+                )
         except (AttributeError, TypeError, ValueError):
             selection = GraspSelection(
                 False,
@@ -172,6 +196,9 @@ class PickPlaceRunner:
             )
         self._grasp_selection = selection
         self._grasp_selection_latency_sec = time.perf_counter() - selection_started
+        marker_publisher = getattr(self.backend, "publish_grasp_candidates", None)
+        if callable(marker_publisher):
+            marker_publisher(candidates if "candidates" in locals() else [], selection)
         self._stage_metrics[self.state.value] = {
             "grasp_selection_success": selection.success,
             "grasp_selection_latency_sec": self._grasp_selection_latency_sec,
@@ -180,6 +207,9 @@ class PickPlaceRunner:
                 selection.candidate.yaw_rad if selection.candidate is not None else None
             ),
             "selected_grasp_path_length_rad": selection.path_length_rad,
+            "selected_object_id": selection.selected_object_id,
+            "selection_score": selection.selection_score,
+            "feasible_candidate_count": selection.feasible_candidate_count,
             "failure_type": selection.failure_type,
         }
         if not selection.success or selection.candidate is None:
@@ -191,6 +221,26 @@ class PickPlaceRunner:
                 episode_start_collisions,
             )
         candidate = selection.candidate
+        self._selected_object_id = selection.selected_object_id or candidate.object_id
+        select_object = getattr(self.backend, "select_manipulation_object", None)
+        if task.workpiece_count > 1 and not callable(select_object):
+            return self._failure(
+                task,
+                object_initial_position,
+                "selected_object_sync_failed",
+                episode_start_steps,
+                episode_start_collisions,
+            )
+        if callable(select_object) and select_object(self._selected_object_id) is False:
+            return self._failure(
+                task,
+                object_initial_position,
+                str(getattr(self.backend, "last_failure_type", ""))
+                or "selected_object_sync_failed",
+                episode_start_steps,
+                episode_start_collisions,
+            )
+        object_initial_position, _ = self.backend.object_state()
         orientation = candidate.orientation_xyzw
 
         self.state = PickPlaceState.PRE_GRASP
@@ -328,6 +378,9 @@ class PickPlaceRunner:
                 collision_count > 0,
             )
         )
+        nonselected_moved = float(
+            getattr(self.backend, "max_nonselected_displacement_m", 0.0) or 0.0
+        ) > 0.010
         release_confirmed = bool(
             self._object_was_released
             and getattr(self.backend, "object_released_confirmed", True)
@@ -339,6 +392,7 @@ class PickPlaceRunner:
             and collision_state_known
             and not invalid_collision
             and collision_count == 0
+            and not nonselected_moved
         )
         final_failure_type = self._final_failure_type(
             released=release_confirmed,
@@ -357,6 +411,8 @@ class PickPlaceRunner:
                 )
             ),
         )
+        if nonselected_moved:
+            final_failure_type = "nonselected_object_moved"
         self.state = PickPlaceState.DONE if task_success else PickPlaceState.FAILED
         object_final_position, object_final_velocity = self.backend.object_state()
         xy_error, z_error = self._placement_errors(object_final_position, task.target_position)
@@ -576,25 +632,124 @@ class PickPlaceRunner:
             "pose_source": estimate.pose_source,
             "perception_success": estimate.success,
             "perception_latency_sec": estimate.latency_sec,
-            "object_position_error_m": error("cube", task.object_position),
+            "object_position_error_m": self._selected_position_error(task),
             "target_position_error_m": error("target", task.target_position),
             "obstacle_position_error_m": obstacle_error,
             "minimum_perception_confidence": self._minimum_confidence(),
             "object_variant": task.object_variant,
             "perception_profile": task.perception_profile,
             "object_yaw_error_rad": self._object_yaw_error(task),
+            **self._target_selection_kwargs(task),
             **self._grasp_selection_kwargs(),
         }
 
     def _object_yaw_error(self, task: TaskSpec) -> float | None:
         if task.object_variant != "rect_prism" or self._scene_estimate is None:
             return None
-        estimate = self._scene_estimate.estimates.get("cube")
-        if estimate is None:
+        estimate = self._scene_estimate.estimates.get(self._selected_object_id)
+        truth = self._truth_assignment(task).get(self._selected_object_id)
+        if estimate is None or truth is None:
             return None
         return abs(
-            normalize_symmetric_yaw(estimate.yaw_rad - task.object_yaw_rad)
+            normalize_symmetric_yaw(estimate.yaw_rad - truth.yaw_rad)
         )
+
+    def _selected_position_error(self, task: TaskSpec) -> float | None:
+        if self._scene_estimate is None:
+            return None
+        estimate = self._scene_estimate.estimates.get(self._selected_object_id)
+        truth = self._truth_assignment(task).get(self._selected_object_id)
+        if estimate is None or truth is None:
+            return None
+        return math.dist(estimate.position, truth.position)
+
+    def _target_selection_kwargs(self, task: TaskSpec) -> dict[str, Any]:
+        selection = self._grasp_selection
+        nonselected_displacement = getattr(
+            self.backend, "max_nonselected_displacement_m", None
+        )
+        assignment = self._truth_assignment(task)
+        enriched_metrics = ()
+        if selection is not None:
+            values = []
+            for metric in selection.object_metrics:
+                estimate = (
+                    None
+                    if self._scene_estimate is None
+                    else self._scene_estimate.estimates.get(metric.object_id)
+                )
+                truth = assignment.get(metric.object_id)
+                values.append(
+                    replace(
+                        metric,
+                        position_valid=bool(estimate and estimate.position_valid),
+                        orientation_valid=bool(estimate and estimate.orientation_valid),
+                        position_error_m=(
+                            None if estimate is None or truth is None
+                            else math.dist(estimate.position, truth.position)
+                        ),
+                        yaw_error_rad=(
+                            None
+                            if estimate is None
+                            or truth is None
+                            or not estimate.orientation_valid
+                            else abs(
+                                normalize_symmetric_yaw(
+                                    estimate.yaw_rad - truth.yaw_rad
+                                )
+                            )
+                        ),
+                        failure_type="" if estimate is None else estimate.failure_type,
+                    )
+                )
+            enriched_metrics = tuple(values)
+        return {
+            "detected_workpiece_count": (
+                0
+                if self._scene_estimate is None
+                else sum(
+                    1
+                    for object_id in self._scene_estimate.estimates
+                    if object_id == "cube" or object_id.startswith("workpiece_")
+                )
+            ),
+            "selected_object_id": self._selected_object_id,
+            "target_selection_success": bool(selection and selection.success),
+            "target_selection_latency_sec": self._grasp_selection_latency_sec,
+            "selected_object_score": None if selection is None else selection.selection_score,
+            "total_candidate_count": 0 if selection is None else selection.candidate_count,
+            "feasible_candidate_count": (
+                0 if selection is None else selection.feasible_candidate_count
+            ),
+            "selected_object_position_error_m": self._selected_position_error(task),
+            "selected_object_yaw_error_rad": self._object_yaw_error(task),
+            "max_nonselected_displacement_m": nonselected_displacement,
+            "object_selection_metrics": enriched_metrics,
+        }
+
+    def _truth_assignment(self, task: TaskSpec) -> dict[str, Any]:
+        """Match estimates to reset truth only for post-episode error reporting."""
+        if self._scene_estimate is None:
+            return {}
+        estimates = [
+            value
+            for key, value in sorted(self._scene_estimate.estimates.items())
+            if key == "cube" or key.startswith("workpiece_")
+        ]
+        truths = list(task.workpieces)
+        if len(estimates) != len(truths):
+            return {}
+        best = min(
+            permutations(truths),
+            key=lambda ordered: sum(
+                math.dist(estimate.position, truth.position)
+                for estimate, truth in zip(estimates, ordered)
+            ),
+        )
+        return {
+            estimate.object_id: truth
+            for estimate, truth in zip(estimates, best)
+        }
 
     def _grasp_selection_kwargs(self) -> dict[str, Any]:
         selection = self._grasp_selection

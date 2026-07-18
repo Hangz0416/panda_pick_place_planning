@@ -118,3 +118,28 @@ def test_unknown_collision_with_robot_is_conservatively_invalid():
     )
     assert not result.allowed
     assert result.failure_type == "unknown_monitored_collision"
+
+
+def test_multi_object_contacts_are_identity_aware_and_fail_closed():
+    selected_context = CollisionContext(
+        object_carried=True,
+        object_position=(0.57, -0.17, 0.025),
+        object_initial_position=(0.57, -0.17, 0.025),
+        target_position=(0.57, 0.17, 0.025),
+        selected_object_entity="cube_1",
+    )
+    robot_nonselected = classify_contact(
+        "panda::panda_leftfinger::collision",
+        "cube_2::cube_2_link::cube_2_collision",
+        selected_context,
+    )
+    carried_nonselected = classify_contact(
+        "cube_1::cube_1_link::cube_1_collision",
+        "cube_2::cube_2_link::cube_2_collision",
+        selected_context,
+    )
+
+    assert robot_nonselected.failure_type == "robot_nonselected_object_collision"
+    assert carried_nonselected.failure_type == (
+        "carried_object_nonselected_object_collision"
+    )

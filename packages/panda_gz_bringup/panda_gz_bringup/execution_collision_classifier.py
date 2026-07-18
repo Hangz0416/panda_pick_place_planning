@@ -47,6 +47,7 @@ class CollisionContext:
     target_position: tuple[float, float, float]
     target_xy_tolerance_m: float = 0.04
     target_z_tolerance_m: float = 0.015
+    selected_object_entity: str = "cube"
 
 
 @dataclass(frozen=True)
@@ -63,7 +64,7 @@ def canonical_entity(collision_name: str) -> str:
     for link in sorted(ROBOT_LINKS, key=len, reverse=True):
         if link in name:
             return link
-    for entity in ("cube", "obstacle", "table", "ground", "target"):
+    for entity in ("cube_2", "cube_1", "cube", "obstacle", "table", "ground", "target"):
         if entity in name:
             return entity
     return "unknown"
@@ -92,6 +93,8 @@ def classify_contact(
     first = canonical_entity(collision1)
     second = canonical_entity(collision2)
     entities = frozenset((first, second))
+    workpieces = entities & {"cube", "cube_1", "cube_2"}
+    selected = context.selected_object_entity
 
     def result(allowed, reason):
         return ContactClassification(
@@ -110,14 +113,18 @@ def classify_contact(
             return result(True, "allowed_robot_internal_contact")
         return result(False, "robot_self_collision")
 
-    if "cube" in entities and robot_entities:
+    if workpieces and robot_entities:
+        workpiece = next(iter(workpieces))
+        if not selected or workpiece != selected:
+            return result(False, "robot_nonselected_object_collision")
         robot_link = next(iter(robot_entities))
         if robot_link in TOUCH_LINKS:
             return result(True, "allowed_gripper_object_contact")
         return result(False, "robot_object_collision")
 
-    if "cube" in entities and "table" in entities:
-        if not context.object_carried:
+    if workpieces and "table" in entities:
+        workpiece = next(iter(workpieces))
+        if workpiece != selected or not context.object_carried:
             return result(True, "resting_or_released_object_table_contact")
         if _object_is_at_rest_pose(context, context.object_initial_position):
             return result(True, "allowed_source_pickup_contact")
@@ -125,7 +132,7 @@ def classify_contact(
             return result(True, "allowed_target_placement_contact")
         return result(False, "carried_object_environment_collision")
 
-    if "cube" in entities and entities & {"obstacle", "ground"}:
+    if workpieces and entities & {"obstacle", "ground"}:
         failure = (
             "carried_object_environment_collision"
             if context.object_carried
@@ -139,7 +146,12 @@ def classify_contact(
     if robot_entities and entities & ENVIRONMENT:
         return result(False, "robot_environment_collision")
 
-    if robot_entities or "cube" in entities:
+    if len(workpieces) == 2:
+        if context.object_carried and selected in workpieces:
+            return result(False, "carried_object_nonselected_object_collision")
+        return result(False, "workpiece_workpiece_collision")
+
+    if robot_entities or workpieces:
         # A monitored robot or object collision with an unknown model must not
         # silently become allowed when a model is renamed or added.
         return result(False, "unknown_monitored_collision")

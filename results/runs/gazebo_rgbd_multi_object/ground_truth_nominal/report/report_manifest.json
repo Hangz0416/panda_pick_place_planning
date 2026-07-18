@@ -1,0 +1,270 @@
+{
+  "charts": [
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "rates",
+      "path": "full_episode_success_rates.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "planning_time",
+      "path": "full_episode_planning_time.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "path_length",
+      "path": "full_episode_path_length.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "failures",
+      "path": "full_episode_failure_counts.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "place_error",
+      "path": "full_episode_place_error.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "tracking_error",
+      "path": "full_episode_tracking_error.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "perception",
+      "path": "full_episode_perception.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "perception_error",
+      "path": "full_episode_perception_error.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "perception_latency",
+      "path": "full_episode_perception_latency.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "yaw_error",
+      "path": "full_episode_yaw_error.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "grasp_selection",
+      "path": "full_episode_grasp_selection.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "grasp_candidate_path",
+      "path": "full_episode_grasp_candidate_path.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "target_selection",
+      "path": "full_episode_target_selection.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "candidate_counts",
+      "path": "full_episode_candidate_counts.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "selection_cost",
+      "path": "full_episode_selection_cost.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "nonselected_motion",
+      "path": "full_episode_nonselected_motion.svg"
+    }
+  ],
+  "evaluation_modes": [
+    "full_episode"
+  ],
+  "generated_at_utc": "2026-07-18T16:13:13.545183+00:00",
+  "groups": [
+    {
+      "dataset": "ground_truth",
+      "detected_workpiece_count_mean": 3.0,
+      "display_label": "ground_truth · moveit/gazebo · clear · RRTConnectkConfigDefault · ground_truth · rect_prism",
+      "episodes": 50,
+      "evaluation_mode": "full_episode",
+      "execution_success_rate": 1.0,
+      "failure_counts": {},
+      "feasible_candidate_count_mean": 6.0,
+      "final_xy_error_mean_m": 0.00011714443364168235,
+      "final_z_error_mean_m": 5.144384509898209e-07,
+      "grasp_candidate_count_mean": 6.0,
+      "grasp_selection_latency_mean_sec": 0.574154293757747,
+      "grasp_selection_success_rate": 1.0,
+      "group_key": "moveit/gazebo/clear/RRTConnectkConfigDefault/assisted/ground_truth/rect_prism/nominal",
+      "max_nonselected_displacement_p95_m": 0.0,
+      "metric_origins": {
+        "path_length": "reported_planning_success_episode_values",
+        "perception": "reported_episode_values",
+        "placement_error": "reported",
+        "planning_time": "reported_episode_values",
+        "tracking_error": "reported_episode_values"
+      },
+      "metric_sample_counts": {
+        "execution_success_rate": 50,
+        "final_xy_error": 50,
+        "final_z_error": 50,
+        "grasp_selection_latency": 50,
+        "max_nonselected_displacement": 50,
+        "object_position_error": 50,
+        "object_yaw_error": 50,
+        "obstacle_position_error": 0,
+        "path_length": 50,
+        "perception_latency": 50,
+        "perception_success_rate": 50,
+        "planning_success_rate": 50,
+        "planning_time": 50,
+        "selected_grasp_path_length": 50,
+        "selected_object_position_error": 50,
+        "selected_object_score": 50,
+        "selected_object_yaw_error": 50,
+        "target_position_error": 50,
+        "target_selection_latency": 50,
+        "task_success_rate": 50,
+        "tracking_error": 50
+      },
+      "object_position_error_mean_m": 0.0,
+      "object_position_error_p95_m": 0.0,
+      "object_variant": "rect_prism",
+      "object_yaw_error_mean_rad": 0.0,
+      "object_yaw_error_p95_rad": 0.0,
+      "obstacle_position_error_mean_m": null,
+      "obstacle_position_error_p95_m": null,
+      "path_length_mean_rad": 1.039021116777358,
+      "path_length_median_rad": 1.0137090755974778,
+      "perception_latency_mean_sec": 0.0,
+      "perception_latency_median_sec": 0.0,
+      "perception_latency_p95_sec": 0.0,
+      "perception_profile": "nominal",
+      "perception_success_rate": 1.0,
+      "planning_success_rate": 1.0,
+      "planning_time_mean_sec": 0.02799029412,
+      "planning_time_median_sec": 0.027537003999999997,
+      "planning_time_p95_sec": 0.03709188115,
+      "pose_source": "ground_truth",
+      "selected_grasp_path_length_mean_rad": 1.7420929616180298,
+      "selected_object_position_error_p95_m": 0.0,
+      "selected_object_score_mean": 1.7420929616180298,
+      "selected_object_yaw_error_p95_rad": 0.0,
+      "target_position_error_mean_m": 0.0,
+      "target_position_error_p95_m": 0.0,
+      "target_selection_latency_mean_sec": 0.574154293757747,
+      "target_selection_success_rate": 1.0,
+      "task_success_rate": 1.0,
+      "total_candidate_count_mean": 6.0,
+      "tracking_error_mean_rad": 0.05247477247648231
+    },
+    {
+      "dataset": "ground_truth",
+      "detected_workpiece_count_mean": 3.0,
+      "display_label": "ground_truth · moveit/gazebo · obstacle · RRTConnectkConfigDefault · ground_truth · rect_prism",
+      "episodes": 50,
+      "evaluation_mode": "full_episode",
+      "execution_success_rate": 1.0,
+      "failure_counts": {},
+      "feasible_candidate_count_mean": 6.0,
+      "final_xy_error_mean_m": 0.00015110036176225986,
+      "final_z_error_mean_m": 4.815610165351952e-07,
+      "grasp_candidate_count_mean": 6.0,
+      "grasp_selection_latency_mean_sec": 0.6550846069201361,
+      "grasp_selection_success_rate": 1.0,
+      "group_key": "moveit/gazebo/obstacle/RRTConnectkConfigDefault/assisted/ground_truth/rect_prism/nominal",
+      "max_nonselected_displacement_p95_m": 0.0,
+      "metric_origins": {
+        "path_length": "reported_planning_success_episode_values",
+        "perception": "reported_episode_values",
+        "placement_error": "reported",
+        "planning_time": "reported_episode_values",
+        "tracking_error": "reported_episode_values"
+      },
+      "metric_sample_counts": {
+        "execution_success_rate": 50,
+        "final_xy_error": 50,
+        "final_z_error": 50,
+        "grasp_selection_latency": 50,
+        "max_nonselected_displacement": 50,
+        "object_position_error": 50,
+        "object_yaw_error": 50,
+        "obstacle_position_error": 50,
+        "path_length": 50,
+        "perception_latency": 50,
+        "perception_success_rate": 50,
+        "planning_success_rate": 50,
+        "planning_time": 50,
+        "selected_grasp_path_length": 50,
+        "selected_object_position_error": 50,
+        "selected_object_score": 50,
+        "selected_object_yaw_error": 50,
+        "target_position_error": 50,
+        "target_selection_latency": 50,
+        "task_success_rate": 50,
+        "tracking_error": 50
+      },
+      "object_position_error_mean_m": 0.0,
+      "object_position_error_p95_m": 0.0,
+      "object_variant": "rect_prism",
+      "object_yaw_error_mean_rad": 0.0,
+      "object_yaw_error_p95_rad": 0.0,
+      "obstacle_position_error_mean_m": 0.0,
+      "obstacle_position_error_p95_m": 0.0,
+      "path_length_mean_rad": 3.1834508923194607,
+      "path_length_median_rad": 3.014983714396754,
+      "perception_latency_mean_sec": 0.0,
+      "perception_latency_median_sec": 0.0,
+      "perception_latency_p95_sec": 0.0,
+      "perception_profile": "nominal",
+      "perception_success_rate": 1.0,
+      "planning_success_rate": 1.0,
+      "planning_time_mean_sec": 0.0398512755,
+      "planning_time_median_sec": 0.034475809499999996,
+      "planning_time_p95_sec": 0.07473889750000001,
+      "pose_source": "ground_truth",
+      "selected_grasp_path_length_mean_rad": 1.8542774363783183,
+      "selected_object_position_error_p95_m": 0.0,
+      "selected_object_score_mean": 1.8542774363783183,
+      "selected_object_yaw_error_p95_rad": 0.0,
+      "target_position_error_mean_m": 0.0,
+      "target_position_error_p95_m": 0.0,
+      "target_selection_latency_mean_sec": 0.6550846069201361,
+      "target_selection_success_rate": 1.0,
+      "task_success_rate": 1.0,
+      "total_candidate_count_mean": 6.0,
+      "tracking_error_mean_rad": 0.055864860007992366
+    }
+  ],
+  "paired_coverage": null,
+  "report_schema_version": 1,
+  "semantic_notes": {
+    "full_episode": "Planning, execution, and task rates are shown when reported; missing metrics remain null/N/A.",
+    "multi_object_selection": "Target selection is planning-only across detected workpieces. The deterministic score is pre-grasp joint-path length plus one minus perception confidence; task truth is used only for offline error metrics.",
+    "path_length": "Mean and median use planning-success rows with a reported top-level joint path length.",
+    "perception": "Detection rate, service latency, and position error are reported only for rows that persist RGB-D perception observations.",
+    "placement_error": "Uses reported final errors, or derives absolute XY/Z error from recorded final and target positions in raw full-episode JSONL.",
+    "planning_only": "Only planning_success is a success-rate outcome; execution and task success are not applicable because no trajectory or grasp ran."
+  },
+  "sources": [
+    {
+      "batch_status": null,
+      "episode_count": 100,
+      "evaluation_modes": [
+        "full_episode"
+      ],
+      "label": "ground_truth",
+      "path": "results/runs/gazebo_rgbd_multi_object/ground_truth_nominal/episodes.jsonl",
+      "sha256": "5fee66443dca4d2966476ed6a5f2c27f1178400835704c8fcefb8b2868ab49e9",
+      "source_kind": "episode_jsonl",
+      "warnings": []
+    }
+  ],
+  "title": "Panda multi-object ground-truth nominal",
+  "warnings": []
+}

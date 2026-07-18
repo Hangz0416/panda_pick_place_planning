@@ -138,6 +138,10 @@ class PyBulletBackend:
     def attach_object(self) -> bool:
         return self.env.attach_object()
 
+    def select_manipulation_object(self, object_id: str) -> bool:
+        # PyBullet deliberately remains the single-workpiece teaching baseline.
+        return object_id == "cube"
+
     def detach_object(self) -> None:
         self.env.detach_object()
 

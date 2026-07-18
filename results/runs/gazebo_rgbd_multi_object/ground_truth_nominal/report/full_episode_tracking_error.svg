@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="370" viewBox="0 0 1500 370" role="img" aria-labelledby="chart-title">
+<title id="chart-title">Panda multi-object ground-truth nominal — Full episode joint tracking error</title>
+<style>
+text { font-family: Inter, "Noto Sans", "DejaVu Sans", sans-serif; fill: #263238; }
+.chart-title { font-size: 24px; font-weight: 700; }
+.chart-subtitle { font-size: 13px; fill: #52606D; }
+.legend-label, .tick-label { font-size: 12px; }
+.axis-label { font-size: 13px; font-weight: 600; }
+.group-label { font-size: 12px; font-weight: 600; }
+.value-label, .na-label { font-size: 11px; }
+.na-label, .empty-label { fill: #6B7785; font-style: italic; }
+.segment-label { fill: #FFFFFF; font-size: 11px; font-weight: 700; }
+.footer { font-size: 11px; fill: #6B7785; }
+</style>
+<rect width="1500" height="370" fill="#FFFFFF"/>
+<text class="chart-title" x="32" y="38">Panda multi-object ground-truth nominal — Full episode joint tracking error</text>
+<text class="chart-subtitle" x="32" y="64">Mean of reported episode maximum joint tracking errors; unavailable streams remain N/A.</text>
+<line x1="32" y1="72" x2="1468" y2="72" stroke="#D9E1E8"/>
+<rect x="560.0" y="75" width="13" height="13" rx="2" fill="#0072B2"/>
+<text class="legend-label" x="580.0" y="86">Max joint tracking error</text>
+<line x1="560.00" y1="145" x2="560.00" y2="265" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="560.00" y="287" text-anchor="middle">0</text>
+<line x1="720.00" y1="145" x2="720.00" y2="265" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="720.00" y="287" text-anchor="middle">0.02</text>
+<line x1="880.00" y1="145" x2="880.00" y2="265" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="880.00" y="287" text-anchor="middle">0.04</text>
+<line x1="1040.00" y1="145" x2="1040.00" y2="265" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1040.00" y="287" text-anchor="middle">0.06</text>
+<line x1="1200.00" y1="145" x2="1200.00" y2="265" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1200.00" y="287" text-anchor="middle">0.08</text>
+<line x1="1360.00" y1="145" x2="1360.00" y2="265" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1360.00" y="287" text-anchor="middle">0.1</text>
+<line x1="560" y1="265" x2="1360" y2="265" stroke="#52606D"/>
+<text class="axis-label" x="960.00" y="313" text-anchor="middle">mean error (rad)</text>
+<text class="group-label" x="546" y="155.5" text-anchor="end">ground_truth · moveit/gazebo · clear · RRTConnectkConfigDefault · ground_truth · rect_prism</text>
+<rect x="560" y="145" width="419.80" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="986.80" y="157" text-anchor="start" fill="#263238">0.05247 rad</text>
+<text class="group-label" x="546" y="198.5" text-anchor="end">ground_truth · moveit/gazebo · obstacle · RRTConnectkConfigDefault · ground_truth · rect_prism</text>
+<rect x="560" y="188" width="446.92" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="1013.92" y="200" text-anchor="start" fill="#263238">0.05586 rad</text>
+<text class="footer" x="1468" y="352" text-anchor="end">Recorded data only · N/A = not reported or not applicable</text>
+</svg>

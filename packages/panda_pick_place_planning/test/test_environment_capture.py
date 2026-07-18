@@ -7,11 +7,21 @@ from unittest.mock import patch
 from panda_pick_place_planning.core.environment_capture import (
     capture_environment,
     git_state,
+    source_status_dirty,
     source_tree_hash,
 )
 
 
 class EnvironmentCaptureTest(unittest.TestCase):
+    def test_source_dirty_state_ignores_generated_evidence_only(self):
+        self.assertFalse(
+            source_status_dirty(
+                "?? results/runs/run/episodes.jsonl\n"
+                " M docs/media/demo.mp4"
+            )
+        )
+        self.assertTrue(source_status_dirty(" M panda_pick_place/core.py"))
+
     def test_git_state_rejects_non_repository(self):
         with patch(
             "panda_pick_place_planning.core.environment_capture._command",
@@ -32,6 +42,7 @@ class EnvironmentCaptureTest(unittest.TestCase):
                 Path("/tmp"),
                 "gazebo",
                 object_variant="rect_prism",
+                workpiece_count=3,
                 pose_source="rgbd",
                 perception_profile="combined",
             )
@@ -41,9 +52,19 @@ class EnvironmentCaptureTest(unittest.TestCase):
         self.assertEqual(
             document["experiment"]["object_variant"], "rect_prism"
         )
+        self.assertEqual(document["experiment"]["workpiece_count"], 3)
         self.assertEqual(
             document["experiment"]["perception_profile"], "combined"
         )
+
+    def test_three_workpieces_require_rectangular_variant(self):
+        with self.assertRaisesRegex(ValueError, "three workpieces require"):
+            capture_environment(
+                Path("/tmp"),
+                "gazebo",
+                object_variant="cube",
+                workpiece_count=3,
+            )
 
     def test_source_tree_hash_excludes_recorded_results_and_media(self):
         with TemporaryDirectory() as directory:

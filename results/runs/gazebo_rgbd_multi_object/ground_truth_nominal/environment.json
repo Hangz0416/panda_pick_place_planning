@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "captured_at_utc": "2026-07-18T16:13:45.737593+00:00",
+  "platform": {
+    "os": "Ubuntu 22.04.5 LTS",
+    "kernel": "6.8.0-124-generic",
+    "machine": "x86_64",
+    "python": "3.10.12"
+  },
+  "ros_distro": null,
+  "simulator": "gazebo",
+  "git": {
+    "commit": "cc12447bc9cda3c19b37abe5c7d1f58aece2b65f",
+    "branch": "feature/multi-object-selection",
+    "dirty": true,
+    "source_tree_sha256": "96d40c2eff7546c44ef36fb2bad41c9676aaa8608b6b962c32b39aaac1cabcd2",
+    "source_file_count": 184
+  },
+  "packages": {
+    "ros-humble-moveit-resources-panda-description": "2.0.7-1jammy.20260304.090524",
+    "ros-humble-moveit-ros-move-group": "2.5.9-1jammy.20260505.192337",
+    "ros-humble-moveit-planners-ompl": "2.5.9-1jammy.20260505.192135",
+    "ros-humble-ros-gz-interfaces": "0.244.25-1jammy.20260608.150753",
+    "ros-humble-ros-gz-bridge": "0.244.25-1jammy.20260608.160002",
+    "ros-humble-ros-gz-sim": "0.244.25-1jammy.20260608.150939",
+    "ros-humble-gz-ros2-control": "0.7.20-1jammy.20260612.071115",
+    "libignition-msgs8-dev": "8.7.1-1~jammy",
+    "libignition-transport11-dev": "11.4.2-1~jammy",
+    "ros-humble-cv-bridge": "3.2.1-1jammy.20260414.141421",
+    "ros-humble-message-filters": "4.3.16-1jammy.20260421.070941",
+    "ros-humble-tf2-ros": "0.25.20-2jammy.20260421.080016",
+    "python3-numpy": "1:1.21.5-1ubuntu22.04.1",
+    "python3-opencv": "4.5.4+dfsg-9ubuntu4"
+  },
+  "experiment": {
+    "planner_id": "RRTConnectkConfigDefault",
+    "planning_time_sec": 3.0,
+    "velocity_scaling": 0.2,
+    "acceleration_scaling": 0.2,
+    "robot_collision_padding_m": 0.01,
+    "task_seed_base": 42,
+    "grasp_mode": "assisted",
+    "object_variant": "rect_prism",
+    "workpiece_count": 3,
+    "pose_source": "ground_truth",
+    "perception_profile": "nominal",
+    "physics_model_validated": false,
+    "camera": {
+      "resolution": [
+        640,
+        480
+      ],
+      "update_rate_hz": 20.0,
+      "depth_noise_stddev_m": 0.002,
+      "optical_frame": "overhead_camera_optical_frame"
+    }
+  },
+  "inertial_source": {
+    "repository": "https://github.com/frankarobotics/franka_ros",
+    "tag": "0.10.2",
+    "commit": "c11f000c2737acc22ed8dfeff40555b2644a4294",
+    "official_properties": false
+  }
+}

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import threading
 import time
-import math
 from typing import Any, Protocol, Sequence, runtime_checkable
 
 from panda_pick_place_planning.core.schemas import (
@@ -32,15 +31,14 @@ class GroundTruthPoseProvider:
         self.obstacle_position = tuple(float(value) for value in obstacle_position)
 
     def estimate(self, task: TaskSpec) -> SceneEstimate:
-        half_yaw = 0.5 * task.object_yaw_rad
-        estimates = {
-            "cube": SceneObjectEstimate(
-                "cube",
-                task.object_position,
-                orientation_xyzw=(0.0, 0.0, math.sin(half_yaw), math.cos(half_yaw)),
-            ),
-            "target": SceneObjectEstimate("target", task.target_position),
-        }
+        estimates = {"target": SceneObjectEstimate("target", task.target_position)}
+        for workpiece in task.workpieces:
+            estimates[workpiece.object_id] = SceneObjectEstimate(
+                workpiece.object_id,
+                workpiece.position,
+                object_class="workpiece",
+                orientation_xyzw=workpiece.orientation_xyzw,
+            )
         if task.scene == "obstacle":
             estimates["obstacle"] = SceneObjectEstimate(
                 "obstacle", self.obstacle_position
@@ -78,7 +76,10 @@ class RGBDScenePoseProvider:
         request.task_seed = task.task_seed
         request.scene = task.scene
         request.object_variant = task.object_variant
-        request.required_object_ids = ["cube", "target"]
+        request.expected_workpiece_count = task.workpiece_count
+        request.required_object_ids = ["target"]
+        if task.workpiece_count == 1:
+            request.required_object_ids.insert(0, task.workpieces[0].object_id)
         if task.scene == "obstacle":
             request.required_object_ids.append("obstacle")
         request.timeout_sec = self.timeout_sec
@@ -99,7 +100,10 @@ class RGBDScenePoseProvider:
                 str(item.object_id): self._from_ros(item)
                 for item in response.estimates
             }
-            missing = set(request.required_object_ids) - estimates.keys()
+            required = set(request.required_object_ids)
+            if task.workpiece_count > 1:
+                required.update(item.object_id for item in task.workpieces)
+            missing = required - estimates.keys()
             if missing:
                 failure = {
                     "cube": "cube_not_detected",
@@ -124,6 +128,10 @@ class RGBDScenePoseProvider:
         return SceneObjectEstimate(
             object_id=str(message.object_id),
             position=(float(position.x), float(position.y), float(position.z)),
+            object_class=str(message.object_class or message.object_id),
+            position_valid=bool(message.position_valid),
+            orientation_valid=bool(message.orientation_valid),
+            failure_type=str(message.failure_type),
             confidence=float(message.confidence),
             valid_pixel_count=int(message.valid_pixel_count),
             covariance=tuple(float(value) for value in message.pose.covariance),

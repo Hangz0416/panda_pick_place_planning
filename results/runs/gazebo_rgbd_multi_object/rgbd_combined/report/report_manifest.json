@@ -1,0 +1,270 @@
+{
+  "charts": [
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "rates",
+      "path": "full_episode_success_rates.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "planning_time",
+      "path": "full_episode_planning_time.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "path_length",
+      "path": "full_episode_path_length.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "failures",
+      "path": "full_episode_failure_counts.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "place_error",
+      "path": "full_episode_place_error.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "tracking_error",
+      "path": "full_episode_tracking_error.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "perception",
+      "path": "full_episode_perception.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "perception_error",
+      "path": "full_episode_perception_error.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "perception_latency",
+      "path": "full_episode_perception_latency.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "yaw_error",
+      "path": "full_episode_yaw_error.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "grasp_selection",
+      "path": "full_episode_grasp_selection.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "grasp_candidate_path",
+      "path": "full_episode_grasp_candidate_path.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "target_selection",
+      "path": "full_episode_target_selection.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "candidate_counts",
+      "path": "full_episode_candidate_counts.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "selection_cost",
+      "path": "full_episode_selection_cost.svg"
+    },
+    {
+      "evaluation_mode": "full_episode",
+      "metric": "nonselected_motion",
+      "path": "full_episode_nonselected_motion.svg"
+    }
+  ],
+  "evaluation_modes": [
+    "full_episode"
+  ],
+  "generated_at_utc": "2026-07-18T16:27:50.085449+00:00",
+  "groups": [
+    {
+      "dataset": "rgbd_combined",
+      "detected_workpiece_count_mean": 3.0,
+      "display_label": "rgbd_combined · moveit/gazebo · clear · RRTConnectkConfigDefault · rgbd · rect_prism · combined",
+      "episodes": 20,
+      "evaluation_mode": "full_episode",
+      "execution_success_rate": 1.0,
+      "failure_counts": {},
+      "feasible_candidate_count_mean": 6.0,
+      "final_xy_error_mean_m": 0.0024518456149243517,
+      "final_z_error_mean_m": 3.71854010466563e-07,
+      "grasp_candidate_count_mean": 6.0,
+      "grasp_selection_latency_mean_sec": 0.527741307496035,
+      "grasp_selection_success_rate": 1.0,
+      "group_key": "moveit/gazebo/clear/RRTConnectkConfigDefault/assisted/rgbd/rect_prism/combined",
+      "max_nonselected_displacement_p95_m": 0.0,
+      "metric_origins": {
+        "path_length": "reported_planning_success_episode_values",
+        "perception": "reported_episode_values",
+        "placement_error": "reported",
+        "planning_time": "reported_episode_values",
+        "tracking_error": "reported_episode_values"
+      },
+      "metric_sample_counts": {
+        "execution_success_rate": 20,
+        "final_xy_error": 20,
+        "final_z_error": 20,
+        "grasp_selection_latency": 20,
+        "max_nonselected_displacement": 20,
+        "object_position_error": 20,
+        "object_yaw_error": 20,
+        "obstacle_position_error": 0,
+        "path_length": 20,
+        "perception_latency": 20,
+        "perception_success_rate": 20,
+        "planning_success_rate": 20,
+        "planning_time": 20,
+        "selected_grasp_path_length": 20,
+        "selected_object_position_error": 20,
+        "selected_object_score": 20,
+        "selected_object_yaw_error": 20,
+        "target_position_error": 20,
+        "target_selection_latency": 20,
+        "task_success_rate": 20,
+        "tracking_error": 20
+      },
+      "object_position_error_mean_m": 0.002783149504116083,
+      "object_position_error_p95_m": 0.004338338765421963,
+      "object_variant": "rect_prism",
+      "object_yaw_error_mean_rad": 0.04213627067098884,
+      "object_yaw_error_p95_rad": 0.13193927093626287,
+      "obstacle_position_error_mean_m": null,
+      "obstacle_position_error_p95_m": null,
+      "path_length_mean_rad": 1.0094465572638485,
+      "path_length_median_rad": 0.9870903102820786,
+      "perception_latency_mean_sec": 0.07657782455353299,
+      "perception_latency_median_sec": 0.07721840849262662,
+      "perception_latency_p95_sec": 0.11225463581358781,
+      "perception_profile": "combined",
+      "perception_success_rate": 1.0,
+      "planning_success_rate": 1.0,
+      "planning_time_mean_sec": 0.02748593025,
+      "planning_time_median_sec": 0.027048008499999998,
+      "planning_time_p95_sec": 0.03246824055,
+      "pose_source": "rgbd",
+      "selected_grasp_path_length_mean_rad": 1.850968031827492,
+      "selected_object_position_error_p95_m": 0.004338338765421963,
+      "selected_object_score_mean": 1.8938251746846348,
+      "selected_object_yaw_error_p95_rad": 0.13193927093626287,
+      "target_position_error_mean_m": 0.0023433033892248,
+      "target_position_error_p95_m": 0.0033524155817512683,
+      "target_selection_latency_mean_sec": 0.527741307496035,
+      "target_selection_success_rate": 1.0,
+      "task_success_rate": 1.0,
+      "total_candidate_count_mean": 6.0,
+      "tracking_error_mean_rad": 0.05109996862417052
+    },
+    {
+      "dataset": "rgbd_combined",
+      "detected_workpiece_count_mean": 3.0,
+      "display_label": "rgbd_combined · moveit/gazebo · obstacle · RRTConnectkConfigDefault · rgbd · rect_prism · combined",
+      "episodes": 20,
+      "evaluation_mode": "full_episode",
+      "execution_success_rate": 1.0,
+      "failure_counts": {},
+      "feasible_candidate_count_mean": 6.0,
+      "final_xy_error_mean_m": 0.0028786729568759392,
+      "final_z_error_mean_m": 4.5500739320504525e-07,
+      "grasp_candidate_count_mean": 6.0,
+      "grasp_selection_latency_mean_sec": 0.6057521579044988,
+      "grasp_selection_success_rate": 1.0,
+      "group_key": "moveit/gazebo/obstacle/RRTConnectkConfigDefault/assisted/rgbd/rect_prism/combined",
+      "max_nonselected_displacement_p95_m": 0.0,
+      "metric_origins": {
+        "path_length": "reported_planning_success_episode_values",
+        "perception": "reported_episode_values",
+        "placement_error": "reported",
+        "planning_time": "reported_episode_values",
+        "tracking_error": "reported_episode_values"
+      },
+      "metric_sample_counts": {
+        "execution_success_rate": 20,
+        "final_xy_error": 20,
+        "final_z_error": 20,
+        "grasp_selection_latency": 20,
+        "max_nonselected_displacement": 20,
+        "object_position_error": 20,
+        "object_yaw_error": 20,
+        "obstacle_position_error": 20,
+        "path_length": 20,
+        "perception_latency": 20,
+        "perception_success_rate": 20,
+        "planning_success_rate": 20,
+        "planning_time": 20,
+        "selected_grasp_path_length": 20,
+        "selected_object_position_error": 20,
+        "selected_object_score": 20,
+        "selected_object_yaw_error": 20,
+        "target_position_error": 20,
+        "target_selection_latency": 20,
+        "task_success_rate": 20,
+        "tracking_error": 20
+      },
+      "object_position_error_mean_m": 0.0019875338646744172,
+      "object_position_error_p95_m": 0.0034274206944308245,
+      "object_variant": "rect_prism",
+      "object_yaw_error_mean_rad": 0.051227407873788613,
+      "object_yaw_error_p95_rad": 0.1296416946614065,
+      "obstacle_position_error_mean_m": 0.0025263461891639593,
+      "obstacle_position_error_p95_m": 0.0038715979192510855,
+      "path_length_mean_rad": 2.9644551147687013,
+      "path_length_median_rad": 2.7921317376467023,
+      "perception_latency_mean_sec": 0.07714011915086302,
+      "perception_latency_median_sec": 0.06138301899773069,
+      "perception_latency_p95_sec": 0.1380295421025949,
+      "perception_profile": "combined",
+      "perception_success_rate": 1.0,
+      "planning_success_rate": 1.0,
+      "planning_time_mean_sec": 0.0388521633,
+      "planning_time_median_sec": 0.0330408455,
+      "planning_time_p95_sec": 0.06724881040000001,
+      "pose_source": "rgbd",
+      "selected_grasp_path_length_mean_rad": 1.647977976703723,
+      "selected_object_position_error_p95_m": 0.0034274206944308245,
+      "selected_object_score_mean": 1.666835119560866,
+      "selected_object_yaw_error_p95_rad": 0.1296416946614065,
+      "target_position_error_mean_m": 0.0020729083452067413,
+      "target_position_error_p95_m": 0.0029522815147367404,
+      "target_selection_latency_mean_sec": 0.6057521579044988,
+      "target_selection_success_rate": 1.0,
+      "task_success_rate": 1.0,
+      "total_candidate_count_mean": 6.0,
+      "tracking_error_mean_rad": 0.0526680927353672
+    }
+  ],
+  "paired_coverage": null,
+  "report_schema_version": 1,
+  "semantic_notes": {
+    "full_episode": "Planning, execution, and task rates are shown when reported; missing metrics remain null/N/A.",
+    "multi_object_selection": "Target selection is planning-only across detected workpieces. The deterministic score is pre-grasp joint-path length plus one minus perception confidence; task truth is used only for offline error metrics.",
+    "path_length": "Mean and median use planning-success rows with a reported top-level joint path length.",
+    "perception": "Detection rate, service latency, and position error are reported only for rows that persist RGB-D perception observations.",
+    "placement_error": "Uses reported final errors, or derives absolute XY/Z error from recorded final and target positions in raw full-episode JSONL.",
+    "planning_only": "Only planning_success is a success-rate outcome; execution and task success are not applicable because no trajectory or grasp ran."
+  },
+  "sources": [
+    {
+      "batch_status": null,
+      "episode_count": 40,
+      "evaluation_modes": [
+        "full_episode"
+      ],
+      "label": "rgbd_combined",
+      "path": "results/runs/gazebo_rgbd_multi_object/rgbd_combined/episodes.jsonl",
+      "sha256": "05df919dd0de7cde9f8664f1d57502ae5ae2f9e4decda35be0e57bce3a42f6b7",
+      "source_kind": "episode_jsonl",
+      "warnings": []
+    }
+  ],
+  "title": "Panda multi-object RGB-D combined perturbation",
+  "warnings": []
+}

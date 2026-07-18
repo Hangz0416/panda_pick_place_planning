@@ -11,10 +11,12 @@ from control_msgs.action import FollowJointTrajectory, GripperCommand
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
 from geometry_msgs.msg import Point, Pose, PoseArray
 from nav_msgs.msg import Odometry
+from panda_pick_place_interfaces.msg import SceneObjectTask
 from panda_pick_place_interfaces.srv import (
     GetExecutionCollisionState,
     GetPhysicalGraspState,
     ResetEpisode,
+    SetAssistedObject,
 )
 import rclpy
 from rclpy.action import ActionClient
@@ -24,11 +26,11 @@ from rclpy.node import Node
 from ros_gz_interfaces.msg import Entity
 from ros_gz_interfaces.srv import ControlWorld, SetEntityPose
 from sensor_msgs.msg import JointState
-from std_srvs.srv import Trigger
 from trajectory_msgs.msg import JointTrajectoryPoint
 
 from panda_gz_bringup.reset_contract import (
     ResetSpec,
+    ResetWorkpieceSpec,
     ScenePoseConfig,
     entity_pose_map,
     pose_error,
@@ -40,6 +42,17 @@ from panda_gz_bringup.status import StatusCode, service_message
 
 ARM_JOINTS = tuple(f"panda_joint{index}" for index in range(1, 8))
 HAND_JOINTS = ("panda_finger_joint1", "panda_finger_joint2")
+
+
+def reset_failure_type(
+    success: bool, code: StatusCode, workpiece_count: int
+) -> str:
+    """Classify a multi-object reset failure while retaining status detail."""
+    if success:
+        return ""
+    if workpiece_count > 1:
+        return "multi_object_reset_failed"
+    return code.name.lower()
 
 
 class EpisodeResetManager(Node):
@@ -55,9 +68,15 @@ class EpisodeResetManager(Node):
         self._joint_velocities: dict[str, float] = {}
         self._entity_state_condition = threading.Condition()
         self._entity_poses: dict[str, Pose] = {}
-        self._entity_generations = {role: 0 for role in ("cube", "target", "obstacle")}
-        self._cube_linear_velocity = (math.inf, math.inf, math.inf)
-        self._cube_angular_velocity = (math.inf, math.inf, math.inf)
+        self._entity_generations = {
+            role: 0
+            for role in (
+                "cube", "workpiece_0", "workpiece_1", "workpiece_2",
+                "target", "obstacle",
+            )
+        }
+        self._workpiece_linear_velocity = {}
+        self._workpiece_angular_velocity = {}
         self._verified_entity_poses: dict[str, Pose] = {}
         self._active_spec: ResetSpec | None = None
         self._world_paused = False
@@ -66,6 +85,7 @@ class EpisodeResetManager(Node):
         self.declare_parameter("scene", "clear")
         self.declare_parameter("grasp_mode", "assisted")
         self.declare_parameter("object_variant", "cube")
+        self.declare_parameter("workpiece_count", 1)
         self.declare_parameter("default_episode_id", 0)
         self.declare_parameter("default_task_seed", 42)
         self.declare_parameter("default_object_position", [0.57, -0.17, 0.025])
@@ -82,6 +102,7 @@ class EpisodeResetManager(Node):
         self.declare_parameter("service_timeout_sec", 10.0)
         self.declare_parameter("home_timeout_sec", 8.0)
         self.declare_parameter("home_duration_sec", 3.0)
+        self.declare_parameter("home_max_attempts", 3)
         self.declare_parameter("joint_position_tolerance_rad", 0.025)
         self.declare_parameter("joint_velocity_tolerance_rad_s", 0.025)
         self.declare_parameter("gripper_position_tolerance_m", 0.003)
@@ -116,7 +137,9 @@ class EpisodeResetManager(Node):
             callback_group=self._group,
         )
         self._detach_client = self.create_client(
-            Trigger, "/panda_gz/detach_object", callback_group=self._group
+            SetAssistedObject,
+            "/panda_gz/set_assisted_object",
+            callback_group=self._group,
         )
         self._home_client = ActionClient(
             self,
@@ -150,13 +173,18 @@ class EpisodeResetManager(Node):
             10,
             callback_group=self._group,
         )
-        self.create_subscription(
-            Odometry,
-            "/panda_gz/cube_odometry",
-            self._on_cube_odometry,
-            10,
-            callback_group=self._group,
-        )
+        for object_id, topic in (
+            ("cube", "/panda_gz/cube_odometry"),
+            ("workpiece_1", "/panda_gz/cube_1_odometry"),
+            ("workpiece_2", "/panda_gz/cube_2_odometry"),
+        ):
+            self.create_subscription(
+                Odometry,
+                topic,
+                lambda message, value=object_id: self._on_workpiece_odometry(value, message),
+                10,
+                callback_group=self._group,
+            )
         self.create_subscription(
             PoseArray,
             "/panda_gz/target_pose",
@@ -186,6 +214,18 @@ class EpisodeResetManager(Node):
         self._publish_status(StatusCode.READY, "typed reset manager ready")
 
     def _default_spec(self) -> ResetSpec:
+        count = int(self.get_parameter("workpiece_count").value)
+        workpieces = ()
+        if count == 3:
+            workpieces = tuple(
+                ResetWorkpieceSpec.create(
+                    f"workpiece_{index}",
+                    "rect_prism",
+                    (0.46 + 0.11 * index, -0.17, 0.025),
+                    (0.0, 0.0, 0.0, 1.0),
+                )
+                for index in range(3)
+            )
         return ResetSpec.create(
             episode_id=int(self.get_parameter("default_episode_id").value),
             task_seed=int(self.get_parameter("default_task_seed").value),
@@ -195,10 +235,25 @@ class EpisodeResetManager(Node):
             target_position=self.get_parameter("default_target_position").value,
             object_variant=str(self.get_parameter("object_variant").value),
             object_yaw_rad=0.0,
+            workpieces=workpieces,
         )
 
     def _request_spec(self, request: ResetEpisode.Request) -> ResetSpec:
         require_world_frame(request.header.frame_id)
+        workpieces = tuple(
+            ResetWorkpieceSpec.create(
+                item.object_id,
+                str(item.object_variant or request.object_variant or "cube"),
+                (item.pose.position.x, item.pose.position.y, item.pose.position.z),
+                (
+                    item.pose.orientation.x,
+                    item.pose.orientation.y,
+                    item.pose.orientation.z,
+                    item.pose.orientation.w,
+                ),
+            )
+            for item in request.workpieces
+        )
         spec = ResetSpec.create(
             episode_id=request.episode_id,
             task_seed=request.task_seed,
@@ -216,6 +271,7 @@ class EpisodeResetManager(Node):
             ),
             object_variant=str(request.object_variant or "cube"),
             object_yaw_rad=float(request.object_yaw_rad),
+            workpieces=workpieces,
         )
         configured_mode = str(self.get_parameter("grasp_mode").value)
         if spec.grasp_mode != configured_mode:
@@ -228,6 +284,12 @@ class EpisodeResetManager(Node):
             raise ValueError(
                 "request object_variant does not match launch object_variant "
                 f"({spec.object_variant} != {configured_variant})"
+            )
+        configured_count = int(self.get_parameter("workpiece_count").value)
+        if len(spec.workpieces) != configured_count:
+            raise ValueError(
+                "request workpiece count does not match launch workpiece_count "
+                f"({len(spec.workpieces)} != {configured_count})"
             )
         return spec
 
@@ -247,13 +309,18 @@ class EpisodeResetManager(Node):
             self._entity_state_condition.notify_all()
 
     def _on_cube_odometry(self, message: Odometry) -> None:
+        self._on_workpiece_odometry("cube", message)
+
+    def _on_workpiece_odometry(self, role: str, message: Odometry) -> None:
+        if role == "cube" and int(self.get_parameter("workpiece_count").value) == 3:
+            role = "workpiece_0"
         linear = message.twist.twist.linear
         angular = message.twist.twist.angular
         with self._entity_state_condition:
-            self._entity_poses["cube"] = message.pose.pose
-            self._cube_linear_velocity = (linear.x, linear.y, linear.z)
-            self._cube_angular_velocity = (angular.x, angular.y, angular.z)
-            self._entity_generations["cube"] += 1
+            self._entity_poses[role] = message.pose.pose
+            self._workpiece_linear_velocity[role] = (linear.x, linear.y, linear.z)
+            self._workpiece_angular_velocity[role] = (angular.x, angular.y, angular.z)
+            self._entity_generations[role] += 1
             self._entity_state_condition.notify_all()
 
     def _on_target_pose(self, message: PoseArray) -> None:
@@ -292,14 +359,19 @@ class EpisodeResetManager(Node):
     ) -> ResetEpisode.Response:
         response.success = success
         response.status_code = int(code)
-        response.failure_type = "" if success else code.name.lower()
+        response.failure_type = reset_failure_type(
+            success,
+            code,
+            len(spec.workpieces) if spec is not None else 0,
+        )
         response.message = service_message(code, detail)
         # Applied coordinates are populated only after fresh Gazebo readback
         # has verified all three scene entities.  A failed SetEntityPose call
         # must never be reported by echoing the request.
         if success and spec is not None:
             with self._entity_state_condition:
-                cube_pose = self._verified_entity_poses.get("cube")
+                first_id = spec.workpieces[0].object_id
+                cube_pose = self._verified_entity_poses.get(first_id)
                 target_pose = self._verified_entity_poses.get("target")
             if cube_pose is None or target_pose is None:
                 raise RuntimeError("successful reset has no verified entity state")
@@ -323,6 +395,15 @@ class EpisodeResetManager(Node):
                 2.0 * (quaternion.w * quaternion.z + quaternion.x * quaternion.y),
                 1.0 - 2.0 * (quaternion.y ** 2 + quaternion.z ** 2),
             )
+            for item in spec.workpieces:
+                pose = self._verified_entity_poses.get(item.object_id)
+                if pose is None:
+                    raise RuntimeError("successful reset is missing a workpiece")
+                applied = SceneObjectTask()
+                applied.object_id = item.object_id
+                applied.object_variant = item.object_variant
+                applied.pose = pose
+                response.applied_workpieces.append(applied)
         return response
 
     def _perform_reset(
@@ -357,14 +438,18 @@ class EpisodeResetManager(Node):
             # controlled state explicitly instead: detach while physics is
             # running, pause, place all task entities, resume, command the arm
             # and hand, then prove convergence from fresh Gazebo readback.
-            detached = self._wait_future(
-                self._detach_client.call_async(Trigger.Request()), timeout
-            )
-            if detached is None or not detached.success:
-                return self._fail(
-                    StatusCode.GZ_SERVICE_FAILED,
-                    "DetachableJoint did not confirm reset-time detach",
+            for item in spec.workpieces:
+                request = SetAssistedObject.Request()
+                request.object_id = item.object_id
+                request.attach = False
+                detached = self._wait_future(
+                    self._detach_client.call_async(request), timeout
                 )
+                if detached is None or not detached.success:
+                    return self._fail(
+                        StatusCode.GZ_SERVICE_FAILED,
+                        f"DetachableJoint did not detach {item.object_id}",
+                    )
             if not self._control_world(pause=True):
                 return self._fail(StatusCode.GZ_SERVICE_FAILED, "world pause failed")
             generations = self._entity_generation_snapshot()
@@ -375,10 +460,15 @@ class EpisodeResetManager(Node):
             if not self._control_world(pause=False):
                 return self._fail(StatusCode.GZ_SERVICE_FAILED, "world resume failed")
 
-            if not self._move_home() or not self._open_gripper():
+            if not self._move_home():
                 return self._fail(
                     StatusCode.HOME_FAILED,
-                    "arm home or open-gripper command failed",
+                    "arm home command failed after bounded retries",
+                )
+            if not self._open_gripper():
+                return self._fail(
+                    StatusCode.HOME_FAILED,
+                    "open-gripper command failed",
                 )
             home_ok, home_detail = self._wait_for_home_settled()
             if not home_ok:
@@ -445,6 +535,9 @@ class EpisodeResetManager(Node):
     def _set_scene_poses(self, spec: ResetSpec) -> bool:
         model_names = {
             "cube": str(self.get_parameter("cube_model").value),
+            "workpiece_0": str(self.get_parameter("cube_model").value),
+            "workpiece_1": "cube_1",
+            "workpiece_2": "cube_2",
             "target": str(self.get_parameter("target_model").value),
             "obstacle": str(self.get_parameter("obstacle_model").value),
         }
@@ -556,11 +649,19 @@ class EpisodeResetManager(Node):
                                 f"rotation={rotation:.6f}rad)"
                             )
 
-                linear_speed = vector_norm(self._cube_linear_velocity)
-                angular_speed = vector_norm(self._cube_angular_velocity)
-                velocities_ok = (
-                    linear_speed <= linear_tolerance
-                    and angular_speed <= angular_tolerance
+                workpiece_roles = [item.object_id for item in spec.workpieces]
+                speed_values = [
+                    (
+                        vector_norm(self._workpiece_linear_velocity.get(role, (math.inf,) * 3)),
+                        vector_norm(self._workpiece_angular_velocity.get(role, (math.inf,) * 3)),
+                    )
+                    for role in workpiece_roles
+                ]
+                linear_speed = max(value[0] for value in speed_values)
+                angular_speed = max(value[1] for value in speed_values)
+                velocities_ok = all(
+                    linear <= linear_tolerance and angular <= angular_tolerance
+                    for linear, angular in speed_values
                 )
                 state_ok = (
                     not stale_roles
@@ -571,10 +672,10 @@ class EpisodeResetManager(Node):
                 if state_ok:
                     if stable_since is None:
                         stable_since = now
-                        stable_cube_generation = self._entity_generations["cube"]
+                        stable_cube_generation = self._entity_generations[workpiece_roles[0]]
                     stable_elapsed = now - stable_since
                     cube_advanced = (
-                        self._entity_generations["cube"]
+                        self._entity_generations[workpiece_roles[0]]
                         > stable_cube_generation
                     )
                     if stable_elapsed >= stable_required and cube_advanced:
@@ -587,7 +688,7 @@ class EpisodeResetManager(Node):
                         )
                     last_detail = (
                         f"stable for {stable_elapsed:.3f}/{stable_required:.3f}s; "
-                        f"cube odometry advanced={cube_advanced}"
+                        f"workpiece odometry advanced={cube_advanced}"
                     )
                 else:
                     stable_since = None
@@ -628,17 +729,43 @@ class EpisodeResetManager(Node):
         point.time_from_start.sec = int(duration)
         point.time_from_start.nanosec = int((duration % 1.0) * 1.0e9)
         goal.trajectory.points = [point]
-        goal_handle = self._wait_future(
-            self._home_client.send_goal_async(goal), timeout
-        )
-        if goal_handle is None or not goal_handle.accepted:
-            return False
-        wrapped_result = self._wait_future(goal_handle.get_result_async(), timeout)
-        return bool(
-            wrapped_result is not None
-            and wrapped_result.result.error_code
-            == FollowJointTrajectory.Result.SUCCESSFUL
-        )
+        max_attempts = int(self.get_parameter("home_max_attempts").value)
+        if max_attempts < 1:
+            raise ValueError("home_max_attempts must be positive")
+        for attempt in range(1, max_attempts + 1):
+            goal_handle = self._wait_future(
+                self._home_client.send_goal_async(goal), timeout
+            )
+            if goal_handle is None or not goal_handle.accepted:
+                detail = "goal response timed out or was rejected"
+            else:
+                wrapped_result = self._wait_future(
+                    goal_handle.get_result_async(), timeout
+                )
+                if (
+                    wrapped_result is not None
+                    and wrapped_result.result.error_code
+                    == FollowJointTrajectory.Result.SUCCESSFUL
+                ):
+                    return True
+                if wrapped_result is None:
+                    detail = "trajectory result timed out"
+                else:
+                    result = wrapped_result.result
+                    detail = (
+                        f"error_code={result.error_code} "
+                        f"error_string={result.error_string!r}"
+                    )
+            if attempt < max_attempts:
+                self.get_logger().warning(
+                    f"home attempt {attempt}/{max_attempts} failed: "
+                    f"{detail}; retrying from controller readback"
+                )
+            else:
+                self.get_logger().error(
+                    f"home attempt {attempt}/{max_attempts} failed: {detail}"
+                )
+        return False
 
     def _open_gripper(self) -> bool:
         timeout = float(self.get_parameter("home_timeout_sec").value)
@@ -826,6 +953,7 @@ class EpisodeResetManager(Node):
             return None
 
     def _fail(self, code: StatusCode, detail: str):
+        self.get_logger().error(service_message(code, detail))
         self._publish_status(code, detail)
         return False, code, detail
 

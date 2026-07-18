@@ -1,0 +1,21 @@
+{
+  "readiness": "ready",
+  "episode_status": "failed",
+  "failure_type": "result_save_incomplete",
+  "expected_episodes": 100,
+  "saved_episodes": 80,
+  "failed_episodes": 2,
+  "result_saved": false,
+  "result_path": "/media/hgz/2EDC05C6DC0588F3/ros2_ws/src/panda_pick_place_planning/results/runs/gazebo_rgbd_multi_object/ground_truth_nominal/episodes.jsonl",
+  "summary_path": "/media/hgz/2EDC05C6DC0588F3/ros2_ws/src/panda_pick_place_planning/results/runs/gazebo_rgbd_multi_object/ground_truth_nominal/summary.json",
+  "batch_exit_code": 130,
+  "teardown": "abnormal_exit",
+  "teardown_events": [
+    {
+      "process": "move_group-13",
+      "returncode": -11
+    }
+  ],
+  "parse_error": "",
+  "updated_unix_sec": 1784388285.0588799
+}

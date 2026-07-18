@@ -7,6 +7,7 @@ string object_variant
 float64 object_yaw_rad
 geometry_msgs/Point object_position
 geometry_msgs/Point target_position
+SceneObjectTask[] workpieces
 ---
 bool success
 uint16 status_code
@@ -15,3 +16,4 @@ string message
 geometry_msgs/Point applied_object_position
 geometry_msgs/Point applied_target_position
 float64 applied_object_yaw_rad
+SceneObjectTask[] applied_workpieces

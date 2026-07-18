@@ -21,6 +21,7 @@ def generate_launch_description() -> LaunchDescription:
     backend = LaunchConfiguration("backend")
     grasp_mode = LaunchConfiguration("grasp_mode")
     object_variant = LaunchConfiguration("object_variant")
+    workpiece_count = LaunchConfiguration("workpiece_count")
     use_gui = LaunchConfiguration("use_gui")
     use_gazebo = LaunchConfiguration("use_gazebo")
     moveit_execute = LaunchConfiguration("moveit_execute")
@@ -44,6 +45,9 @@ def generate_launch_description() -> LaunchDescription:
                 "object_variant",
                 default_value="cube",
                 choices=["cube", "rect_prism"],
+            ),
+            DeclareLaunchArgument(
+                "workpiece_count", default_value="1", choices=["1", "3"]
             ),
             DeclareLaunchArgument("use_gui", default_value="true"),
             DeclareLaunchArgument("use_gazebo", default_value="false"),
@@ -117,6 +121,9 @@ def generate_launch_description() -> LaunchDescription:
                         "backend": backend,
                         "grasp_mode": grasp_mode,
                         "object_variant": object_variant,
+                        "workpiece_count": ParameterValue(
+                            workpiece_count, value_type=int
+                        ),
                         "perception_profile": perception_profile,
                         "use_gazebo": ParameterValue(
                             use_gazebo, value_type=bool

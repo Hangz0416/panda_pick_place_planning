@@ -148,3 +148,44 @@ def test_combined_profile_is_deterministic():
     )
 
     assert first["cube"].position == second["cube"].position
+
+
+def test_three_workpieces_are_sorted_by_world_x_without_truth_input():
+    color, depth = synthetic_scene()
+    color[170:230, 260:340] = (60, 90, 130)
+    for center, angle in [((210, 200), -25), ((300, 220), 10), ((400, 205), 35)]:
+        corners = cv2.boxPoints((center, (60, 40), angle)).astype(np.int32)
+        cv2.fillConvexPoly(color, corners, (0, 0, 255))
+
+    result = detector().detect_scene(
+        color,
+        depth,
+        (500.0, 500.0, 320.0, 240.0),
+        (0.0, 0.0, 0.0),
+        (0.0, 0.0, 0.0, 1.0),
+        ["target"],
+        object_variant="rect_prism",
+        expected_workpiece_count=3,
+    )
+
+    workpieces = [result[f"workpiece_{index}"] for index in range(3)]
+    assert [item.position[0] for item in workpieces] == sorted(
+        item.position[0] for item in workpieces
+    )
+    assert all(item.orientation_valid for item in workpieces)
+
+
+def test_three_workpiece_count_mismatch_is_typed():
+    color, depth = synthetic_scene()
+
+    with pytest.raises(DetectionError, match="object_count_mismatch"):
+        detector().detect_scene(
+            color,
+            depth,
+            (500.0, 500.0, 320.0, 240.0),
+            (0.0, 0.0, 0.0),
+            (0.0, 0.0, 0.0, 1.0),
+            ["target"],
+            object_variant="rect_prism",
+            expected_workpiece_count=3,
+        )

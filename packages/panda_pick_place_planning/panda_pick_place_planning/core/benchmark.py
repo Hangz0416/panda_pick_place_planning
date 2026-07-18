@@ -67,7 +67,7 @@ def summarize_results(results: Iterable[EpisodeResult]) -> dict:
         for key, items in sorted(backend_grouped.items())
     }
     return {
-        "schema_version": 4,
+        "schema_version": 5,
         "total_episodes": len(rows),
         "groups": groups,
         "backend_groups": backend_groups,
@@ -173,6 +173,40 @@ def _summarize_group(items: list[EpisodeResult]) -> dict:
         ),
         "selected_grasp_path_length_rad": _optional_distribution(
             item.selected_grasp_path_length_rad for item in items
+        ),
+        "complete_workpiece_detection_rate": _rate(
+            item.detected_workpiece_count
+            == (
+                3
+                if item.object_variant == "rect_prism"
+                and item.selected_object_id.startswith("workpiece_")
+                else 1
+            )
+            for item in items
+        ),
+        "target_selection_success_rate": _rate(
+            item.target_selection_success for item in items
+        ),
+        "target_selection_latency_sec": _optional_distribution(
+            item.target_selection_latency_sec for item in items
+        ),
+        "selected_object_position_error_m": _optional_distribution(
+            item.selected_object_position_error_m for item in items
+        ),
+        "selected_object_yaw_error_rad": _optional_distribution(
+            item.selected_object_yaw_error_rad for item in items
+        ),
+        "selected_object_score": _optional_distribution(
+            item.selected_object_score for item in items
+        ),
+        "avg_total_candidate_count": _mean(
+            item.total_candidate_count for item in items
+        ),
+        "avg_feasible_candidate_count": _mean(
+            item.feasible_candidate_count for item in items
+        ),
+        "max_nonselected_displacement_m": _optional_distribution(
+            item.max_nonselected_displacement_m for item in items
         ),
         "failure_counts": dict(
             Counter(item.failure_type or "success" for item in items)

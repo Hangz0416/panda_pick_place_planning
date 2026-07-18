@@ -35,11 +35,13 @@ install(TARGETS control_system_loader entity_pose_bridge
 )
 install(PROGRAMS
   scripts/assisted_grasp_manager
+  scripts/demo_completion_gate
   scripts/episode_reset_manager
   scripts/execution_collision_monitor
   scripts/joint_state_canonicalizer
   scripts/physical_grasp_monitor
   scripts/stack_ready_gate
+  scripts/supervise_visual_demo
   scripts/validate_episode_reset
   scripts/validate_robot_model
   DESTINATION lib/${PROJECT_NAME}
@@ -58,11 +60,13 @@ if(BUILD_TESTING)
     launch
     test
     scripts/assisted_grasp_manager
+    scripts/demo_completion_gate
     scripts/episode_reset_manager
     scripts/execution_collision_monitor
     scripts/joint_state_canonicalizer
     scripts/physical_grasp_monitor
     scripts/stack_ready_gate
+    scripts/supervise_visual_demo
     scripts/validate_episode_reset
     scripts/validate_robot_model
   )

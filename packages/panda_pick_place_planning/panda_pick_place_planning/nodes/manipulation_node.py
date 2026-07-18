@@ -12,6 +12,7 @@ from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from panda_pick_place_interfaces.msg import EpisodeResult as EpisodeResultMsg
 from panda_pick_place_interfaces.msg import ManipulationTask
+from std_msgs.msg import Bool
 
 from panda_pick_place_planning.core.pick_place_fsm import PickPlaceRunner
 from panda_pick_place_planning.core.planning_regression import (
@@ -104,6 +105,18 @@ class ManipulationNode(Node):
             reliable_qos(transient_local=True),
             callback_group=self.task_callback_group,
         )
+        self.create_subscription(
+            Bool,
+            "/demo_application_shutdown",
+            self._on_application_shutdown,
+            10,
+            callback_group=self.task_callback_group,
+        )
+
+    @staticmethod
+    def _on_application_shutdown(message: Bool) -> None:
+        if message.data and rclpy.ok():
+            rclpy.shutdown()
 
     def on_task(self, message: ManipulationTask) -> None:
         if not self.task_lock.acquire(blocking=False):

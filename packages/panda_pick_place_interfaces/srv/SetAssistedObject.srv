@@ -1,0 +1,7 @@
+string object_id
+bool attach
+---
+bool success
+string actual_object_id
+string failure_type
+string message

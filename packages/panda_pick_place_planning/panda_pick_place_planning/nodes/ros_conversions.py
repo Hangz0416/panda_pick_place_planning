@@ -3,7 +3,12 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from panda_pick_place_planning.core.schemas import EpisodeResult, TaskSpec
+from panda_pick_place_planning.core.schemas import (
+    EpisodeResult,
+    ObjectSelectionMetric,
+    TaskSpec,
+    WorkpieceSpec,
+)
 
 
 def _point_values(point: Any) -> tuple[float, float, float]:
@@ -12,6 +17,38 @@ def _point_values(point: Any) -> tuple[float, float, float]:
 
 def _set_point(point: Any, values: tuple[float, float, float]) -> None:
     point.x, point.y, point.z = (float(value) for value in values)
+
+
+def _workpiece_to_ros(workpiece: WorkpieceSpec):
+    from panda_pick_place_interfaces.msg import SceneObjectTask
+
+    message = SceneObjectTask()
+    message.object_id = workpiece.object_id
+    message.object_variant = workpiece.object_variant
+    _set_point(message.pose.position, workpiece.position)
+    orientation = workpiece.orientation_xyzw
+    (
+        message.pose.orientation.x,
+        message.pose.orientation.y,
+        message.pose.orientation.z,
+        message.pose.orientation.w,
+    ) = orientation
+    return message
+
+
+def _workpiece_from_ros(message: Any) -> WorkpieceSpec:
+    orientation = message.pose.orientation
+    return WorkpieceSpec(
+        object_id=str(message.object_id),
+        object_variant=str(message.object_variant or "rect_prism"),
+        position=_point_values(message.pose.position),
+        orientation_xyzw=(
+            float(orientation.x),
+            float(orientation.y),
+            float(orientation.z),
+            float(orientation.w),
+        ),
+    )
 
 
 def task_to_ros(task: TaskSpec):
@@ -34,6 +71,7 @@ def task_to_ros(task: TaskSpec):
     message.perception_profile = task.perception_profile
     _set_point(message.object_position, task.object_position)
     _set_point(message.target_position, task.target_position)
+    message.workpieces = [_workpiece_to_ros(item) for item in task.workpieces]
     return message
 
 
@@ -63,6 +101,7 @@ def task_from_ros(message: Any) -> TaskSpec:
         object_variant=str(message.object_variant or "cube"),
         object_yaw_rad=float(message.object_yaw_rad),
         perception_profile=str(message.perception_profile or "nominal"),
+        workpieces=tuple(_workpiece_from_ros(item) for item in message.workpieces),
     )
 
 
@@ -134,6 +173,29 @@ def episode_to_ros(result: EpisodeResult):
     message.selected_grasp_path_length_rad = _optional_float_to_ros(
         result.selected_grasp_path_length_rad
     )
+    message.detected_workpiece_count = result.detected_workpiece_count
+    message.selected_object_id = result.selected_object_id
+    message.target_selection_success = result.target_selection_success
+    message.target_selection_latency_sec = _optional_float_to_ros(
+        result.target_selection_latency_sec
+    )
+    message.selected_object_score = _optional_float_to_ros(
+        result.selected_object_score
+    )
+    message.total_candidate_count = result.total_candidate_count
+    message.feasible_candidate_count = result.feasible_candidate_count
+    message.selected_object_position_error_m = _optional_float_to_ros(
+        result.selected_object_position_error_m
+    )
+    message.selected_object_yaw_error_rad = _optional_float_to_ros(
+        result.selected_object_yaw_error_rad
+    )
+    message.max_nonselected_displacement_m = _optional_float_to_ros(
+        result.max_nonselected_displacement_m
+    )
+    message.object_selection_metrics = [
+        _selection_metric_to_ros(item) for item in result.object_selection_metrics
+    ]
     message.collision_count = result.collision_count
     message.failed_state = result.failure_state
     message.failure_type = result.failure_type
@@ -236,6 +298,30 @@ def episode_from_ros(message: Any) -> EpisodeResult:
         selected_grasp_path_length_rad=_optional_float_from_ros(
             message.selected_grasp_path_length_rad
         ),
+        detected_workpiece_count=int(message.detected_workpiece_count),
+        selected_object_id=str(message.selected_object_id or "cube"),
+        target_selection_success=bool(message.target_selection_success),
+        target_selection_latency_sec=_optional_float_from_ros(
+            message.target_selection_latency_sec
+        ),
+        selected_object_score=_optional_float_from_ros(
+            message.selected_object_score
+        ),
+        total_candidate_count=int(message.total_candidate_count),
+        feasible_candidate_count=int(message.feasible_candidate_count),
+        selected_object_position_error_m=_optional_float_from_ros(
+            message.selected_object_position_error_m
+        ),
+        selected_object_yaw_error_rad=_optional_float_from_ros(
+            message.selected_object_yaw_error_rad
+        ),
+        max_nonselected_displacement_m=_optional_float_from_ros(
+            message.max_nonselected_displacement_m
+        ),
+        object_selection_metrics=tuple(
+            _selection_metric_from_ros(item)
+            for item in message.object_selection_metrics
+        ),
         execution_time_sec=float(message.execution_time_sec),
         execution_success=bool(message.execution_success),
         trajectory_points=int(message.trajectory_points),
@@ -311,6 +397,46 @@ def _stage_metric_to_ros(state_name: str, metrics: dict[str, Any]):
         _metric_float(metrics, "max_joint_tracking_error_rad")
     )
     return message
+
+
+def _selection_metric_to_ros(metric: ObjectSelectionMetric):
+    from panda_pick_place_interfaces.msg import ObjectSelectionMetric as MetricMsg
+
+    message = MetricMsg()
+    message.object_id = metric.object_id
+    message.position_valid = metric.position_valid
+    message.orientation_valid = metric.orientation_valid
+    message.confidence = metric.confidence
+    message.position_error_m = _optional_float_to_ros(metric.position_error_m)
+    message.yaw_error_rad = _optional_float_to_ros(metric.yaw_error_rad)
+    message.candidate_count = metric.candidate_count
+    message.feasible_candidate_count = metric.feasible_candidate_count
+    message.best_path_length_rad = _optional_float_to_ros(
+        metric.best_path_length_rad
+    )
+    message.selection_score = _optional_float_to_ros(metric.selection_score)
+    message.selected = metric.selected
+    message.failure_type = metric.failure_type
+    return message
+
+
+def _selection_metric_from_ros(message: Any) -> ObjectSelectionMetric:
+    return ObjectSelectionMetric(
+        object_id=str(message.object_id),
+        position_valid=bool(message.position_valid),
+        orientation_valid=bool(message.orientation_valid),
+        confidence=float(message.confidence),
+        position_error_m=_optional_float_from_ros(message.position_error_m),
+        yaw_error_rad=_optional_float_from_ros(message.yaw_error_rad),
+        candidate_count=int(message.candidate_count),
+        feasible_candidate_count=int(message.feasible_candidate_count),
+        best_path_length_rad=_optional_float_from_ros(
+            message.best_path_length_rad
+        ),
+        selection_score=_optional_float_from_ros(message.selection_score),
+        selected=bool(message.selected),
+        failure_type=str(message.failure_type),
+    )
 
 
 def _stage_metric_from_ros(message: Any) -> tuple[str, dict[str, Any]]:

@@ -74,7 +74,7 @@ def audit_episode_semantics(records: list[dict], mode: str) -> None:
         identifiers.add(identifier)
         coverage.add((str(record.get("scene", "")), int(record.get("task_seed", -1))))
         schema_version = int(record.get("schema_version", 0))
-        if schema_version not in {2, 3, 4}:
+        if schema_version not in {2, 3, 4, 5}:
             raise ValueError(f"episode {index} has unsupported schema version")
         if not bool(record.get("planning_scene_sync_success", False)):
             raise ValueError(f"episode {index} reports PlanningScene sync failure")

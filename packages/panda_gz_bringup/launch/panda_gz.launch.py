@@ -36,6 +36,8 @@ def _launch_setup(context):
     scene = LaunchConfiguration("scene").perform(context)
     object_variant = LaunchConfiguration("object_variant")
     object_variant_value = object_variant.perform(context)
+    workpiece_count = LaunchConfiguration("workpiece_count")
+    workpiece_count_value = int(workpiece_count.perform(context))
     headless = LaunchConfiguration("headless").perform(context).lower() == "true"
     grasp_mode = LaunchConfiguration("grasp_mode")
     grasp_mode_value = grasp_mode.perform(context)
@@ -93,6 +95,7 @@ def _launch_setup(context):
             "initial_positions_file": str(initial_positions),
             "controllers_file": str(controllers),
             "assisted_grasp": str(assisted_grasp).lower(),
+            "workpiece_count": str(workpiece_count_value),
         },
     ).toxml()
     robot_sdf = convert_urdf_to_sdf(robot_description)
@@ -102,6 +105,7 @@ def _launch_setup(context):
         robot_sdf,
         camera_config=camera_config,
         object_variant=object_variant_value,
+        workpiece_count=workpiece_count_value,
     )
     gz_args = f"{'-s ' if headless else ''}-r -v 3 {world}"
     gazebo = IncludeLaunchDescription(
@@ -249,7 +253,11 @@ def _launch_setup(context):
         output="screen",
         parameters=[
             str(grasp),
-            {"grasp_mode": grasp_mode, "use_sim_time": use_sim_time},
+            {
+                "grasp_mode": grasp_mode,
+                "workpiece_count": workpiece_count,
+                "use_sim_time": use_sim_time,
+            },
         ],
     )
     reset_manager = Node(
@@ -264,6 +272,7 @@ def _launch_setup(context):
                 "grasp_mode": grasp_mode,
                 "auto_reset": auto_reset,
                 "object_variant": object_variant,
+                "workpiece_count": workpiece_count,
                 "use_sim_time": use_sim_time,
             },
         ],
@@ -275,7 +284,11 @@ def _launch_setup(context):
         output="screen",
         parameters=[
             str(grasp),
-            {"grasp_mode": grasp_mode, "use_sim_time": use_sim_time},
+            {
+                "grasp_mode": grasp_mode,
+                "workpiece_count": workpiece_count,
+                "use_sim_time": use_sim_time,
+            },
         ],
     )
     managers = [grasp_manager, collision_monitor]
@@ -323,6 +336,9 @@ def generate_launch_description():
                 "object_variant",
                 default_value="cube",
                 choices=["cube", "rect_prism"],
+            ),
+            DeclareLaunchArgument(
+                "workpiece_count", default_value="1", choices=["1", "3"]
             ),
             DeclareLaunchArgument(
                 "grasp_mode",

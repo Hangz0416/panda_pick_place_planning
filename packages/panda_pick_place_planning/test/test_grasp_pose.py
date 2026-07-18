@@ -85,7 +85,7 @@ def test_selection_uses_shortest_feasible_path_and_stable_tie_break():
 
     selected = select_feasible_grasp(
         candidates,
-        FeasibilityBackend([2.0, 1.0]),
+        FeasibilityBackend([2.0, 0.2, 1.0, 0.2]),
         planner="rrt_connect",
         seed=42,
         timeout_sec=3.0,
@@ -115,6 +115,59 @@ def test_all_collision_failures_are_typed():
 
     assert not selected.success
     assert selected.failure_type == "all_grasp_candidates_in_collision"
+
+
+def test_grasp_goal_is_checked_before_a_candidate_is_feasible():
+    candidates = GraspPoseGenerator().generate(
+        estimate(0.2),
+        "rect_prism",
+        BASE_DOWN,
+        hover_height=0.24,
+        grasp_height=0.075,
+    )
+
+    selected = select_feasible_grasp(
+        candidates,
+        # Candidate zero reaches pre-grasp but its grasp goal is invalid.
+        FeasibilityBackend([0.5, None, 0.8, 0.2]),
+        planner="rrt_connect",
+        seed=42,
+        timeout_sec=3.0,
+    )
+
+    assert selected.success
+    assert selected.candidate.index == 1
+    assert selected.feasible_candidate_count == 1
+
+
+def test_multi_object_selection_scores_path_and_confidence_stably():
+    first = SceneObjectEstimate(
+        "workpiece_0", (0.50, -0.17, 0.025), confidence=0.5,
+        orientation_xyzw=(0.0, 0.0, 0.0, 1.0), object_class="workpiece",
+    )
+    second = SceneObjectEstimate(
+        "workpiece_1", (0.61, -0.17, 0.025), confidence=1.0,
+        orientation_xyzw=(0.0, 0.0, 0.0, 1.0), object_class="workpiece",
+    )
+    generator = GraspPoseGenerator()
+    candidates = generator.generate(
+        first, "rect_prism", BASE_DOWN, hover_height=0.24, grasp_height=0.075
+    ) + generator.generate(
+        second, "rect_prism", BASE_DOWN, hover_height=0.24, grasp_height=0.075
+    )
+
+    selected = select_feasible_grasp(
+        candidates,
+        FeasibilityBackend([0.8, 0.1, 0.8, 0.1, 1.0, 0.1, 1.0, 0.1]),
+        planner="rrt_connect",
+        seed=42,
+        timeout_sec=3.0,
+    )
+
+    assert selected.selected_object_id == "workpiece_1"
+    assert selected.selection_score == pytest.approx(1.0)
+    assert selected.feasible_candidate_count == 4
+    assert sum(metric.selected for metric in selected.object_metrics) == 1
 
 
 @pytest.mark.parametrize("angle", [-4.0, -1.2, 0.0, 2.4, 5.0])

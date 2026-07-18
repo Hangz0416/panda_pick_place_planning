@@ -14,6 +14,7 @@ from panda_pick_place_interfaces.srv import GetExecutionCollisionState
 
 from panda_pick_place_planning.core.backends import (
     BackendMotionReport,
+    BackendOperationError,
     ManipulationBackend,
     MoveItBackend,
     MoveItBackendConfig,
@@ -27,6 +28,7 @@ from panda_pick_place_planning.core.schemas import (
     SceneEstimate,
     SceneObjectEstimate,
     TaskSpec,
+    WorkpieceSpec,
 )
 from panda_pick_place_planning.nodes.manipulation_node import runtime_error_result
 
@@ -286,6 +288,33 @@ def clients(
 
 
 class MoveItBackendTest(unittest.TestCase):
+    def test_service_failure_preserves_typed_class_and_specific_message(self):
+        backend = MoveItBackend(
+            object(),
+            MoveItBackendConfig(service_timeout_sec=0.05),
+            clients=clients(),
+        )
+        client = FakeServiceClient(False)
+        client.call_async = lambda request: ImmediateFuture(
+            SimpleNamespace(
+                success=False,
+                failure_type="multi_object_reset_failed",
+                message=(
+                    "reset_state_invalid: workpiece_2 linear_speed="
+                    "0.014m/s/0.010m/s"
+                ),
+            )
+        )
+
+        with self.assertRaises(BackendOperationError) as captured:
+            backend._require_service_success(client, object(), "fallback")
+
+        self.assertEqual(
+            captured.exception.failure_type,
+            "multi_object_reset_failed",
+        )
+        self.assertIn("workpiece_2 linear_speed", captured.exception.detail)
+
     def test_candidate_feasibility_is_planning_only_even_in_gazebo(self):
         fake_clients = clients()
         backend = MoveItBackend(
@@ -539,6 +568,57 @@ class MoveItBackendTest(unittest.TestCase):
         self.assertEqual(
             [request.object_id for request in cases[2][1].remove.requests],
             ["cube", "obstacle"],
+        )
+
+    def test_reset_detaches_every_previous_multi_object_identity(self):
+        workpieces = tuple(
+            WorkpieceSpec(
+                object_id=f"workpiece_{index}",
+                object_variant="rect_prism",
+                position=(0.46 + 0.11 * index, 0.16, 0.025),
+            )
+            for index in range(3)
+        )
+        multi_task = TaskSpec(
+            episode_id=1,
+            task_seed=42,
+            planner="rrt_connect",
+            planner_seed=10042,
+            scene="clear",
+            object_position=workpieces[0].position,
+            target_position=(0.46, -0.20, 0.025),
+            backend="moveit",
+            object_variant="rect_prism",
+            workpieces=workpieces,
+        )
+        fake_clients = clients()
+        backend = MoveItBackend(
+            object(),
+            MoveItBackendConfig(
+                execute_motion=False,
+                command_gripper=False,
+                verify_gazebo_reset_pose=False,
+            ),
+            clients=fake_clients,
+        )
+
+        backend.reset(multi_task)
+        self.assertTrue(backend.select_manipulation_object("workpiece_2"))
+        backend.reset(multi_task)
+
+        detach_ids = [
+            request.object_id for request in fake_clients.attached.requests
+        ]
+        self.assertEqual(
+            detach_ids,
+            [
+                "workpiece_0",
+                "workpiece_1",
+                "workpiece_2",
+                "workpiece_0",
+                "workpiece_1",
+                "workpiece_2",
+            ],
         )
 
     def test_assisted_attach_rolls_back_gazebo_if_scene_sync_fails(self):
@@ -933,6 +1013,54 @@ class MoveItBackendTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "reset_response_mismatch"):
             backend.reset(task(scene="clear"))
         self.assertFalse(backend.planning_scene_sync_success)
+
+    def test_multi_object_displacement_starts_after_verified_reset(self):
+        workpieces = tuple(
+            WorkpieceSpec(
+                object_id=f"workpiece_{index}",
+                object_variant="rect_prism",
+                position=(0.46 + 0.11 * index, 0.16, 0.025),
+            )
+            for index in range(3)
+        )
+        multi_task = TaskSpec(
+            episode_id=1,
+            task_seed=42,
+            planner="rrt_connect",
+            planner_seed=10042,
+            scene="clear",
+            object_position=workpieces[0].position,
+            target_position=(0.46, -0.20, 0.025),
+            backend="moveit",
+            object_variant="rect_prism",
+            workpieces=workpieces,
+        )
+        response = SimpleNamespace(
+            applied_workpieces=[
+                SimpleNamespace(
+                    object_id=item.object_id,
+                    pose=SimpleNamespace(
+                        position=SimpleNamespace(
+                            x=item.position[0] + 0.001,
+                            y=item.position[1],
+                            z=item.position[2],
+                        )
+                    ),
+                )
+                for item in workpieces
+            ]
+        )
+        backend = MoveItBackend(
+            object(), MoveItBackendConfig(command_gripper=False), clients=clients()
+        )
+        backend.max_nonselected_displacement_m = 0.32
+
+        backend._rebase_nonselected_displacement(response, multi_task)
+
+        self.assertEqual(backend.max_nonselected_displacement_m, 0.0)
+        self.assertAlmostEqual(
+            backend._initial_workpiece_positions["workpiece_2"][0], 0.681
+        )
 
     def test_future_wait_allows_another_executor_thread_to_complete_callback(self):
         future = DelayedFuture()

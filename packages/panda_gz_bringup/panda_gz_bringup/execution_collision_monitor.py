@@ -34,12 +34,11 @@ class ExecutionCollisionMonitor(Node):
         self._object_initial_position = (0.57, -0.17, 0.025)
         self._target_position = (0.57, 0.17, 0.025)
         self._object_position: tuple[float, float, float] | None = None
-        self._assisted_attached = False
+        self._object_positions = {}
+        self._assisted_attached = {}
+        self._selected_object_id = ""
         self._physics_holding = False
-        self._stream_last_seen: dict[str, float | None] = {
-            "robot": None,
-            "cube": None,
-        }
+        self._stream_last_seen: dict[str, float | None] = {"robot": None}
         self._seen_invalid_pairs: set[tuple[str, str, str]] = set()
         self._collision_count = 0
         self._last_failure_type = ""
@@ -47,12 +46,22 @@ class ExecutionCollisionMonitor(Node):
         self._last_collision2 = ""
 
         self.declare_parameter("grasp_mode", "assisted")
+        self.declare_parameter("workpiece_count", 1)
         self.declare_parameter("contact_stream_timeout_sec", 1.0)
         self.declare_parameter("target_xy_tolerance_m", 0.04)
         self.declare_parameter("target_z_tolerance_m", 0.015)
         mode = str(self.get_parameter("grasp_mode").value)
         if mode not in {"assisted", "physics"}:
             raise ValueError("grasp_mode must be 'assisted' or 'physics'")
+        count = int(self.get_parameter("workpiece_count").value)
+        if count not in {1, 3}:
+            raise ValueError("workpiece_count must be one or three")
+        self._object_ids = (
+            ("cube",) if count == 1
+            else ("workpiece_0", "workpiece_1", "workpiece_2")
+        )
+        self._assisted_attached = {value: False for value in self._object_ids}
+        self._stream_last_seen.update({value: None for value in self._object_ids})
 
         self._status_pub = self.create_publisher(
             DiagnosticArray, "/panda_gz/execution_collision_status", 10
@@ -64,26 +73,38 @@ class ExecutionCollisionMonitor(Node):
             10,
             callback_group=self._group,
         )
+        suffixes = {"cube": "", "workpiece_0": "", "workpiece_1": "_1", "workpiece_2": "_2"}
+        pose_topics = {
+            "cube": "/panda_gz/cube_pose",
+            "workpiece_0": "/panda_gz/cube_pose",
+            "workpiece_1": "/panda_gz/cube_1_pose",
+            "workpiece_2": "/panda_gz/cube_2_pose",
+        }
+        contact_topics = {
+            "cube": "/panda_gz/cube_contacts",
+            "workpiece_0": "/panda_gz/cube_contacts",
+            "workpiece_1": "/panda_gz/cube_1_contacts",
+            "workpiece_2": "/panda_gz/cube_2_contacts",
+        }
+        for object_id in self._object_ids:
+            self.create_subscription(
+                Contacts, contact_topics[object_id],
+                lambda message, value=object_id: self._on_contacts(value, message),
+                10, callback_group=self._group,
+            )
+            self.create_subscription(
+                PoseArray, pose_topics[object_id],
+                lambda message, value=object_id: self._on_object_pose(value, message),
+                10, callback_group=self._group,
+            )
+            self.create_subscription(
+                String, f"/panda/detachable_joint{suffixes[object_id]}/state",
+                lambda message, value=object_id: self._on_assisted_attachment(value, message),
+                10, callback_group=self._group,
+            )
         self.create_subscription(
-            Contacts,
-            "/panda_gz/cube_contacts",
-            lambda message: self._on_contacts("cube", message),
-            10,
-            callback_group=self._group,
-        )
-        self.create_subscription(
-            PoseArray,
-            "/panda_gz/cube_pose",
-            self._on_cube_pose,
-            10,
-            callback_group=self._group,
-        )
-        self.create_subscription(
-            String,
-            "/panda/detachable_joint/state",
-            self._on_assisted_attachment,
-            10,
-            callback_group=self._group,
+            String, "/panda_gz/selected_object_id", self._on_selected_object,
+            10, callback_group=self._group,
         )
         self.create_subscription(
             Bool,
@@ -105,13 +126,19 @@ class ExecutionCollisionMonitor(Node):
         )
 
     def _on_cube_pose(self, message: PoseArray) -> None:
+        self._on_object_pose(self._object_ids[0], message)
+
+    def _on_object_pose(self, object_id: str, message: PoseArray) -> None:
         if not message.poses:
             return
         position = message.poses[0].position
         with self._lock:
-            self._object_position = (position.x, position.y, position.z)
+            value = (position.x, position.y, position.z)
+            self._object_positions[object_id] = value
+            if object_id == self._selected_object_id:
+                self._object_position = value
 
-    def _on_assisted_attachment(self, message: String) -> None:
+    def _on_assisted_attachment(self, object_id: str, message: String) -> None:
         state = message.data.strip().lower()
         if state not in {"attached", "detached"}:
             self.get_logger().error(
@@ -119,7 +146,19 @@ class ExecutionCollisionMonitor(Node):
             )
             return
         with self._lock:
-            self._assisted_attached = state == "attached"
+            self._assisted_attached[object_id] = state == "attached"
+
+    def _on_selected_object(self, message: String) -> None:
+        object_id = message.data.strip()
+        with self._lock:
+            if object_id not in self._object_ids:
+                self._selected_object_id = ""
+                self._last_failure_type = "instance_association_failed"
+                return
+            self._selected_object_id = object_id
+            self._object_position = self._object_positions.get(object_id)
+            if self._object_position is not None:
+                self._object_initial_position = self._object_position
 
     def _on_physics_holding(self, message: Bool) -> None:
         with self._lock:
@@ -127,7 +166,10 @@ class ExecutionCollisionMonitor(Node):
 
     def _object_carried(self) -> bool:
         mode = str(self.get_parameter("grasp_mode").value)
-        return self._assisted_attached if mode == "assisted" else self._physics_holding
+        return (
+            bool(self._assisted_attached.get(self._selected_object_id, False))
+            if mode == "assisted" else self._physics_holding
+        )
 
     def _collision_context(self) -> CollisionContext:
         return CollisionContext(
@@ -141,6 +183,9 @@ class ExecutionCollisionMonitor(Node):
             target_z_tolerance_m=float(
                 self.get_parameter("target_z_tolerance_m").value
             ),
+            selected_object_entity={
+                "workpiece_0": "cube", "workpiece_1": "cube_1", "workpiece_2": "cube_2",
+            }.get(self._selected_object_id, self._selected_object_id),
         )
 
     def _on_contacts(self, stream: str, message: Contacts) -> None:
@@ -257,7 +302,11 @@ class ExecutionCollisionMonitor(Node):
             timestamp is not None and now - timestamp <= timeout
             for timestamp in self._stream_last_seen.values()
         )
-        return streams_ready and self._object_position is not None
+        return (
+            streams_ready
+            and bool(self._selected_object_id)
+            and self._object_position is not None
+        )
 
     def _publish_diagnostic(self) -> None:
         with self._lock:

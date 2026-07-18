@@ -23,6 +23,18 @@ from panda_pick_place_planning.core.pybullet_env import SceneConfig
 from panda_pick_place_planning.core.schemas import PlanResult, SceneEstimate, TaskSpec
 
 
+def _pose_yaw(pose: Any) -> float:
+    quaternion = pose.orientation
+    x_value = float(quaternion.x)
+    y_value = float(quaternion.y)
+    z_value = float(quaternion.z)
+    w_value = float(quaternion.w)
+    return math.atan2(
+        2.0 * (w_value * z_value + x_value * y_value),
+        1.0 - 2.0 * (y_value * y_value + z_value * z_value),
+    )
+
+
 @dataclass(frozen=True)
 class MoveItBackendConfig:
     action_name: str = "/plan_execute_motion"
@@ -32,6 +44,7 @@ class MoveItBackendConfig:
     reset_service_name: str = "/panda_gz/reset_episode"
     gazebo_attach_service_name: str = "/panda_gz/attach_object"
     gazebo_detach_service_name: str = "/panda_gz/detach_object"
+    set_assisted_object_service_name: str = "/panda_gz/set_assisted_object"
     physical_grasp_state_service_name: str = (
         "/panda_gz/get_physical_grasp_state"
     )
@@ -40,6 +53,11 @@ class MoveItBackendConfig:
     )
     gripper_action_name: str = "/panda_hand_controller/gripper_cmd"
     cube_pose_topic: str = "/panda_gz/cube_pose"
+    workpiece_pose_topics: tuple[str, ...] = (
+        "/panda_gz/cube_pose",
+        "/panda_gz/cube_1_pose",
+        "/panda_gz/cube_2_pose",
+    )
     controller_state_topic: str = "/panda_arm_controller/controller_state"
     world_frame: str = "world"
     # Pose goals use the same grasp frame as the PyBullet baseline.  Object
@@ -101,6 +119,7 @@ class MoveItClients:
     gripper: Any = None
     physical_grasp: Any = None
     execution_collision: Any = None
+    set_assisted_object: Any = None
 
 
 class MoveItBackend:
@@ -136,6 +155,13 @@ class MoveItBackend:
         self.reset_motion_report: BackendMotionReport | None = None
         self.last_motion_report: BackendMotionReport | None = None
         self._task: TaskSpec | None = None
+        self._selected_object_id = "cube"
+        self._object_states: dict[
+            str,
+            tuple[tuple[float, float, float], tuple[float, float, float, float]],
+        ] = {}
+        self._initial_workpiece_positions: dict[str, tuple[float, float, float]] = {}
+        self.max_nonselected_displacement_m = 0.0
         self._object_position = (0.0, 0.0, self.scene_config.cube_half_extent)
         self._object_orientation = (0.0, 0.0, 0.0, 1.0)
         self._object_velocity = (
@@ -165,12 +191,16 @@ class MoveItBackend:
         self._callback_group = callback_group
         if clients is None:
             self.clients = self._create_ros_clients(callback_group)
-            self._cube_subscription = self._create_cube_subscription(callback_group)
+            self._selected_object_publisher = self._create_selected_object_publisher()
+            self._grasp_marker_publisher = self._create_grasp_marker_publisher()
+            self._cube_subscription = self._create_cube_subscriptions(callback_group)
             self._controller_state_subscription = (
                 self._create_controller_state_subscription(callback_group)
             )
         else:
             self.clients = clients
+            self._selected_object_publisher = None
+            self._grasp_marker_publisher = None
             self._cube_subscription = None
             self._controller_state_subscription = None
 
@@ -200,15 +230,26 @@ class MoveItBackend:
             return self._episode_tracking_max
 
     def reset(self, task: TaskSpec) -> None:
-        self._task = task
-        self._object_position = tuple(task.object_position)
-        half_yaw = 0.5 * task.object_yaw_rad
-        self._object_orientation = (
-            0.0,
-            0.0,
-            math.sin(half_yaw),
-            math.cos(half_yaw),
+        previous_workpiece_ids = (
+            {item.object_id for item in self._task.workpieces}
+            if self._task is not None
+            else set()
         )
+        if self._task is not None:
+            previous_workpiece_ids.add(self._selected_object_id)
+        self._task = task
+        self._selected_object_id = task.workpieces[0].object_id
+        self._object_states = {
+            item.object_id: (item.position, item.orientation_xyzw)
+            for item in task.workpieces
+        }
+        self._initial_workpiece_positions = {
+            item.object_id: item.position for item in task.workpieces
+        }
+        self.max_nonselected_displacement_m = 0.0
+        selected = task.workpieces[0]
+        self._object_position = tuple(selected.position)
+        self._object_orientation = tuple(selected.orientation_xyzw)
         self._object_velocity = (
             self._unknown_velocity()
             if self.config.use_gazebo
@@ -253,8 +294,9 @@ class MoveItBackend:
             if not self._reset_response_matches(reset_response, task):
                 self.planning_scene_sync_success = False
                 raise BackendOperationError("gazebo_reset_response_mismatch")
+            self._rebase_nonselected_displacement(reset_response, task)
             if self.config.verify_gazebo_reset_pose and not self._wait_for_reset_pose(
-                task.object_position,
+                selected.position,
                 previous_generation,
             ):
                 self.planning_scene_sync_success = False
@@ -275,14 +317,20 @@ class MoveItBackend:
         # These services perform PlanningScene readback before returning
         # success.  Reset must fail closed if stale attachment/world state
         # cannot be proven absent.
-        self._require_attached_state(
-            False,
-            "planning_scene_reset_detach_failed",
-        )
-        self._require_world_object_removed(
-            "cube",
-            "planning_scene_reset_cube_remove_failed",
-        )
+        reset_workpiece_ids = previous_workpiece_ids | {
+            item.object_id for item in task.workpieces
+        }
+        for object_id in sorted(reset_workpiece_ids):
+            self._require_service_success(
+                self.clients.attached,
+                self._attached_request_for(object_id, False),
+                "planning_scene_reset_detach_failed",
+            )
+        for object_id in (item.object_id for item in task.workpieces):
+            self._require_world_object_removed(
+                object_id,
+                "planning_scene_reset_cube_remove_failed",
+            )
         self._upsert_box(
             "table",
             self.scene_config.table_position,
@@ -296,13 +344,14 @@ class MoveItBackend:
             # surface.  Preserve this one ACM pair through attachment, then
             # clear it immediately after the first successful lift.
             cube_allowed_collisions += ("table",)
-        self._upsert_box(
-            "cube",
-            task.object_position,
-            cube_size,
-            orientation=self._object_orientation,
-            allowed_collision_links=cube_allowed_collisions,
-        )
+        for item in task.workpieces:
+            self._upsert_box(
+                item.object_id,
+                item.position,
+                cube_size,
+                orientation=item.orientation_xyzw,
+                allowed_collision_links=cube_allowed_collisions,
+            )
         if task.scene == "obstacle":
             obstacle_size = tuple(
                 2.0 * value for value in self.scene_config.obstacle_half_extents
@@ -357,7 +406,7 @@ class MoveItBackend:
                 # attached it leaves the AttachedCollisionObject untouched and
                 # removes only the temporary support-surface ACM entry.
                 self._require_world_object_removed(
-                    "cube",
+                    self._selected_object_id,
                     "planning_scene_support_cleanup_failed",
                 )
             except BackendOperationError:
@@ -379,20 +428,28 @@ class MoveItBackend:
             self.planning_scene_sync_success = False
             return False
         try:
-            cube = estimate.require("cube")
             cube_size = self._object_size(
                 self._task.object_variant if self._task is not None else "cube"
             )
             allowed = self.config.touch_links
             if self.config.use_gazebo:
                 allowed += ("table",)
-            self._upsert_box(
-                "cube",
-                cube.position,
-                cube_size,
-                orientation=cube.orientation_xyzw,
-                allowed_collision_links=allowed,
+            workpiece_ids = (
+                [item.object_id for item in self._task.workpieces]
+                if self._task is not None
+                else ["cube"]
             )
+            for object_id in workpiece_ids:
+                workpiece = estimate.require(object_id)
+                if not workpiece.position_valid:
+                    raise ValueError("workpiece_position_invalid")
+                self._upsert_box(
+                    object_id,
+                    workpiece.position,
+                    cube_size,
+                    orientation=workpiece.orientation_xyzw,
+                    allowed_collision_links=allowed,
+                )
             if scene == "obstacle":
                 obstacle = estimate.require("obstacle")
                 obstacle_size = tuple(
@@ -438,6 +495,97 @@ class MoveItBackend:
         self._configure_motion_goal(goal, planner, timeout_sec)
         goal.execute = False
         return self._send_motion(goal)
+
+    def select_manipulation_object(self, object_id: str) -> bool:
+        """Lock Gazebo, PlanningScene and result accounting to one workpiece."""
+        valid_ids = (
+            {item.object_id for item in self._task.workpieces}
+            if self._task is not None
+            else {"cube"}
+        )
+        if object_id not in valid_ids:
+            self.last_failure_type = "selected_object_sync_failed"
+            return False
+        self._selected_object_id = object_id
+        state = self._object_states.get(object_id)
+        if state is not None:
+            self._object_position, self._object_orientation = state
+            self.object_state_known = True
+        elif self._task is not None:
+            truth = next(item for item in self._task.workpieces if item.object_id == object_id)
+            if self.config.use_gazebo:
+                self.last_failure_type = "selected_object_sync_failed"
+                return False
+            self._object_position = truth.position
+            self._object_orientation = truth.orientation_xyzw
+        self.last_failure_type = ""
+        if self._selected_object_publisher is not None:
+            from std_msgs.msg import String
+
+            self._selected_object_publisher.publish(String(data=object_id))
+        return True
+
+    def _create_selected_object_publisher(self):
+        if not self.config.use_gazebo:
+            return None
+        from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
+        from std_msgs.msg import String
+
+        qos = QoSProfile(
+            depth=1,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+            reliability=ReliabilityPolicy.RELIABLE,
+        )
+        return self.node.create_publisher(String, "/panda_gz/selected_object_id", qos)
+
+    def _create_grasp_marker_publisher(self):
+        from visualization_msgs.msg import MarkerArray
+
+        return self.node.create_publisher(
+            MarkerArray, "/panda/grasp_candidate_markers", 10
+        )
+
+    def publish_grasp_candidates(self, candidates, selection) -> None:
+        if self._grasp_marker_publisher is None:
+            return
+        from visualization_msgs.msg import Marker, MarkerArray
+
+        array = MarkerArray()
+        feasible = set(selection.feasible_candidate_keys)
+        selected = (
+            None
+            if selection.candidate is None
+            else (selection.candidate.object_id, selection.candidate.index)
+        )
+        for marker_id, candidate in enumerate(candidates):
+            key = (candidate.object_id, candidate.index)
+            marker = Marker()
+            marker.header.frame_id = self.config.world_frame
+            marker.header.stamp = self.node.get_clock().now().to_msg()
+            marker.ns = "grasp_candidates"
+            marker.id = marker_id
+            marker.type = Marker.ARROW
+            marker.action = Marker.ADD
+            marker.pose.position.x = candidate.pre_grasp_position[0]
+            marker.pose.position.y = candidate.pre_grasp_position[1]
+            marker.pose.position.z = candidate.pre_grasp_position[2]
+            marker.pose.orientation.x = candidate.orientation_xyzw[0]
+            marker.pose.orientation.y = candidate.orientation_xyzw[1]
+            marker.pose.orientation.z = candidate.orientation_xyzw[2]
+            marker.pose.orientation.w = candidate.orientation_xyzw[3]
+            marker.scale.x = 0.10
+            marker.scale.y = 0.018
+            marker.scale.z = 0.018
+            marker.color.a = 0.9
+            if key == selected:
+                marker.color.g = 1.0
+            elif key in feasible:
+                marker.color.r = 1.0
+                marker.color.g = 0.75
+            else:
+                marker.color.r = 1.0
+            array.markers.append(marker)
+        self._grasp_marker_publisher.publish(array)
 
     def move_home(self) -> BackendMotionReport:
         goal = self._new_motion_goal()
@@ -498,10 +646,16 @@ class MoveItBackend:
 
         gazebo_attached = False
         if self.config.use_gazebo:
-            gazebo_attached = self._service_success(
-                self.clients.gazebo_attach,
-                self._trigger_request(),
-            )
+            if self.clients.set_assisted_object is not None:
+                gazebo_attached = self._service_success(
+                    self.clients.set_assisted_object,
+                    self._assisted_object_request(True),
+                )
+            else:
+                gazebo_attached = self._service_success(
+                    self.clients.gazebo_attach,
+                    self._trigger_request(),
+                )
             if not gazebo_attached:
                 self.last_failure_type = "assisted_attach_failed"
                 return False
@@ -510,10 +664,13 @@ class MoveItBackend:
             self.planning_scene_sync_success = False
             self.last_failure_type = "planning_scene_attach_failed"
             if gazebo_attached:
-                self._service_success(
-                    self.clients.gazebo_detach,
-                    self._trigger_request(),
+                client = self.clients.set_assisted_object or self.clients.gazebo_detach
+                request = (
+                    self._assisted_object_request(False)
+                    if self.clients.set_assisted_object is not None
+                    else self._trigger_request()
                 )
+                self._service_success(client, request)
             return False
 
         self._attached = True
@@ -546,10 +703,13 @@ class MoveItBackend:
                 raise BackendOperationError(failure)
         if self.config.use_gazebo and self._task is not None:
             if self._task.grasp_mode == "assisted":
-                if not self._service_success(
-                    self.clients.gazebo_detach,
-                    self._trigger_request(),
-                ):
+                client = self.clients.set_assisted_object or self.clients.gazebo_detach
+                request = (
+                    self._assisted_object_request(False)
+                    if self.clients.set_assisted_object is not None
+                    else self._trigger_request()
+                )
+                if not self._service_success(client, request):
                     raise BackendOperationError("gazebo_detach_failed")
         if not self._set_attached(False):
             self.planning_scene_sync_success = False
@@ -613,7 +773,7 @@ class MoveItBackend:
             self._task.object_variant if self._task is not None else "cube"
         )
         self._upsert_box(
-            "cube",
+            self._selected_object_id,
             self._object_position,
             cube_size,
             orientation=self._object_orientation,
@@ -652,6 +812,7 @@ class MoveItBackend:
             GetPhysicalGraspState,
             RemoveWorldObject,
             ResetEpisode,
+            SetAssistedObject,
             SetAttachedObject,
             UpsertWorldObject,
         )
@@ -660,6 +821,7 @@ class MoveItBackend:
 
         keyword = {"callback_group": callback_group} if callback_group is not None else {}
         reset = gazebo_attach = gazebo_detach = physical_grasp = None
+        set_assisted_object = None
         execution_collision = None
         if self.config.use_gazebo:
             reset = self.node.create_client(
@@ -670,6 +832,11 @@ class MoveItBackend:
             )
             gazebo_detach = self.node.create_client(
                 Trigger, self.config.gazebo_detach_service_name, **keyword
+            )
+            set_assisted_object = self.node.create_client(
+                SetAssistedObject,
+                self.config.set_assisted_object_service_name,
+                **keyword,
             )
             physical_grasp = self.node.create_client(
                 GetPhysicalGraspState,
@@ -711,6 +878,7 @@ class MoveItBackend:
             gripper=gripper,
             physical_grasp=physical_grasp,
             execution_collision=execution_collision,
+            set_assisted_object=set_assisted_object,
         )
 
     def _reset_execution_collision_state(self, task: TaskSpec) -> None:
@@ -996,19 +1164,25 @@ class MoveItBackend:
         self._object_velocity_known = bool(response.success)
         self.object_state_known = bool(response.success)
 
-    def _create_cube_subscription(self, callback_group: Any):
+    def _create_cube_subscriptions(self, callback_group: Any):
         if not self.config.use_gazebo:
-            return None
+            return []
         from geometry_msgs.msg import PoseArray
 
         keyword = {"callback_group": callback_group} if callback_group is not None else {}
-        return self.node.create_subscription(
-            PoseArray,
-            self.config.cube_pose_topic,
-            self._on_cube_pose,
-            10,
-            **keyword,
-        )
+        subscriptions = []
+        for index, topic in enumerate(self.config.workpiece_pose_topics):
+            object_id = "cube" if index == 0 else f"workpiece_{index}"
+            subscriptions.append(
+                self.node.create_subscription(
+                    PoseArray,
+                    topic,
+                    lambda message, value=object_id: self._on_workpiece_pose(value, message),
+                    10,
+                    **keyword,
+                )
+            )
+        return subscriptions
 
     def _create_controller_state_subscription(self, callback_group: Any):
         from control_msgs.msg import JointTrajectoryControllerState
@@ -1056,6 +1230,9 @@ class MoveItBackend:
         return replace(report, max_joint_tracking_error_rad=value)
 
     def _on_cube_pose(self, message: Any) -> None:
+        self._on_workpiece_pose(self._selected_object_id, message)
+
+    def _on_workpiece_pose(self, object_id: str, message: Any) -> None:
         if not message.poses:
             return
         pose = message.poses[0]
@@ -1064,6 +1241,32 @@ class MoveItBackend:
             float(pose.position.y),
             float(pose.position.z),
         )
+        orientation = (
+            float(pose.orientation.x),
+            float(pose.orientation.y),
+            float(pose.orientation.z),
+            float(pose.orientation.w),
+        )
+        self._object_states[object_id] = (position, orientation)
+        if object_id == "cube":
+            self._object_states["workpiece_0"] = (position, orientation)
+        semantic_id = (
+            "workpiece_0"
+            if object_id == "cube"
+            and "workpiece_0" in self._initial_workpiece_positions
+            else object_id
+        )
+        if semantic_id != self._selected_object_id:
+            initial = self._initial_workpiece_positions.get(semantic_id)
+            if initial is not None:
+                self.max_nonselected_displacement_m = max(
+                    self.max_nonselected_displacement_m,
+                    math.dist(position, initial),
+                )
+        if object_id != self._selected_object_id and not (
+            object_id == "cube" and self._selected_object_id == "workpiece_0"
+        ):
+            return
         sample_time = self._pose_stamp_sec(message)
         with self._pose_condition:
             velocity_known = False
@@ -1377,12 +1580,23 @@ class MoveItBackend:
         )
 
     def _attached_request(self, attach: bool):
+        return self._attached_request_for(self._selected_object_id, attach)
+
+    def _attached_request_for(self, object_id: str, attach: bool):
         from panda_pick_place_interfaces.srv import SetAttachedObject
 
         request = SetAttachedObject.Request()
-        request.object_id = "cube"
+        request.object_id = object_id
         request.link_name = self.config.attach_link
         request.touch_links = list(self.config.touch_links)
+        request.attach = attach
+        return request
+
+    def _assisted_object_request(self, attach: bool):
+        from panda_pick_place_interfaces.srv import SetAssistedObject
+
+        request = SetAssistedObject.Request()
+        request.object_id = self._selected_object_id
         request.attach = attach
         return request
 
@@ -1393,6 +1607,7 @@ class MoveItBackend:
         return Trigger.Request()
 
     def _reset_request(self, task: TaskSpec):
+        from panda_pick_place_interfaces.msg import SceneObjectTask
         from panda_pick_place_interfaces.srv import ResetEpisode
 
         request = ResetEpisode.Request()
@@ -1413,6 +1628,18 @@ class MoveItBackend:
         request.target_position.x = task.target_position[0]
         request.target_position.y = task.target_position[1]
         request.target_position.z = task.target_position[2]
+        for item in task.workpieces:
+            workpiece = SceneObjectTask()
+            workpiece.object_id = item.object_id
+            workpiece.object_variant = item.object_variant
+            workpiece.pose.position.x = item.position[0]
+            workpiece.pose.position.y = item.position[1]
+            workpiece.pose.position.z = item.position[2]
+            workpiece.pose.orientation.x = item.orientation_xyzw[0]
+            workpiece.pose.orientation.y = item.orientation_xyzw[1]
+            workpiece.pose.orientation.z = item.orientation_xyzw[2]
+            workpiece.pose.orientation.w = item.orientation_xyzw[3]
+            request.workpieces.append(workpiece)
         return request
 
     def _reset_response_matches(self, response: Any, task: TaskSpec) -> bool:
@@ -1434,11 +1661,58 @@ class MoveItBackend:
                 math.cos(applied_yaw - task.object_yaw_rad),
             )
         )
+        multi_matches = True
+        if task.workpiece_count > 1:
+            applied = {
+                item.object_id: item for item in response.applied_workpieces
+            }
+            multi_matches = len(applied) == task.workpiece_count and all(
+                item.object_id in applied
+                and math.dist(values(applied[item.object_id].pose.position), item.position)
+                <= tolerance
+                and abs(
+                    math.atan2(
+                        math.sin(_pose_yaw(applied[item.object_id].pose) - item.yaw_rad),
+                        math.cos(_pose_yaw(applied[item.object_id].pose) - item.yaw_rad),
+                    )
+                )
+                <= 0.05
+                for item in task.workpieces
+            )
         return (
             math.dist(applied_object, task.object_position) <= tolerance
             and math.dist(applied_target, task.target_position) <= tolerance
             and yaw_error <= 0.05
+            and multi_matches
         )
+
+    def _rebase_nonselected_displacement(
+        self, response: Any, task: TaskSpec
+    ) -> None:
+        """Start displacement accounting after Gazebo has applied the reset.
+
+        Pose topics can publish the launch-time scene while the reset service
+        is still moving entities.  Counting those samples against the pending
+        task pose produces a large false displacement before an episode has
+        begun.  The reset response contains verified Gazebo readback, so it is
+        the correct baseline for post-reset non-selected motion.
+        """
+        if task.workpiece_count == 1:
+            self._initial_workpiece_positions = {
+                task.workpieces[0].object_id: task.workpieces[0].position
+            }
+            self.max_nonselected_displacement_m = 0.0
+            return
+        applied = {
+            str(item.object_id): (
+                float(item.pose.position.x),
+                float(item.pose.position.y),
+                float(item.pose.position.z),
+            )
+            for item in response.applied_workpieces
+        }
+        self._initial_workpiece_positions = applied
+        self.max_nonselected_displacement_m = 0.0
 
     def _require_service_success(
         self,
@@ -1450,8 +1724,8 @@ class MoveItBackend:
         if response is None or not bool(response.success):
             self.planning_scene_sync_success = False
             detail = "" if response is None else str(
-                getattr(response, "failure_type", "")
-                or getattr(response, "message", "")
+                getattr(response, "message", "")
+                or getattr(response, "failure_type", "")
             )
             typed_failure = "" if response is None else str(
                 getattr(response, "failure_type", "")

@@ -55,7 +55,9 @@ def test_combined_launch_static_generation_contract():
     assert 'executable="joint_state_canonicalizer"' in standalone
     assert "IGN_GAZEBO_RESOURCE_PATH" in standalone
     assert "moveit_resources_panda_description" in standalone
-    assert "TimerAction" not in source
+    assert "TimerAction" in source
+    assert "demo_completion_gate" in source
+    assert "SignalProcess" in source
     assert "TimerAction" not in standalone
     assert "if event.returncode == 0:" in source
     assert "Shutdown(reason=reason)" in source
@@ -127,6 +129,8 @@ def test_gazebo_batch_wrapper_is_fail_closed_and_assisted_only():
         "if event.returncode == 0",
         "Shutdown(reason=reason)",
         "batch will not start",
+        "write_readiness_failure",
+        "record_teardown_exit",
     ):
         assert contract in source
     declared_arguments = {
@@ -164,6 +168,10 @@ def test_visual_pick_place_is_the_minimal_recommended_entrypoint():
     assert '"start_application": "true"' in source
     assert 'default_value="rect_prism"' in source
     assert 'default_value="rgbd"' in source
+    assert 'default_value=""' in source
+    assert "if not output_path:" in source
+    assert '"panda_pick_place"' in source
+    assert '"episodes.jsonl"' in source
     declared_arguments = {
         node.args[0].value
         for node in ast.walk(tree)
@@ -181,4 +189,7 @@ def test_visual_pick_place_is_the_minimal_recommended_entrypoint():
         "perception_profile",
         "headless",
         "use_rviz",
+        "workpiece_count",
+        "output_path",
+        "keep_open_after_result",
     }

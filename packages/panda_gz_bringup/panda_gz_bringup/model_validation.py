@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import copy
 import hashlib
 from pathlib import Path
 import shutil
@@ -133,6 +134,7 @@ def compose_world_with_deferred_control(
     output_directory: Path | None = None,
     camera_config: dict | None = None,
     object_variant: str = "cube",
+    workpiece_count: int = 1,
 ) -> Path:
     """Put Panda in the initial world but defer its control system plugin."""
     root = ET.parse(world_path).getroot()
@@ -160,6 +162,7 @@ def compose_world_with_deferred_control(
     if world.find("./model[@name='panda']") is not None:
         raise ValueError("base Gazebo world already contains a Panda model")
     _configure_object_variant(world, object_variant)
+    _configure_workpiece_instances(world, workpiece_count)
     if camera_config is not None:
         _append_rgbd_camera(world, camera_config)
     world.append(robot_model)
@@ -209,6 +212,34 @@ def _configure_object_variant(world: ET.Element, object_variant: str) -> None:
         if node is None:
             raise ValueError(f"grasp object inertia has no {name}")
         node.text = f"{value:.12g}"
+
+
+def _configure_workpiece_instances(world: ET.Element, workpiece_count: int) -> None:
+    if workpiece_count not in {1, 3}:
+        raise ValueError("workpiece_count must be one or three")
+    if workpiece_count == 1:
+        return
+    base = world.find("./model[@name='cube']")
+    if base is None:
+        raise ValueError("multi-workpiece world requires cube model")
+    base.find("pose").text = "0.46 -0.17 0.025 0 0 0"
+    for index, x_value in ((1, 0.57), (2, 0.68)):
+        model = copy.deepcopy(base)
+        old = "cube"
+        new = f"cube_{index}"
+        model.find("pose").text = f"{x_value} -0.17 0.025 0 0 0"
+        for element in model.iter():
+            if "name" in element.attrib:
+                element.attrib["name"] = element.attrib["name"].replace(old, new)
+            if element.text:
+                if f"/{old}/" in element.text:
+                    element.text = element.text.replace(
+                        f"/model/{old}/", f"/model/{new}/"
+                    ).replace(f"/{old}/", f"/{new}/")
+                else:
+                    element.text = element.text.replace(f"{old}_", f"{new}_")
+        model.attrib["name"] = new
+        world.append(model)
 
 
 def _append_rgbd_camera(world: ET.Element, config: dict) -> None:

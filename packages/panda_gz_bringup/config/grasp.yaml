@@ -48,6 +48,7 @@ episode_reset_manager:
     home_joints: [0.0, -0.65, 0.0, -2.2, 0.0, 1.55, 0.78]
     home_duration_sec: 3.0
     home_timeout_sec: 8.0
+    home_max_attempts: 3
     service_timeout_sec: 10.0
     joint_position_tolerance_rad: 0.025
     joint_velocity_tolerance_rad_s: 0.025

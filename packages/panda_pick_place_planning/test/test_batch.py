@@ -113,6 +113,8 @@ class BatchSequencerTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("OnProcessExit", batch_launch)
         self.assertIn("Shutdown", batch_launch)
+        self.assertIn("finalize_batch_run", batch_launch)
+        self.assertIn("TimerAction", batch_launch)
         # Runtime booleans must not be shadowed by the node-specific mock YAML
         # when the Gazebo wrapper includes this launch dynamically.
         self.assertNotIn("moveit_backend_defaults.yaml", batch_launch)

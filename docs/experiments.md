@@ -9,13 +9,15 @@
 | Gazebo assisted | MoveIt 规划、控制器执行和约束辅助抓放 | `results/v2/gazebo_assisted_final/` |
 | Gazebo RGB-D assisted | RGB-D 位置估计驱动 MoveIt/Gazebo 闭环 | `results/runs/gazebo_rgbd/` |
 | Gazebo RGB-D grasp pose | 矩形工件 yaw 估计、候选筛选与 assisted 闭环 | `results/runs/gazebo_rgbd_grasp_pose/` |
+| Gazebo RGB-D multi-object | 三矩形工件检测、联合候选筛选与 assisted 闭环 | `results/runs/gazebo_rgbd_multi_object/` |
 | 历史 PyBullet 冻结数据 | 保留原始哈希的早期基线 | `baselines/v0.1-pybullet-baseline/` |
 | 失败证据 | 用于定位问题，不混入最终汇总 | `results/v2/*failed_attempt*/` |
 
 表中的 `v0.1` 和 `v2` 只是已发布数据的历史路径。为避免破坏 SHA256 审计和旧引用，
 这些目录不重命名。它们不对应两份当前源码。
 
-新实验统一写入 `results/runs/<backend_or_purpose>/`，默认由 `.gitignore` 排除。
+新实验统一写入 `results/runs/<backend_or_purpose>/`。普通临时运行默认由 `.gitignore`
+排除；完成哈希审计的 `gazebo_rgbd_multi_object/` 是当前保留的证据集。
 
 ## PyBullet
 
@@ -65,6 +67,25 @@ clear 中 RRT-Connect 先检查直连边，因此与 Linear 得到相同的路�
 - 固定关节连接的连杆属于同一刚性组件；只过滤刚性体内部接触，保留真实自碰撞与环境碰撞。
 - Gazebo 夹爪在 assisted 预夹紧的小位移中曾被低增益控制器报告 `stalled`。修复只允许
   assisted 预夹紧将该结果交给独立位姿/开度门控，release 仍 fail-closed。
+- 三工件 nominal 首轮在一次携带 `workpiece_2` 的 transfer 失败后连续出现目标状态无效。根因是
+  下一 episode 的 MoveIt reset 先切回默认 `workpiece_0`，只清理了新 ID，旧的
+  `workpiece_2` AttachedCollisionObject 残留。修复后 reset 对上一批和当前批全部工件逐一
+  detach；候选筛选也同时验证 pre-grasp 与实际 grasp 目标。失败批次原样保留。
+
+失败批次位于
+`results/runs/gazebo_rgbd_multi_object/rgbd_nominal_failed_attempt_stale_attachment/`：clear 为
+50/50，obstacle 为 37/50；首先出现 1 条 `invalid_motion_plan`，随后 12 条
+`goal_state_invalid`。该批次不并入修复后的正式汇总。
+
+- ground-truth 首次正式运行在两个连续 reset 中返回 `HOME_FAILED`。控制器日志显示
+  `panda_joint1` 的路径误差约为 0.1514 rad，略高于 0.15 rad 容差；下一次 reset 因机械臂
+  已经部分回 home 而自然恢复。修复在同一个 reset 事务内部增加最多三次 home 尝试，并继续
+  使用严格的最终关节位置/速度稳态检查，不重跑失败 episode。原失败批次和两个 task seed
+  保存在 `ground_truth_nominal_failed_attempt_home_tolerance/`，修复后同一组种子及完整正式
+  批次通过。
+- 更早的一次 RGB-D 批次出现两条无详情的 `multi_object_reset_failed`。该批次发生在服务错误
+  详情透传实现之前，因此只保留原始数据，不推测根因；后端现在保留 reset manager 的错误码
+  与 message，后续同类问题可以定位。结构化说明见 `failure_examples/failure_examples.json`。
 
 ## Gazebo RGB-D assisted
 
@@ -123,6 +144,33 @@ pose-sampling IK；不执行试探轨迹，也不对其他规划错误扩大重�
 均完成 5 clear + 5 obstacle，全部任务成功；方块继续使用单个旧版固定朝向候选，不声明 yaw
 可观测性。两组也通过 `(scene, task_seed)` 配对覆盖检查，说明新增矩形姿态链路没有复制状态机
 或破坏原方块语义。
+
+## 三工件 RGB-D 与联合抓取选择
+
+当前多工件正式数据位于 `results/runs/gazebo_rgbd_multi_object/`。任务生成器为三个矩形工件
+独立生成位置和 yaw，并按真实 X、Y 固定实例 ID；在线感知只按估计 world X、Y 排序，不读取
+任务真值。每个工件生成两个 π 对称顶抓候选，MoveIt planning-only 筛选后按路径长度与置信度
+联合代价确定性选择。
+
+nominal RGB-D 与 ground-truth 使用相同 `(scene, task_seed)`，各运行 50 clear + 50 obstacle。
+两组均为 100/100 任务成功，完整三工件检测和联合选择均为 100%，所有 episode 的六个候选均
+可行；三个 object ID 都曾被选择，未选工件最大位移为 0 mm。
+
+| pose source / 场景 | 任务结果 | 平均规划时间 / P95 | 平均路径 | 选中工件位置误差 P95 | yaw 误差 P95 | 最终 XY 误差均值 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| ground truth / clear | 50/50 | 27.99 / 37.09 ms | 1.039 rad | 0 mm | 0° | 0.12 mm |
+| ground truth / obstacle | 50/50 | 39.85 / 74.74 ms | 3.183 rad | 0 mm | 0° | 0.15 mm |
+| RGB-D / clear | 50/50 | 28.70 / 37.20 ms | 1.088 rad | 5.15 mm | 3.95° | 2.42 mm |
+| RGB-D / obstacle | 50/50 | 40.91 / 71.90 ms | 3.224 rad | 3.25 mm | 4.76° | 2.95 mm |
+
+`combined` 是由 episode ID 和 task seed 确定的低亮度、RGB 高斯噪声与深度丢失组合扰动，
+clear/obstacle 各运行 20 个 episode，均为 20/20 完整检测、联合选择和任务成功。位置误差
+P95 分别为 4.34 mm 和 3.43 mm，yaw 误差 P95 分别为 7.56° 和 7.43°。三组碰撞率均为 0，
+没有 `selected_attachment_mismatch`、PlanningScene 同步失败或未分类 `runtime_error`。
+
+确定性 reset 连续验证 10 次均通过，三个工件最大位置误差为 `6.15e-7 m`、最大 yaw 误差为
+`5.45e-7 rad`。每个正式目录包含 JSONL、summary、environment、run status、SVG report 和
+SHA256 manifest；配对覆盖见 `paired_nominal_report/report_manifest.json`。
 
 ## 跨后端比较边界
 

@@ -89,6 +89,15 @@ class ReportGroup:
     grasp_selection_latency_mean_sec: float | None
     grasp_candidate_count_mean: float | None
     selected_grasp_path_length_mean_rad: float | None
+    detected_workpiece_count_mean: float | None
+    target_selection_success_rate: float | None
+    target_selection_latency_mean_sec: float | None
+    selected_object_score_mean: float | None
+    total_candidate_count_mean: float | None
+    feasible_candidate_count_mean: float | None
+    selected_object_position_error_p95_m: float | None
+    selected_object_yaw_error_p95_rad: float | None
+    max_nonselected_displacement_p95_m: float | None
     failure_counts: dict[str, int] = field(default_factory=dict)
     metric_sample_counts: dict[str, int | None] = field(default_factory=dict)
     metric_origins: dict[str, str] = field(default_factory=dict)
@@ -314,6 +323,38 @@ def generate_report(
                         ),
                     ]
                 )
+            if any(
+                group.target_selection_success_rate is not None
+                for group in scoped
+            ):
+                chart_specs.extend(
+                    [
+                        (
+                            output_dir / "full_episode_target_selection.svg",
+                            "target_selection",
+                            f"{title} — Multi-object target selection",
+                            scoped,
+                        ),
+                        (
+                            output_dir / "full_episode_candidate_counts.svg",
+                            "candidate_counts",
+                            f"{title} — Multi-object candidate feasibility",
+                            scoped,
+                        ),
+                        (
+                            output_dir / "full_episode_selection_cost.svg",
+                            "selection_cost",
+                            f"{title} — Selected-object cost",
+                            scoped,
+                        ),
+                        (
+                            output_dir / "full_episode_nonselected_motion.svg",
+                            "nonselected_motion",
+                            f"{title} — Non-selected workpiece motion",
+                            scoped,
+                        ),
+                    ]
+                )
 
     manifest_path = output_dir / "report_manifest.json"
     targets = [path for path, _, _, _ in chart_specs] + [manifest_path]
@@ -377,6 +418,12 @@ def generate_report(
             "perception": (
                 "Detection rate, service latency, and position error are reported "
                 "only for rows that persist RGB-D perception observations."
+            ),
+            "multi_object_selection": (
+                "Target selection is planning-only across detected workpieces. "
+                "The deterministic score is pre-grasp joint-path length plus "
+                "one minus perception confidence; task truth is used only for "
+                "offline error metrics."
             ),
         },
         "groups": [asdict(group) for group in groups],
@@ -550,6 +597,33 @@ def _normalize_record(
         "selected_grasp_path_length_rad": _record_number(
             record, "selected_grasp_path_length_rad", path, index
         ),
+        "detected_workpiece_count": _record_number(
+            record, "detected_workpiece_count", path, index
+        ),
+        "target_selection_success": _record_bool(
+            record, "target_selection_success", path, index
+        ),
+        "target_selection_latency_sec": _record_number(
+            record, "target_selection_latency_sec", path, index
+        ),
+        "selected_object_score": _record_number(
+            record, "selected_object_score", path, index
+        ),
+        "total_candidate_count": _record_number(
+            record, "total_candidate_count", path, index
+        ),
+        "feasible_candidate_count": _record_number(
+            record, "feasible_candidate_count", path, index
+        ),
+        "selected_object_position_error_m": _record_number(
+            record, "selected_object_position_error_m", path, index
+        ),
+        "selected_object_yaw_error_rad": _record_number(
+            record, "selected_object_yaw_error_rad", path, index
+        ),
+        "max_nonselected_displacement_m": _record_number(
+            record, "max_nonselected_displacement_m", path, index
+        ),
     }
     xy_error = _record_number(record, "final_xy_error_m", path, index)
     z_error = _record_number(record, "final_z_error_m", path, index)
@@ -655,6 +729,20 @@ def _summarize_records(
     selection_latencies = _reported(records, "grasp_selection_latency_sec")
     candidate_counts = _reported(records, "grasp_candidate_count")
     selected_path_lengths = _reported(records, "selected_grasp_path_length_rad")
+    detected_counts = _reported(records, "detected_workpiece_count")
+    target_selection_latencies = _reported(
+        records, "target_selection_latency_sec"
+    )
+    selected_scores = _reported(records, "selected_object_score")
+    total_candidate_counts = _reported(records, "total_candidate_count")
+    feasible_candidate_counts = _reported(records, "feasible_candidate_count")
+    selected_position_errors = _reported(
+        records, "selected_object_position_error_m"
+    )
+    selected_yaw_errors = _reported(records, "selected_object_yaw_error_rad")
+    nonselected_displacements = _reported(
+        records, "max_nonselected_displacement_m"
+    )
     failure_counts: Counter[str] = Counter()
     for record in records:
         if mode == PLANNING_ONLY:
@@ -721,6 +809,25 @@ def _summarize_records(
         grasp_selection_latency_mean_sec=_safe_mean(selection_latencies),
         grasp_candidate_count_mean=_safe_mean(candidate_counts),
         selected_grasp_path_length_mean_rad=_safe_mean(selected_path_lengths),
+        detected_workpiece_count_mean=_safe_mean(detected_counts),
+        target_selection_success_rate=_bool_rate(
+            records, "target_selection_success"
+        ),
+        target_selection_latency_mean_sec=_safe_mean(
+            target_selection_latencies
+        ),
+        selected_object_score_mean=_safe_mean(selected_scores),
+        total_candidate_count_mean=_safe_mean(total_candidate_counts),
+        feasible_candidate_count_mean=_safe_mean(feasible_candidate_counts),
+        selected_object_position_error_p95_m=_percentile(
+            selected_position_errors, 0.95
+        ),
+        selected_object_yaw_error_p95_rad=_percentile(
+            selected_yaw_errors, 0.95
+        ),
+        max_nonselected_displacement_p95_m=_percentile(
+            nonselected_displacements, 0.95
+        ),
         failure_counts=dict(sorted(failure_counts.items())),
         metric_sample_counts={
             "planning_success_rate": len(records),
@@ -745,6 +852,11 @@ def _summarize_records(
             "object_yaw_error": len(yaw_errors),
             "grasp_selection_latency": len(selection_latencies),
             "selected_grasp_path_length": len(selected_path_lengths),
+            "target_selection_latency": len(target_selection_latencies),
+            "selected_object_score": len(selected_scores),
+            "selected_object_position_error": len(selected_position_errors),
+            "selected_object_yaw_error": len(selected_yaw_errors),
+            "max_nonselected_displacement": len(nonselected_displacements),
         },
         metric_origins={
             "planning_time": "reported_episode_values",
@@ -929,6 +1041,37 @@ def _dataset_from_summary(
                 ),
                 selected_grasp_path_length_mean_rad=_nested_summary_number(
                     values, "selected_grasp_path_length_rad", "mean", path
+                ),
+                detected_workpiece_count_mean=None,
+                target_selection_success_rate=_summary_number(
+                    values.get("target_selection_success_rate"),
+                    "target_selection_success_rate",
+                    path,
+                ),
+                target_selection_latency_mean_sec=_nested_summary_number(
+                    values, "target_selection_latency_sec", "mean", path
+                ),
+                selected_object_score_mean=_nested_summary_number(
+                    values, "selected_object_score", "mean", path
+                ),
+                total_candidate_count_mean=_summary_number(
+                    values.get("avg_total_candidate_count"),
+                    "avg_total_candidate_count",
+                    path,
+                ),
+                feasible_candidate_count_mean=_summary_number(
+                    values.get("avg_feasible_candidate_count"),
+                    "avg_feasible_candidate_count",
+                    path,
+                ),
+                selected_object_position_error_p95_m=_nested_summary_number(
+                    values, "selected_object_position_error_m", "p95", path
+                ),
+                selected_object_yaw_error_p95_rad=_nested_summary_number(
+                    values, "selected_object_yaw_error_rad", "p95", path
+                ),
+                max_nonselected_displacement_p95_m=_nested_summary_number(
+                    values, "max_nonselected_displacement_m", "p95", path
                 ),
                 failure_counts=failure_counts,
                 metric_sample_counts={
@@ -1342,6 +1485,82 @@ def _write_chart(
             [[group.selected_grasp_path_length_mean_rad] for group in groups],
             axis_label="joint-path length (rad)",
             value_format=lambda value: f"{value:.3g} rad",
+        )
+        return
+
+    if chart_kind == "target_selection":
+        _render_grouped_horizontal(
+            path,
+            title,
+            "Joint planning-only selection success across all detected workpieces.",
+            groups,
+            ["Target selection success"],
+            [
+                [_scale_optional(group.target_selection_success_rate, 100.0)]
+                for group in groups
+            ],
+            axis_max=100.0,
+            axis_label="success rate (%)",
+            value_format=lambda value: f"{value:.1f}%",
+            tick_format=lambda value: f"{value:.0f}%",
+        )
+        return
+
+    if chart_kind == "candidate_counts":
+        _render_grouped_horizontal(
+            path,
+            title,
+            "Mean generated and planning-feasible candidates per episode.",
+            groups,
+            ["Total", "Feasible"],
+            [
+                [
+                    group.total_candidate_count_mean,
+                    group.feasible_candidate_count_mean,
+                ]
+                for group in groups
+            ],
+            axis_label="candidate count",
+            value_format=lambda value: f"{value:.3g}",
+        )
+        return
+
+    if chart_kind == "selection_cost":
+        _render_grouped_horizontal(
+            path,
+            title,
+            "Mean selected score = pre-grasp path length + (1 - confidence).",
+            groups,
+            ["Selection score", "Pre-grasp path"],
+            [
+                [
+                    group.selected_object_score_mean,
+                    group.selected_grasp_path_length_mean_rad,
+                ]
+                for group in groups
+            ],
+            axis_label="selection cost",
+            value_format=lambda value: f"{value:.3g}",
+        )
+        return
+
+    if chart_kind == "nonselected_motion":
+        _render_grouped_horizontal(
+            path,
+            title,
+            "P95 maximum displacement of workpieces not selected for grasping.",
+            groups,
+            ["Non-selected displacement"],
+            [
+                [
+                    _scale_optional(
+                        group.max_nonselected_displacement_p95_m, 1000.0
+                    )
+                ]
+                for group in groups
+            ],
+            axis_label="P95 displacement (mm)",
+            value_format=lambda value: f"{value:.3g} mm",
         )
         return
 

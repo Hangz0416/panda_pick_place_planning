@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="378" viewBox="0 0 1500 378" role="img" aria-labelledby="chart-title">
+<title id="chart-title">Panda multi-object RGB-D nominal failed attempt — Full episode RGB-D perception latency</title>
+<style>
+text { font-family: Inter, "Noto Sans", "DejaVu Sans", sans-serif; fill: #263238; }
+.chart-title { font-size: 24px; font-weight: 700; }
+.chart-subtitle { font-size: 13px; fill: #52606D; }
+.legend-label, .tick-label { font-size: 12px; }
+.axis-label { font-size: 13px; font-weight: 600; }
+.group-label { font-size: 12px; font-weight: 600; }
+.value-label, .na-label { font-size: 11px; }
+.na-label, .empty-label { fill: #6B7785; font-style: italic; }
+.segment-label { fill: #FFFFFF; font-size: 11px; font-weight: 700; }
+.footer { font-size: 11px; fill: #6B7785; }
+</style>
+<rect width="1500" height="378" fill="#FFFFFF"/>
+<text class="chart-title" x="32" y="38">Panda multi-object RGB-D nominal failed attempt — Full episode RGB-D perception latency</text>
+<text class="chart-subtitle" x="32" y="64">EstimateScene service latency from request to completed estimate.</text>
+<line x1="32" y1="72" x2="1468" y2="72" stroke="#D9E1E8"/>
+<rect x="560.0" y="75" width="13" height="13" rx="2" fill="#0072B2"/>
+<text class="legend-label" x="580.0" y="86">Mean</text>
+<rect x="960.0" y="75" width="13" height="13" rx="2" fill="#E69F00"/>
+<text class="legend-label" x="980.0" y="86">P95</text>
+<line x1="560.00" y1="145" x2="560.00" y2="273" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="560.00" y="295" text-anchor="middle">0</text>
+<line x1="720.00" y1="145" x2="720.00" y2="273" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="720.00" y="295" text-anchor="middle">40</text>
+<line x1="880.00" y1="145" x2="880.00" y2="273" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="880.00" y="295" text-anchor="middle">80</text>
+<line x1="1040.00" y1="145" x2="1040.00" y2="273" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1040.00" y="295" text-anchor="middle">120</text>
+<line x1="1200.00" y1="145" x2="1200.00" y2="273" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1200.00" y="295" text-anchor="middle">160</text>
+<line x1="1360.00" y1="145" x2="1360.00" y2="273" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1360.00" y="295" text-anchor="middle">200</text>
+<line x1="560" y1="273" x2="1360" y2="273" stroke="#52606D"/>
+<text class="axis-label" x="960.00" y="321" text-anchor="middle">latency (ms)</text>
+<text class="group-label" x="546" y="166.0" text-anchor="end">failed_attempt · moveit/gazebo · clear · RRTConnectkConfigDefault · rgbd · rect_prism</text>
+<rect x="560" y="145" width="274.95" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="841.95" y="157" text-anchor="start" fill="#263238">68.7 ms</text>
+<rect x="560" y="166" width="521.74" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="1088.74" y="178" text-anchor="start" fill="#263238">130 ms</text>
+<text class="group-label" x="546" y="230.0" text-anchor="end">failed_attempt · moveit/gazebo · obstacle · RRTConnectkConfigDefault · rgbd · rect_prism</text>
+<rect x="560" y="209" width="263.57" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="830.57" y="221" text-anchor="start" fill="#263238">65.9 ms</text>
+<rect x="560" y="230" width="473.14" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="1040.14" y="242" text-anchor="start" fill="#263238">118 ms</text>
+<text class="footer" x="1468" y="360" text-anchor="end">Recorded data only · N/A = not reported or not applicable</text>
+</svg>

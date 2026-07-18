@@ -91,6 +91,10 @@ class FakeBackend:
         self.attached = True
         return True
 
+    def select_manipulation_object(self, object_id):
+        self.selected_object_id = object_id
+        return True
+
     def detach_object(self):
         self.released = True
 

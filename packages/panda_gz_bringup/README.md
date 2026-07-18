@@ -31,7 +31,7 @@ ros2 launch panda_gz_bringup panda_gz.launch.py \
 
 ```bash
 ros2 launch panda_gz_bringup panda_visual_pick_place.launch.py \
-  scene:=clear seed:=42 object_variant:=rect_prism \
+  scene:=clear seed:=42 object_variant:=rect_prism workpiece_count:=3 \
   pose_source:=rgbd perception_profile:=nominal \
   headless:=false use_rviz:=true
 ```
@@ -52,7 +52,7 @@ state publisher and Gazebo-created controller manager. With
 cube odometry, all three active controllers, reset/scene/collision services,
 and motion/arm/gripper actions before starting the shared FSM.
 
-The recommended wrapper exposes `scene`, `seed`, `object_variant`, `pose_source`,
+The recommended wrapper exposes `scene`, `seed`, `object_variant`, `workpiece_count`, `pose_source`,
 `perception_profile`, `headless`, and `use_rviz`. Lower-level bringup also
 accepts `grasp_mode:=assisted|physics`, `use_sim_time`, and `auto_reset`; these
 are intentionally fixed by the recommended visual workflow.
@@ -60,10 +60,10 @@ are intentionally fixed by the recommended visual workflow.
 Management interfaces:
 
 - `/panda_gz/reset_episode` (`panda_pick_place_interfaces/srv/ResetEpisode`),
-  carrying episode ID, task seed, scene, grasp mode, object variant/yaw,
-  object position and target
-- `/panda_gz/attach_object` (`std_srvs/srv/Trigger`)
-- `/panda_gz/detach_object` (`std_srvs/srv/Trigger`)
+  carrying episode ID, task seed, scene, target and one or three workpiece poses
+- `/panda_gz/set_assisted_object`
+  (`panda_pick_place_interfaces/srv/SetAssistedObject`), selecting the exact
+  workpiece identity for attach/detach
 - `/panda_gz/get_physical_grasp_state`
   (`panda_pick_place_interfaces/srv/GetPhysicalGraspState`)
 - `/panda_gz/get_execution_collision_state`
@@ -114,8 +114,8 @@ The pure contact classifier applies these rules:
 - Cube–obstacle / ground, non-ACM self-collision, arm–cube, and a monitored
   entity touching an unknown model are invalid and latched per episode.
 
-The typed query returns `available=false` until robot contacts, cube contacts,
-and cube pose have all arrived. This is intentionally different from a manual
+The typed query returns `available=false` until robot contacts, all configured
+workpiece contacts and poses, and selected-object identity have arrived. This is intentionally different from a manual
 "collision monitor available" flag.
 
 The reset manager performs a model-only Gazebo reset (so `/clock` does not jump
@@ -131,7 +131,8 @@ With a matching `rect_prism` stack running, the deterministic ten-reset audit is
 ```bash
 ros2 run panda_gz_bringup validate_episode_reset \
   --repetitions 10 --scene clear --seed 42 --object-variant rect_prism \
-  --output results/runs/gazebo_rgbd_grasp_pose/reset_validation.json
+  --workpiece-count 3 \
+  --output results/runs/gazebo_rgbd_multi_object/reset_validation.json
 ```
 
 The Gazebo collision table matches the PyBullet 1.5 x 1.0 x 0.05 m slab with its top

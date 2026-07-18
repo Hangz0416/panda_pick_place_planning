@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="420" viewBox="0 0 1500 420" role="img" aria-labelledby="chart-title">
+<title id="chart-title">Panda multi-object RGB-D combined perturbation — Full episode planning time</title>
+<style>
+text { font-family: Inter, "Noto Sans", "DejaVu Sans", sans-serif; fill: #263238; }
+.chart-title { font-size: 24px; font-weight: 700; }
+.chart-subtitle { font-size: 13px; fill: #52606D; }
+.legend-label, .tick-label { font-size: 12px; }
+.axis-label { font-size: 13px; font-weight: 600; }
+.group-label { font-size: 12px; font-weight: 600; }
+.value-label, .na-label { font-size: 11px; }
+.na-label, .empty-label { fill: #6B7785; font-style: italic; }
+.segment-label { fill: #FFFFFF; font-size: 11px; font-weight: 700; }
+.footer { font-size: 11px; fill: #6B7785; }
+</style>
+<rect width="1500" height="420" fill="#FFFFFF"/>
+<text class="chart-title" x="32" y="38">Panda multi-object RGB-D combined perturbation — Full episode planning time</text>
+<text class="chart-subtitle" x="32" y="64">Top-level planning metric scope is preserved from each source; missing statistics are N/A.</text>
+<line x1="32" y1="72" x2="1468" y2="72" stroke="#D9E1E8"/>
+<rect x="560.0" y="75" width="13" height="13" rx="2" fill="#0072B2"/>
+<text class="legend-label" x="580.0" y="86">Mean</text>
+<rect x="826.7" y="75" width="13" height="13" rx="2" fill="#E69F00"/>
+<text class="legend-label" x="846.7" y="86">Median</text>
+<rect x="1093.3" y="75" width="13" height="13" rx="2" fill="#009E73"/>
+<text class="legend-label" x="1113.3" y="86">P95</text>
+<line x1="560.00" y1="145" x2="560.00" y2="315" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="560.00" y="337" text-anchor="middle">0</text>
+<line x1="720.00" y1="145" x2="720.00" y2="315" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="720.00" y="337" text-anchor="middle">20</text>
+<line x1="880.00" y1="145" x2="880.00" y2="315" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="880.00" y="337" text-anchor="middle">40</text>
+<line x1="1040.00" y1="145" x2="1040.00" y2="315" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1040.00" y="337" text-anchor="middle">60</text>
+<line x1="1200.00" y1="145" x2="1200.00" y2="315" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1200.00" y="337" text-anchor="middle">80</text>
+<line x1="1360.00" y1="145" x2="1360.00" y2="315" stroke="#E7ECF0" stroke-width="1"/>
+<text class="tick-label" x="1360.00" y="337" text-anchor="middle">100</text>
+<line x1="560" y1="315" x2="1360" y2="315" stroke="#52606D"/>
+<text class="axis-label" x="960.00" y="363" text-anchor="middle">planning time (ms)</text>
+<text class="group-label" x="546" y="176.5" text-anchor="end">rgbd_combined · moveit/gazebo · clear · RRTConnectkConfigDefault · rgbd · rect_prism · combined</text>
+<rect x="560" y="145" width="219.89" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="786.89" y="157" text-anchor="start" fill="#263238">27.5 ms</text>
+<rect x="560" y="166" width="216.38" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="783.38" y="178" text-anchor="start" fill="#263238">27 ms</text>
+<rect x="560" y="187" width="259.75" height="16" rx="3" fill="#009E73"/>
+<text class="value-label" x="826.75" y="199" text-anchor="start" fill="#263238">32.5 ms</text>
+<text class="group-label" x="546" y="261.5" text-anchor="end">rgbd_combined · moveit/gazebo · obstacle · RRTConnectkConfigDefault · rgbd · rect_prism · combined</text>
+<rect x="560" y="230" width="310.82" height="16" rx="3" fill="#0072B2"/>
+<text class="value-label" x="877.82" y="242" text-anchor="start" fill="#263238">38.9 ms</text>
+<rect x="560" y="251" width="264.33" height="16" rx="3" fill="#E69F00"/>
+<text class="value-label" x="831.33" y="263" text-anchor="start" fill="#263238">33 ms</text>
+<rect x="560" y="272" width="537.99" height="16" rx="3" fill="#009E73"/>
+<text class="value-label" x="1104.99" y="284" text-anchor="start" fill="#263238">67.2 ms</text>
+<text class="footer" x="1468" y="402" text-anchor="end">Recorded data only · N/A = not reported or not applicable</text>
+</svg>

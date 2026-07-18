@@ -18,6 +18,37 @@ SUPPORTED_PERCEPTION_PROFILES = {
 
 
 @dataclass(frozen=True)
+class WorkpieceSpec:
+    """One reset-time workpiece pose; truth is never used for online selection."""
+
+    object_id: str
+    object_variant: str
+    position: tuple[float, float, float]
+    orientation_xyzw: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)
+
+    def __post_init__(self) -> None:
+        if not self.object_id:
+            raise ValueError("workpiece object_id must not be empty")
+        if self.object_variant not in SUPPORTED_OBJECT_VARIANTS:
+            raise ValueError(f"unsupported object variant: {self.object_variant}")
+        _validate_pose_values(self.position, self.orientation_xyzw)
+
+    @property
+    def yaw_rad(self) -> float:
+        return _quaternion_yaw(self.orientation_xyzw)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "WorkpieceSpec":
+        orientation = data.get("orientation_xyzw", (0.0, 0.0, 0.0, 1.0))
+        return cls(
+            object_id=str(data["object_id"]),
+            object_variant=str(data.get("object_variant", "rect_prism")),
+            position=tuple(float(value) for value in data["position"]),
+            orientation_xyzw=tuple(float(value) for value in orientation),
+        )
+
+
+@dataclass(frozen=True)
 class TaskSpec:
     episode_id: int
     task_seed: int
@@ -32,6 +63,7 @@ class TaskSpec:
     object_variant: str = "cube"
     object_yaw_rad: float = 0.0
     perception_profile: str = "nominal"
+    workpieces: tuple[WorkpieceSpec, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
         if self.planner not in SUPPORTED_PLANNERS:
@@ -52,6 +84,38 @@ class TaskSpec:
             )
         if len(self.object_position) != 3 or len(self.target_position) != 3:
             raise ValueError("object_position and target_position must be 3D")
+        if not self.workpieces:
+            half_yaw = 0.5 * float(self.object_yaw_rad)
+            object.__setattr__(
+                self,
+                "workpieces",
+                (
+                    WorkpieceSpec(
+                        object_id="cube",
+                        object_variant=self.object_variant,
+                        position=tuple(float(value) for value in self.object_position),
+                        orientation_xyzw=(
+                            0.0,
+                            0.0,
+                            math.sin(half_yaw),
+                            math.cos(half_yaw),
+                        ),
+                    ),
+                ),
+            )
+        identifiers = [item.object_id for item in self.workpieces]
+        if len(identifiers) not in {1, 3}:
+            raise ValueError("workpieces must contain one or three objects")
+        if len(set(identifiers)) != len(identifiers):
+            raise ValueError("workpiece object_id values must be unique")
+        if len(self.workpieces) == 3 and self.object_variant != "rect_prism":
+            raise ValueError("three-workpiece tasks require rect_prism objects")
+        if any(item.object_variant != self.object_variant for item in self.workpieces):
+            raise ValueError("all workpieces must match task object_variant")
+
+    @property
+    def workpiece_count(self) -> int:
+        return len(self.workpieces)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -75,6 +139,9 @@ class TaskSpec:
             object_variant=str(data.get("object_variant", "cube")),
             object_yaw_rad=float(data.get("object_yaw_rad", 0.0)),
             perception_profile=str(data.get("perception_profile", "nominal")),
+            workpieces=tuple(
+                WorkpieceSpec.from_dict(item) for item in data.get("workpieces", [])
+            ),
         )
 
     @classmethod
@@ -104,14 +171,20 @@ class SceneObjectEstimate:
     valid_pixel_count: int = 0
     covariance: tuple[float, ...] = (0.0,) * 36
     orientation_xyzw: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)
+    object_class: str = ""
+    position_valid: bool = True
+    orientation_valid: bool = True
+    failure_type: str = ""
 
     def __post_init__(self) -> None:
         if not self.object_id:
             raise ValueError("object_id must not be empty")
-        if len(self.position) != 3 or not all(
+        if len(self.position) != 3:
+            raise ValueError("position must contain three values")
+        if self.position_valid and not all(
             math.isfinite(float(value)) for value in self.position
         ):
-            raise ValueError("position must contain three finite values")
+            raise ValueError("valid position must contain three finite values")
         if len(self.orientation_xyzw) != 4 or not all(
             math.isfinite(float(value)) for value in self.orientation_xyzw
         ):
@@ -125,13 +198,63 @@ class SceneObjectEstimate:
             raise ValueError("valid_pixel_count must be non-negative")
         if len(self.covariance) != 36:
             raise ValueError("covariance must contain 36 values")
+        if self.failure_type and self.position_valid and self.orientation_valid:
+            raise ValueError("fully valid estimate cannot have a failure_type")
 
     @property
     def yaw_rad(self) -> float:
-        x, y, z, w = (float(value) for value in self.orientation_xyzw)
-        return math.atan2(
-            2.0 * (w * z + x * y),
-            1.0 - 2.0 * (y * y + z * z),
+        return _quaternion_yaw(self.orientation_xyzw)
+
+
+@dataclass(frozen=True)
+class ObjectSelectionMetric:
+    object_id: str
+    position_valid: bool = True
+    orientation_valid: bool = True
+    confidence: float = 0.0
+    position_error_m: float | None = None
+    yaw_error_rad: float | None = None
+    candidate_count: int = 0
+    feasible_candidate_count: int = 0
+    best_path_length_rad: float | None = None
+    selection_score: float | None = None
+    selected: bool = False
+    failure_type: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.object_id:
+            raise ValueError("selection metric object_id must not be empty")
+        if not 0.0 <= float(self.confidence) <= 1.0:
+            raise ValueError("selection metric confidence must be in [0, 1]")
+        for name in (
+            "position_error_m",
+            "yaw_error_rad",
+            "best_path_length_rad",
+            "selection_score",
+        ):
+            value = getattr(self, name)
+            if value is not None and (not math.isfinite(value) or value < 0.0):
+                raise ValueError(f"{name} must be finite, non-negative, or null")
+        if self.candidate_count < 0 or self.feasible_candidate_count < 0:
+            raise ValueError("candidate counts must be non-negative")
+        if self.feasible_candidate_count > self.candidate_count:
+            raise ValueError("feasible candidates cannot exceed candidates")
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ObjectSelectionMetric":
+        return cls(
+            object_id=str(data["object_id"]),
+            position_valid=bool(data.get("position_valid", True)),
+            orientation_valid=bool(data.get("orientation_valid", True)),
+            confidence=float(data.get("confidence", 0.0)),
+            position_error_m=_optional_float(data.get("position_error_m")),
+            yaw_error_rad=_optional_float(data.get("yaw_error_rad")),
+            candidate_count=int(data.get("candidate_count", 0)),
+            feasible_candidate_count=int(data.get("feasible_candidate_count", 0)),
+            best_path_length_rad=_optional_float(data.get("best_path_length_rad")),
+            selection_score=_optional_float(data.get("selection_score")),
+            selected=bool(data.get("selected", False)),
+            failure_type=str(data.get("failure_type", "")),
         )
 
 
@@ -193,7 +316,7 @@ class EpisodeResult:
     object_initial_position: tuple[float, float, float]
     object_final_position: tuple[float, float, float]
     target_position: tuple[float, float, float]
-    schema_version: int = 4
+    schema_version: int = 5
     backend: str = "pybullet"
     simulator: str = "pybullet"
     planner_id: str = ""
@@ -213,6 +336,19 @@ class EpisodeResult:
     grasp_candidate_count: int = 0
     selected_grasp_yaw_rad: float | None = None
     selected_grasp_path_length_rad: float | None = None
+    detected_workpiece_count: int = 1
+    selected_object_id: str = "cube"
+    target_selection_success: bool = False
+    target_selection_latency_sec: float | None = None
+    selected_object_score: float | None = None
+    total_candidate_count: int = 0
+    feasible_candidate_count: int = 0
+    selected_object_position_error_m: float | None = None
+    selected_object_yaw_error_rad: float | None = None
+    max_nonselected_displacement_m: float | None = None
+    object_selection_metrics: tuple[ObjectSelectionMetric, ...] = field(
+        default_factory=tuple
+    )
     execution_time_sec: float = 0.0
     execution_success: bool = False
     trajectory_points: int = 0
@@ -255,12 +391,23 @@ class EpisodeResult:
             "object_yaw_error_rad",
             "grasp_selection_latency_sec",
             "selected_grasp_path_length_rad",
+            "target_selection_latency_sec",
+            "selected_object_score",
+            "selected_object_position_error_m",
+            "selected_object_yaw_error_rad",
+            "max_nonselected_displacement_m",
         ):
             value = getattr(self, name)
             if value is not None and (not math.isfinite(value) or value < 0.0):
                 raise ValueError(f"{name} must be finite, non-negative, or null")
         if self.grasp_candidate_count < 0:
             raise ValueError("grasp_candidate_count must be non-negative")
+        if self.detected_workpiece_count < 0:
+            raise ValueError("detected_workpiece_count must be non-negative")
+        if self.total_candidate_count < 0 or self.feasible_candidate_count < 0:
+            raise ValueError("selection candidate counts must be non-negative")
+        if self.feasible_candidate_count > self.total_candidate_count:
+            raise ValueError("feasible candidates cannot exceed total candidates")
         if self.selected_grasp_yaw_rad is not None and not math.isfinite(
             self.selected_grasp_yaw_rad
         ):
@@ -409,6 +556,34 @@ class EpisodeResult:
             selected_grasp_path_length_rad=_optional_float(
                 data.get("selected_grasp_path_length_rad")
             ),
+            detected_workpiece_count=int(data.get("detected_workpiece_count", 1)),
+            selected_object_id=str(data.get("selected_object_id", "cube")),
+            target_selection_success=bool(
+                data.get("target_selection_success", False)
+            ),
+            target_selection_latency_sec=_optional_float(
+                data.get("target_selection_latency_sec")
+            ),
+            selected_object_score=_optional_float(
+                data.get("selected_object_score")
+            ),
+            total_candidate_count=int(data.get("total_candidate_count", 0)),
+            feasible_candidate_count=int(
+                data.get("feasible_candidate_count", 0)
+            ),
+            selected_object_position_error_m=_optional_float(
+                data.get("selected_object_position_error_m")
+            ),
+            selected_object_yaw_error_rad=_optional_float(
+                data.get("selected_object_yaw_error_rad")
+            ),
+            max_nonselected_displacement_m=_optional_float(
+                data.get("max_nonselected_displacement_m")
+            ),
+            object_selection_metrics=tuple(
+                ObjectSelectionMetric.from_dict(item)
+                for item in data.get("object_selection_metrics", [])
+            ),
             execution_time_sec=float(data.get("execution_time_sec", 0.0)),
             execution_success=bool(
                 data.get("execution_success", data.get("task_success", False))
@@ -482,3 +657,25 @@ def _optional_bool(value: Any) -> bool | None:
     if not isinstance(value, bool):
         raise ValueError("optional boolean metric must be true, false, or null")
     return value
+
+
+def _quaternion_yaw(values: tuple[float, float, float, float]) -> float:
+    x, y, z, w = (float(value) for value in values)
+    return math.atan2(
+        2.0 * (w * z + x * y),
+        1.0 - 2.0 * (y * y + z * z),
+    )
+
+
+def _validate_pose_values(
+    position: tuple[float, float, float],
+    orientation: tuple[float, float, float, float],
+) -> None:
+    if len(position) != 3 or not all(math.isfinite(float(v)) for v in position):
+        raise ValueError("position must contain three finite values")
+    if len(orientation) != 4 or not all(
+        math.isfinite(float(v)) for v in orientation
+    ):
+        raise ValueError("orientation must contain four finite values")
+    if math.sqrt(sum(float(v) ** 2 for v in orientation)) <= 1.0e-9:
+        raise ValueError("orientation quaternion must be non-zero")

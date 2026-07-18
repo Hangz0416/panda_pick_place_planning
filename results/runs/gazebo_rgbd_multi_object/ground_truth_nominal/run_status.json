@@ -1,0 +1,25 @@
+{
+  "readiness": "ready",
+  "episode_status": "success",
+  "failure_type": "",
+  "expected_episodes": 100,
+  "saved_episodes": 100,
+  "failed_episodes": 0,
+  "result_saved": true,
+  "result_path": "/media/hgz/2EDC05C6DC0588F3/ros2_ws/src/panda_pick_place_planning/results/runs/gazebo_rgbd_multi_object/ground_truth_nominal/episodes.jsonl",
+  "summary_path": "/media/hgz/2EDC05C6DC0588F3/ros2_ws/src/panda_pick_place_planning/results/runs/gazebo_rgbd_multi_object/ground_truth_nominal/summary.json",
+  "batch_exit_code": 0,
+  "teardown": "abnormal_exit",
+  "teardown_events": [
+    {
+      "process": "move_group-13",
+      "returncode": -11
+    },
+    {
+      "process": "ign gazebo-1",
+      "returncode": -15
+    }
+  ],
+  "parse_error": "",
+  "updated_unix_sec": 1784391050.449334
+}

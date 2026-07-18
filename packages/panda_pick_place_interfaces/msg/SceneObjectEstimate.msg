@@ -1,5 +1,9 @@
 std_msgs/Header header
 string object_id
+string object_class
 geometry_msgs/PoseWithCovariance pose
 float64 confidence
 uint32 valid_pixel_count
+bool position_valid
+bool orientation_valid
+string failure_type

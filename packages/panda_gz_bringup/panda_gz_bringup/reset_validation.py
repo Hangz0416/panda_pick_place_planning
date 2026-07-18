@@ -5,12 +5,12 @@ from __future__ import annotations
 import argparse
 from dataclasses import asdict
 import json
-import math
 from pathlib import Path
 import time
 
 from geometry_msgs.msg import PoseArray
 from nav_msgs.msg import Odometry
+from panda_pick_place_interfaces.msg import SceneObjectTask
 from panda_pick_place_interfaces.srv import ResetEpisode
 from panda_pick_place_planning.core.tasks import generate_task
 import rclpy
@@ -36,22 +36,44 @@ def _position_error(actual, expected) -> float:
     return vector_norm(tuple(a - b for a, b in zip(actual, expected)))
 
 
+def workpiece_ids(workpiece_count: int) -> tuple[str, ...]:
+    """Return semantic identities for legacy and multi-workpiece resets."""
+    if workpiece_count not in {1, 3}:
+        raise ValueError("workpiece_count must be one or three")
+    if workpiece_count == 1:
+        return ("cube",)
+    return tuple(f"workpiece_{index}" for index in range(workpiece_count))
+
+
 class ResetValidationNode(Node):
     """Collect post-reset state without modifying the reset service schema."""
 
-    def __init__(self) -> None:
+    def __init__(self, workpiece_count: int = 1) -> None:
         super().__init__("panda_reset_validation")
+        # Preserve the legacy single-object identity while the multi-object
+        # contract uses the deterministic workpiece_0..2 identities.
+        self.workpiece_ids = workpiece_ids(workpiece_count)
         self.joints: dict[str, tuple[float, float]] = {}
-        self.cube_pose = None
-        self.cube_linear = None
-        self.cube_angular = None
+        self.workpiece_poses = {}
+        self.workpiece_linear = {}
+        self.workpiece_angular = {}
         self.target_pose = None
         self.obstacle_pose = None
-        self.generations = {"joints": 0, "cube": 0, "target": 0, "obstacle": 0}
+        self.generations = {
+            "joints": 0,
+            "target": 0,
+            "obstacle": 0,
+            **{object_id: 0 for object_id in self.workpiece_ids},
+        }
         self.create_subscription(JointState, "/joint_states", self._joints, 10)
-        self.create_subscription(
-            Odometry, "/panda_gz/cube_odometry", self._cube, 10
-        )
+        for index, object_id in enumerate(self.workpiece_ids):
+            suffix = "" if index == 0 else f"_{index}"
+            self.create_subscription(
+                Odometry,
+                f"/panda_gz/cube{suffix}_odometry",
+                lambda message, value=object_id: self._workpiece(value, message),
+                10,
+            )
         self.create_subscription(
             PoseArray, "/panda_gz/target_pose", self._target, 10
         )
@@ -74,11 +96,11 @@ class ResetValidationNode(Node):
         )
         self.generations["joints"] += 1
 
-    def _cube(self, message: Odometry) -> None:
-        self.cube_pose = message.pose.pose
-        self.cube_linear = message.twist.twist.linear
-        self.cube_angular = message.twist.twist.angular
-        self.generations["cube"] += 1
+    def _workpiece(self, object_id: str, message: Odometry) -> None:
+        self.workpiece_poses[object_id] = message.pose.pose
+        self.workpiece_linear[object_id] = message.twist.twist.linear
+        self.workpiece_angular[object_id] = message.twist.twist.angular
+        self.generations[object_id] += 1
 
     def _target(self, message: PoseArray) -> None:
         if message.poses:
@@ -98,23 +120,28 @@ class ResetValidationNode(Node):
                 return True
         return False
 
-    def metrics(
-        self, scene: str, object_position, object_yaw_rad: float, target_position
-    ) -> ResetValidationMetrics:
+    def metrics(self, scene: str, workpieces, target_position) -> ResetValidationMetrics:
         required = set(ARM_JOINTS + FINGER_JOINTS)
         if not required <= self.joints.keys():
             raise RuntimeError("joint state is incomplete")
         if any(
             value is None
             for value in (
-                self.cube_pose,
-                self.cube_linear,
-                self.cube_angular,
                 self.target_pose,
                 self.obstacle_pose,
             )
         ):
             raise RuntimeError("entity state is incomplete")
+        expected = {item.object_id: item for item in workpieces}
+        if set(expected) != set(self.workpiece_ids):
+            raise RuntimeError("workpiece identity mismatch")
+        if any(
+            object_id not in self.workpiece_poses
+            or object_id not in self.workpiece_linear
+            or object_id not in self.workpiece_angular
+            for object_id in self.workpiece_ids
+        ):
+            raise RuntimeError("workpiece state is incomplete")
         arm_error = max(
             abs(self.joints[name][0] - expected)
             for name, expected in zip(ARM_JOINTS, HOME)
@@ -123,32 +150,43 @@ class ResetValidationNode(Node):
         gripper_error = max(
             abs(self.joints[name][0] - OPEN_FINGER) for name in FINGER_JOINTS
         )
-        cube = self.cube_pose.position
-        cube_orientation = self.cube_pose.orientation
         target = self.target_pose.position
         obstacle = self.obstacle_pose.position
         expected_obstacle = (0.54, 0.0 if scene == "obstacle" else 2.0, 0.14)
+        position_errors = []
+        orientation_errors = []
+        linear_speeds = []
+        angular_speeds = []
+        for object_id in self.workpiece_ids:
+            item = expected[object_id]
+            pose = self.workpiece_poses[object_id]
+            position_errors.append(
+                _position_error(
+                    (pose.position.x, pose.position.y, pose.position.z),
+                    item.position,
+                )
+            )
+            orientation_errors.append(
+                quaternion_angle_error(
+                    (
+                        pose.orientation.x,
+                        pose.orientation.y,
+                        pose.orientation.z,
+                        pose.orientation.w,
+                    ),
+                    item.orientation_xyzw,
+                )
+            )
+            linear = self.workpiece_linear[object_id]
+            angular = self.workpiece_angular[object_id]
+            linear_speeds.append(vector_norm((linear.x, linear.y, linear.z)))
+            angular_speeds.append(vector_norm((angular.x, angular.y, angular.z)))
         return ResetValidationMetrics(
             joint_position_error_rad=arm_error,
             joint_velocity_rad_s=arm_velocity,
             gripper_position_error_m=gripper_error,
-            cube_position_error_m=_position_error(
-                (cube.x, cube.y, cube.z), object_position
-            ),
-            cube_orientation_error_rad=quaternion_angle_error(
-                (
-                    cube_orientation.x,
-                    cube_orientation.y,
-                    cube_orientation.z,
-                    cube_orientation.w,
-                ),
-                (
-                    0.0,
-                    0.0,
-                    math.sin(0.5 * object_yaw_rad),
-                    math.cos(0.5 * object_yaw_rad),
-                ),
-            ),
+            cube_position_error_m=max(position_errors),
+            cube_orientation_error_rad=max(orientation_errors),
             target_position_error_m=_position_error(
                 (target.x, target.y, target.z),
                 (target_position[0], target_position[1], 0.001),
@@ -156,12 +194,8 @@ class ResetValidationNode(Node):
             obstacle_position_error_m=_position_error(
                 (obstacle.x, obstacle.y, obstacle.z), expected_obstacle
             ),
-            cube_linear_speed_mps=vector_norm(
-                (self.cube_linear.x, self.cube_linear.y, self.cube_linear.z)
-            ),
-            cube_angular_speed_rad_s=vector_norm(
-                (self.cube_angular.x, self.cube_angular.y, self.cube_angular.z)
-            ),
+            cube_linear_speed_mps=max(linear_speeds),
+            cube_angular_speed_rad_s=max(angular_speeds),
         )
 
 
@@ -175,6 +209,7 @@ def parse_args(args=None):
         choices=("cube", "rect_prism"),
         default="rect_prism",
     )
+    parser.add_argument("--workpiece-count", type=int, choices=(1, 3), default=3)
     parser.add_argument(
         "--output",
         type=Path,
@@ -185,13 +220,15 @@ def parse_args(args=None):
         parser.error("--repetitions must be positive")
     if parsed.seed < 0:
         parser.error("--seed must be non-negative")
+    if parsed.workpiece_count == 3 and parsed.object_variant != "rect_prism":
+        parser.error("three-workpiece validation requires --object-variant rect_prism")
     return parsed
 
 
 def main(args=None) -> int:
     cli = parse_args(remove_ros_args(args=args)[1:])
     rclpy.init(args=args)
-    node = ResetValidationNode()
+    node = ResetValidationNode(cli.workpiece_count)
     records = []
     terminal_error = ""
     try:
@@ -203,6 +240,7 @@ def main(args=None) -> int:
             "rrt_connect",
             cli.scene,
             object_variant=cli.object_variant,
+            workpiece_count=cli.workpiece_count,
         )
         for index in range(cli.repetitions if not terminal_error else 0):
             request = ResetEpisode.Request()
@@ -223,6 +261,22 @@ def main(args=None) -> int:
                 request.target_position.y,
                 request.target_position.z,
             ) = task.target_position
+            for item in task.workpieces:
+                message = SceneObjectTask()
+                message.object_id = item.object_id
+                message.object_variant = item.object_variant
+                (
+                    message.pose.position.x,
+                    message.pose.position.y,
+                    message.pose.position.z,
+                ) = item.position
+                (
+                    message.pose.orientation.x,
+                    message.pose.orientation.y,
+                    message.pose.orientation.z,
+                    message.pose.orientation.w,
+                ) = item.orientation_xyzw
+                request.workpieces.append(message)
             before = dict(node.generations)
             future = node.client.call_async(request)
             rclpy.spin_until_future_complete(node, future, timeout_sec=45.0)
@@ -238,8 +292,7 @@ def main(args=None) -> int:
             else:
                 metrics = node.metrics(
                     cli.scene,
-                    task.object_position,
-                    task.object_yaw_rad,
+                    task.workpieces,
                     task.target_position,
                 )
                 record.update(asdict(metrics))
@@ -274,6 +327,7 @@ def main(args=None) -> int:
         "scene": cli.scene,
         "task_seed": cli.seed,
         "object_variant": task.object_variant,
+        "workpiece_count": task.workpiece_count,
         "object_yaw_rad": task.object_yaw_rad,
         "repetitions_requested": cli.repetitions,
         "repetitions_completed": len(records),

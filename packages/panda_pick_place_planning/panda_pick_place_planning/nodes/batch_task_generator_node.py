@@ -33,6 +33,7 @@ class BatchTaskGeneratorNode(Node):
         self.declare_parameter("simulator", "moveit_mock")
         self.declare_parameter("grasp_mode", "assisted")
         self.declare_parameter("object_variant", "cube")
+        self.declare_parameter("workpiece_count", 1)
         self.declare_parameter("perception_profile", "nominal")
         self.declare_parameter("startup_delay_sec", 2.0)
         self.declare_parameter("result_timeout_sec", 120.0)
@@ -52,6 +53,7 @@ class BatchTaskGeneratorNode(Node):
             perception_profile=str(
                 self.get_parameter("perception_profile").value
             ),
+            workpiece_count=int(self.get_parameter("workpiece_count").value),
         )
         self.sequencer = BatchSequencer(tasks)
         self.summary_path = Path(

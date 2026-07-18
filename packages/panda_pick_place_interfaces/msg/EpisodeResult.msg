@@ -42,6 +42,17 @@ float64 grasp_selection_latency_sec
 uint32 grasp_candidate_count
 float64 selected_grasp_yaw_rad
 float64 selected_grasp_path_length_rad
+uint32 detected_workpiece_count
+string selected_object_id
+bool target_selection_success
+float64 target_selection_latency_sec
+float64 selected_object_score
+uint32 total_candidate_count
+uint32 feasible_candidate_count
+float64 selected_object_position_error_m
+float64 selected_object_yaw_error_rad
+float64 max_nonselected_displacement_m
+ObjectSelectionMetric[] object_selection_metrics
 uint32 collision_count
 
 string failed_state

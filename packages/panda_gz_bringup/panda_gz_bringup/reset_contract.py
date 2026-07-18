@@ -102,6 +102,30 @@ def _point(values: Sequence[float], field: str) -> tuple[float, float, float]:
 
 
 @dataclass(frozen=True)
+class ResetWorkpieceSpec:
+    object_id: str
+    object_variant: str
+    position: tuple[float, float, float]
+    orientation_xyzw: tuple[float, float, float, float]
+
+    @classmethod
+    def create(cls, object_id, object_variant, position, orientation_xyzw):
+        orientation = tuple(float(value) for value in orientation_xyzw)
+        if not object_id or object_variant not in SUPPORTED_OBJECT_VARIANTS:
+            raise ValueError("invalid workpiece identity or variant")
+        if len(orientation) != 4 or not all(math.isfinite(v) for v in orientation):
+            raise ValueError("workpiece orientation must be a finite quaternion")
+        if vector_norm(orientation) <= 1.0e-9:
+            raise ValueError("workpiece orientation quaternion is zero")
+        return cls(
+            str(object_id),
+            str(object_variant),
+            _point(position, "workpiece_position"),
+            orientation,
+        )
+
+
+@dataclass(frozen=True)
 class ResetSpec:
     episode_id: int
     task_seed: int
@@ -111,6 +135,7 @@ class ResetSpec:
     target_position: tuple[float, float, float]
     object_variant: str = "cube"
     object_yaw_rad: float = 0.0
+    workpieces: tuple[ResetWorkpieceSpec, ...] = ()
 
     @classmethod
     def create(
@@ -124,6 +149,7 @@ class ResetSpec:
         target_position: Sequence[float],
         object_variant: str = "cube",
         object_yaw_rad: float = 0.0,
+        workpieces: Sequence[ResetWorkpieceSpec] = (),
     ) -> "ResetSpec":
         if scene not in SUPPORTED_SCENES:
             raise ValueError(f"unsupported scene: {scene}")
@@ -135,6 +161,21 @@ class ResetSpec:
             raise ValueError(f"unsupported object_variant: {object_variant}")
         if not math.isfinite(float(object_yaw_rad)):
             raise ValueError("object_yaw_rad must be finite")
+        values = tuple(workpieces)
+        if not values:
+            half_yaw = 0.5 * float(object_yaw_rad)
+            values = (
+                ResetWorkpieceSpec.create(
+                    "cube",
+                    object_variant,
+                    object_position,
+                    (0.0, 0.0, math.sin(half_yaw), math.cos(half_yaw)),
+                ),
+            )
+        if len(values) not in {1, 3} or len({item.object_id for item in values}) != len(values):
+            raise ValueError("reset requires one or three uniquely named workpieces")
+        if any(item.object_variant != object_variant for item in values):
+            raise ValueError("workpiece variants must match reset object_variant")
         return cls(
             episode_id=int(episode_id),
             task_seed=int(task_seed),
@@ -144,6 +185,7 @@ class ResetSpec:
             target_position=_point(target_position, "target_position"),
             object_variant=object_variant,
             object_yaw_rad=float(object_yaw_rad),
+            workpieces=values,
         )
 
 
@@ -163,15 +205,7 @@ def entity_pose_map(
         if spec.scene == "obstacle"
         else config.clear_obstacle_pose
     )
-    half_yaw = 0.5 * spec.object_yaw_rad
-    return {
-        "cube": (
-            *spec.object_position,
-            0.0,
-            0.0,
-            math.sin(half_yaw),
-            math.cos(half_yaw),
-        ),
+    values = {
         "target": (
             spec.target_position[0],
             spec.target_position[1],
@@ -183,3 +217,10 @@ def entity_pose_map(
         ),
         "obstacle": tuple(float(value) for value in obstacle),
     }
+    values.update(
+        {
+            item.object_id: (*item.position, *item.orientation_xyzw)
+            for item in spec.workpieces
+        }
+    )
+    return values

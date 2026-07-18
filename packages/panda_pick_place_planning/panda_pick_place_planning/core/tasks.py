@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import math
 import random
 
-from panda_pick_place_planning.core.schemas import TaskSpec
+from panda_pick_place_planning.core.schemas import TaskSpec, WorkpieceSpec
 
 
 def generate_task(
@@ -12,7 +13,12 @@ def generate_task(
     scene: str,
     planner_seed: int | None = None,
     object_variant: str = "cube",
+    workpiece_count: int = 1,
 ) -> TaskSpec:
+    if workpiece_count not in {1, 3}:
+        raise ValueError("workpiece_count must be one or three")
+    if workpiece_count == 3 and object_variant != "rect_prism":
+        raise ValueError("three-workpiece tasks require rect_prism objects")
     rng = random.Random(task_seed)
     if scene == "obstacle":
         # Keep the grasp on the home side of the barrier.  Randomly swapping
@@ -28,9 +34,38 @@ def generate_task(
         if rng.random() < 0.5:
             start_y, target_y = target_y, start_y
 
-    object_yaw = rng.uniform(-3.141592653589793 / 2.0, 3.141592653589793 / 2.0)
+    object_yaw = rng.uniform(-math.pi / 2.0, math.pi / 2.0)
     if object_variant == "cube":
         object_yaw = 0.0
+    workpieces: tuple[WorkpieceSpec, ...] = ()
+    if workpiece_count == 3:
+        # X-separated slots make same-colour instance ordering stable without
+        # consulting reset truth in the perception path.
+        center_x = rng.uniform(0.56, 0.58)
+        positions = [
+            (center_x + offset, start_y + rng.uniform(-0.012, 0.012), 0.025)
+            for offset in (-0.11, 0.0, 0.11)
+        ]
+        generated = []
+        for index, position in enumerate(positions):
+            yaw = rng.uniform(-math.pi / 2.0, math.pi / 2.0)
+            half_yaw = 0.5 * yaw
+            generated.append(
+                WorkpieceSpec(
+                    object_id=f"workpiece_{index}",
+                    object_variant="rect_prism",
+                    position=position,
+                    orientation_xyzw=(
+                        0.0,
+                        0.0,
+                        math.sin(half_yaw),
+                        math.cos(half_yaw),
+                    ),
+                )
+            )
+        workpieces = tuple(generated)
+        x_position, start_y, _ = workpieces[0].position
+        object_yaw = workpieces[0].yaw_rad
     return TaskSpec(
         episode_id=episode_id,
         task_seed=task_seed,
@@ -41,6 +76,7 @@ def generate_task(
         target_position=(x_position, target_y, 0.025),
         object_variant=object_variant,
         object_yaw_rad=object_yaw,
+        workpieces=workpieces,
     )
 
 
@@ -81,6 +117,7 @@ def generate_backend_tasks(
     grasp_mode: str = "assisted",
     object_variant: str = "cube",
     perception_profile: str = "nominal",
+    workpiece_count: int = 1,
 ) -> list[TaskSpec]:
     """Generate deterministic backend tasks with shared geometry per planner.
 
@@ -109,6 +146,7 @@ def generate_backend_tasks(
                     scene=scene,
                     planner_seed=planner_seed,
                     object_variant=object_variant,
+                    workpiece_count=workpiece_count,
                 )
                 tasks.append(
                     TaskSpec.from_dict(

@@ -181,6 +181,26 @@ def test_rect_prism_world_preserves_entity_contract_and_updates_inertia(tmp_path
     assert float(model.findtext("./link/inertial/inertia/izz")) > 0.0
 
 
+def test_three_rect_prism_worlds_have_independent_transport_contracts(tmp_path):
+    output = compose_world_with_deferred_control(
+        ROOT / "worlds" / "panda_pick_place.sdf",
+        _sdf(),
+        output_directory=tmp_path,
+        object_variant="rect_prism",
+        workpiece_count=3,
+    )
+    world = ET.parse(output).getroot().find("world")
+    for index, model_name in enumerate(("cube", "cube_1", "cube_2")):
+        model = world.find(f"./model[@name='{model_name}']")
+        assert model is not None
+        suffix = "" if index == 0 else f"_{index}"
+        assert model.find(f"./link[@name='cube{suffix}_link']") is not None
+        assert model.findtext(".//contact/topic") == f"/cube{suffix}/contacts"
+        assert model.findtext(
+            "./plugin[@name='ignition::gazebo::systems::OdometryPublisher']/odom_topic"
+        ) == f"/model/cube{suffix}/odometry"
+
+
 def test_shared_gazebo_xacro_converts_to_valid_sdf():
     document = xacro.process_file(
         str(MOVEIT / "config" / "panda.urdf.xacro"),

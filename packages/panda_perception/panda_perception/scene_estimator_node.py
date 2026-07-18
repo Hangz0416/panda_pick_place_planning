@@ -22,6 +22,7 @@ from rclpy.qos import qos_profile_sensor_data
 from rclpy.time import Time
 from sensor_msgs.msg import CameraInfo, Image
 from tf2_ros import Buffer, TransformException, TransformListener
+from visualization_msgs.msg import Marker, MarkerArray
 
 from panda_perception.config import load_config
 from panda_perception.detector import DetectionError, HSVDepthDetector
@@ -103,6 +104,9 @@ class SceneEstimatorNode(Node):
         )
         self.estimate_publisher = self.create_publisher(
             PoseArray, "/panda_perception/estimates", 10
+        )
+        self.marker_publisher = self.create_publisher(
+            MarkerArray, "/panda_perception/object_markers", 10
         )
         self.service = self.create_service(
             EstimateScene,
@@ -187,6 +191,7 @@ class SceneEstimatorNode(Node):
                 perception_profile=str(
                     self.get_parameter("perception_profile").value
                 ),
+                expected_workpiece_count=int(request.expected_workpiece_count or 1),
             )
         except DetectionError as exc:
             return self._failure(response, exc.failure_type, started_at)
@@ -201,16 +206,28 @@ class SceneEstimatorNode(Node):
         response.success = True
         response.failure_type = ""
         response.latency_sec = time.perf_counter() - started_at
+        response.observed_workpiece_count = sum(
+            1
+            for object_id in detections
+            if object_id == "cube" or object_id.startswith("workpiece_")
+        )
         stamp = self.get_clock().now().to_msg()
         pose_array = PoseArray()
         pose_array.header.stamp = stamp
         pose_array.header.frame_id = self.config.camera.world_frame
-        for object_id in request.required_object_ids:
-            detection = detections[object_id]
+        for object_id, detection in detections.items():
             message = SceneObjectEstimate()
             message.header.stamp = stamp
             message.header.frame_id = self.config.camera.world_frame
             message.object_id = object_id
+            message.object_class = (
+                "workpiece"
+                if object_id == "cube" or object_id.startswith("workpiece_")
+                else object_id
+            )
+            message.position_valid = detection.position_valid
+            message.orientation_valid = detection.orientation_valid
+            message.failure_type = detection.failure_type
             message.pose.pose.position.x = detection.position[0]
             message.pose.pose.position.y = detection.position[1]
             message.pose.pose.position.z = detection.position[2]
@@ -231,6 +248,7 @@ class SceneEstimatorNode(Node):
             pose.orientation = message.pose.pose.orientation
             pose_array.poses.append(pose)
         self.estimate_publisher.publish(pose_array)
+        self._publish_markers(detections, stamp)
         if bool(self.get_parameter("use_debug_overlay").value):
             self._publish_debug(pair[0], detections, stamp)
         return response
@@ -243,10 +261,11 @@ class SceneEstimatorNode(Node):
             "obstacle": (255, 0, 0),
         }
         for object_id, detection in detections.items():
+            color = colors.get(object_id, (0, 0, 255))
             contours, _ = cv2.findContours(
                 detection.mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
             )
-            cv2.drawContours(overlay, contours, -1, colors[object_id], 2)
+            cv2.drawContours(overlay, contours, -1, color, 2)
             u, v = detection.centroid_uv
             label = (
                 f"{object_id} ({detection.position[0]:.3f},"
@@ -262,18 +281,20 @@ class SceneEstimatorNode(Node):
                         overlay,
                         detection.axis_uv[0],
                         detection.axis_uv[1],
-                        colors[object_id],
+                        color,
                         2,
                         cv2.LINE_AA,
                     )
-            cv2.circle(overlay, (u, v), 4, colors[object_id], -1)
+            if not detection.orientation_valid:
+                label += f" {detection.failure_type}"
+            cv2.circle(overlay, (u, v), 4, color, -1)
             cv2.putText(
                 overlay,
                 label,
                 (u + 6, v - 6),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.45,
-                colors[object_id],
+                color,
                 1,
                 cv2.LINE_AA,
             )
@@ -281,6 +302,42 @@ class SceneEstimatorNode(Node):
         message.header.stamp = stamp
         message.header.frame_id = self.config.camera.optical_frame
         self.debug_publisher.publish(message)
+
+    def _publish_markers(self, detections, stamp) -> None:
+        markers = MarkerArray()
+        for index, (object_id, detection) in enumerate(sorted(detections.items())):
+            marker = Marker()
+            marker.header.stamp = stamp
+            marker.header.frame_id = self.config.camera.world_frame
+            marker.ns = "scene_objects"
+            marker.id = index
+            marker.type = Marker.ARROW if detection.orientation_valid else Marker.SPHERE
+            marker.action = Marker.ADD
+            marker.pose.position.x = detection.position[0]
+            marker.pose.position.y = detection.position[1]
+            marker.pose.position.z = detection.position[2] + 0.04
+            marker.pose.orientation.x = detection.orientation_xyzw[0]
+            marker.pose.orientation.y = detection.orientation_xyzw[1]
+            marker.pose.orientation.z = detection.orientation_xyzw[2]
+            marker.pose.orientation.w = detection.orientation_xyzw[3]
+            marker.scale.x = 0.09
+            marker.scale.y = 0.012
+            marker.scale.z = 0.012
+            marker.color.a = 0.9
+            if object_id == "target":
+                marker.color.g = 1.0
+            elif object_id == "obstacle":
+                marker.color.b = 1.0
+            else:
+                marker.color.r = 1.0
+            marker.text = (
+                f"{object_id} yaw={np.degrees(detection.yaw_rad):.1f} "
+                f"conf={detection.confidence:.2f}"
+                if detection.yaw_rad is not None
+                else f"{object_id} conf={detection.confidence:.2f}"
+            )
+            markers.markers.append(marker)
+        self.marker_publisher.publish(markers)
 
     def _missing_stream_failure(self) -> str:
         if not self._color_seen:
@@ -294,6 +351,7 @@ class SceneEstimatorNode(Node):
         response.success = False
         response.failure_type = failure_type
         response.latency_sec = time.perf_counter() - started_at
+        response.observed_workpiece_count = 0
         return response
 
 

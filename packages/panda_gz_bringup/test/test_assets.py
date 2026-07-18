@@ -81,9 +81,19 @@ def test_one_shared_xacro_selects_mock_or_modern_gazebo():
     assert "gz_ros2_control/GazeboSimSystem" in control_text
     assert "gz_ros2_control-system" in control_text
     assert "DetachableJoint" in control_text
+    # The plugin class name is fixed even when multiple instances use
+    # different transport topics.  Appending an instance suffix makes
+    # Fortress look for a non-existent class alias at runtime.
+    suffixed_plugin_name = (
+        'name="ignition::gazebo::systems::DetachableJoint${suffix}"'
+    )
+    assert suffixed_plugin_name not in control_text
+    assert 'name="ignition::gazebo::systems::DetachableJoint"' in control_text
     assert '<gazebo reference="panda_hand_joint">' in control_text
     assert "<preserveFixedJoint>true</preserveFixedJoint>" in control_text
-    assert "<child_link>cube_link</child_link>" in control_text
+    assert 'child_link="cube_link"' in control_text
+    assert 'child_link="cube_1_link"' in control_text
+    assert 'child_link="cube_2_link"' in control_text
     assert "child_model_link" not in control_text
     assert "panda_moveit_config" in launch_text
     assert '"hardware_type": "gz"' in launch_text

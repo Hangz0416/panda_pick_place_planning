@@ -46,7 +46,7 @@ ros2 launch panda_pick_place_planning demo.launch.py \
   use_gazebo:=false moveit_execute:=false moveit_command_gripper:=false
 ```
 
-MoveIt/Gazebo 完整执行请使用 `panda_gz_bringup/panda_moveit_gz.launch.py`，不要在本包内
+MoveIt/Gazebo 三工件完整执行请使用 `panda_gz_bringup/panda_visual_pick_place.launch.py`，不要在本包内
 复制 `move_group` 或 Gazebo 节点。
 
 ## 批量运行
@@ -81,6 +81,16 @@ ros2 launch panda_pick_place_planning batch_benchmark.launch.py \
 ```
 
 This is not Gazebo physics execution. planning-only 结果不证明控制、抓取或物体运动成功。
+
+Gazebo 三工件 RGB-D assisted 快检：
+
+```bash
+ros2 launch panda_gz_bringup gazebo_batch.launch.py \
+  episodes_per_scene:=5 scenes_csv:=clear,obstacle \
+  object_variant:=rect_prism workpiece_count:=3 pose_source:=rgbd \
+  output_path:=results/runs/gazebo_rgbd_multi_object/quick/episodes.jsonl \
+  summary_path:=results/runs/gazebo_rgbd_multi_object/quick/summary.json
+```
 
 批量生成器等待与当前任务匹配的 `EpisodeResult` 后才发布下一任务。超时时 summary
 标记不完整，不会伪造失败 episode。

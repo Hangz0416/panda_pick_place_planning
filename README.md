@@ -1,4 +1,4 @@
-# Panda RGB-D 视觉抓取放置规划与评测系统
+# Panda RGB-D 多工件视觉抓取与联合选择评测系统
 
 这是一个面向机械臂运动规划与仿真工程的 Franka Panda 抓取放置项目。
 项目只有一套当前代码：Python 负责任务、状态机和评测，C++ 负责 MoveIt 2
@@ -11,7 +11,8 @@
 - 通过 MoveIt 2 / OMPL 进行规划，管理 PlanningScene 和 AttachedCollisionObject。
 - 通过顶置 RGB-D 相机、OpenCV HSV 分割、深度反投影和 TF2 估计场景目标位置；
   对 `60×40×50 mm` 矩形工件的 world XY 点云做 PCA，估计平面 yaw。
-- 根据视觉 yaw 生成两个相差 π 的对称顶抓候选，使用 MoveIt planning-only 筛选后再执行。
+- 同时检测三个矩形工件，为每个方向有效的工件生成两个相差 π 的对称顶抓候选；使用
+  MoveIt planning-only 联合筛选，并按路径代价与感知置信度自动选择操作对象。
 - 通过 `ros2_control` 在 Gazebo Fortress 执行视觉驱动轨迹，完成可重置的约束辅助抓放。
 - 记录规划、执行、放置误差、跟踪误差、碰撞与失败阶段。
 - 在 clear 与 obstacle 场景中进行单次演示或固定种子批量评测。
@@ -133,7 +134,7 @@ planning-only 只验证规划和 PlanningScene，结果保持 `not_executed`，�
 
 ```bash
 ros2 launch panda_gz_bringup panda_visual_pick_place.launch.py \
-  scene:=clear seed:=42 object_variant:=rect_prism \
+  scene:=clear seed:=42 object_variant:=rect_prism workpiece_count:=3 \
   pose_source:=rgbd perception_profile:=nominal \
   headless:=false use_rviz:=true
 ```
@@ -142,12 +143,24 @@ ros2 launch panda_gz_bringup panda_visual_pick_place.launch.py \
 `/clock`、相机图像、CameraInfo、TF、关节/方块状态、控制器、Service 和 Action 都就绪后
 才启动任务。`pose_source:=ground_truth` 保留为 oracle 回归；视觉模式的运动目标与
 PlanningScene 均来自 `EstimateScene`，任务真值只用于 reset 和误差评测。将
-`object_variant:=rect_prism` 改为 `cube` 可回归原方块；矩形工件 yaw 由 task seed
-确定性生成。
+`object_variant:=rect_prism workpiece_count:=3` 是当前推荐的多工件入口。改为
+`object_variant:=cube workpiece_count:=1` 可回归原方块；三个矩形工件的位置和 yaw 均由
+task seed 确定性生成。
+
+图形演示默认 `keep_open_after_result:=true`，任务结束后保留 Gazebo/RViz 供检查；自动评测
+使用 `false`。未显式设置 `output_path` 时，结果写入
+`~/.ros/panda_pick_place/runs/<timestamp>/episodes.jsonl`。如需对 readiness 失败自动重启一次：
+
+```bash
+ros2 run panda_gz_bringup supervise_visual_demo \
+  --scene clear --seed 42 --pose-source rgbd --headless --max-attempts 2
+```
 
 相机发布 `/panda_perception/color/image_raw`、`depth/image_raw` 和 `camera_info`；调试叠加图
-发布到 `/panda_perception/debug_overlay`。当前方法估计已知尺寸物体的位置，并只对矩形工件
-估计绕 world Z 的平面方向；不宣称通用六自由度位姿识别。
+发布到 `/panda_perception/debug_overlay`。实例中心与 PCA 主轴发布到
+`/panda_perception/object_markers`，全部候选、不可行候选和最终选择发布到
+`/panda/grasp_candidate_markers`。当前方法估计已知尺寸物体的位置，并只对矩形工件估计绕
+world Z 的平面方向；不宣称通用六自由度位姿识别。
 
 ## 批量评测
 
@@ -175,13 +188,14 @@ Gazebo RGB-D assisted：
 ```bash
 ros2 launch panda_gz_bringup gazebo_batch.launch.py \
   episodes_per_scene:=5 seed:=42 scenes_csv:=clear,obstacle \
-  object_variant:=rect_prism pose_source:=rgbd \
+  object_variant:=rect_prism workpiece_count:=3 pose_source:=rgbd \
   perception_profile:=nominal headless:=true use_rviz:=false \
-  output_path:=results/runs/gazebo_rgbd_grasp_pose/episodes.jsonl \
-  summary_path:=results/runs/gazebo_rgbd_grasp_pose/summary.json
+  output_path:=results/runs/gazebo_rgbd_multi_object/rgbd_nominal/episodes.jsonl \
+  summary_path:=results/runs/gazebo_rgbd_multi_object/rgbd_nominal/summary.json
 ```
 
-`results/runs/` 为新实验的统一输出位置，默认不提交 Git，避免覆盖已审计数据。
+`results/runs/` 为新实验的统一输出位置。普通临时运行默认不提交 Git；完成哈希审计的
+`gazebo_rgbd_multi_object/` 作为当前多工件证据集保留。
 
 ## 已验证结果
 
@@ -249,15 +263,39 @@ PlanningScene 同步错误或未分类 `runtime_error`。
 `results/runs/gazebo_rgbd_grasp_pose/nominal_rgbd/` 和 `combined_rgbd/`。同任务
 ground-truth 对照与 RGB-D 数据已通过 `(scene, task_seed)` 配对覆盖审计。
 
+### 三工件视觉—抓取联合选择正式回归
+
+当前推荐配置为三个 `60×40×50 mm` 矩形工件。视觉节点一次返回全部实例的位置与 yaw，
+状态机为每个方向有效工件生成两个 π 对称候选，使用 MoveIt planning-only 联合筛选，并按
+“预抓取关节路径长度 + 置信度惩罚”选择工件和抓取姿态。固定主种子 42 的 nominal RGB-D
+正式回归结果如下：
+
+| 场景 | 完整检测 / 联合选择 / 任务 | 选中工件位置误差 P95 | yaw 误差 P95 | 平均规划时间 | 平均最终 XY 误差 |
+| --- | --- | ---: | ---: | ---: | ---: |
+| clear | 50/50 / 50/50 / 50/50 | 5.15 mm | 3.95° | 28.70 ms | 2.42 mm |
+| obstacle | 50/50 / 50/50 / 50/50 | 3.25 mm | 4.76° | 40.91 ms | 2.95 mm |
+
+同一批次中六个候选均完成 planning-only 检查，三个工件都曾被选中；筛选阶段不执行轨迹，
+未选工件最大位移为 0 mm。配对 ground-truth 对照同样完成 50 clear + 50 obstacle；两份数据
+具有完全一致的 `(scene, task_seed)` 覆盖。`combined` 合成扰动下另运行 20 clear + 20
+obstacle，均完成三工件检测、联合选择和任务；位置误差 P95 最大为 4.34 mm，yaw 误差 P95
+最大为 7.56°。三组均无无效碰撞、`selected_attachment_mismatch` 或未分类
+`runtime_error`。
+
+原始记录、逐组 summary、SVG 报告、环境记录、运行状态和 SHA256 manifest 位于
+`results/runs/gazebo_rgbd_multi_object/`。其中 `run_status.json` 将 episode 结果与 Humble
+关闭阶段的 `move_group` 析构异常分开记录；失败尝试及修复证据保留在同目录的
+`failure_examples/`，不并入正式汇总。
+
 ## 成功判据与指标
 
 `task_success` 同时要求：方块已释放，XY 误差不超过 40 mm，中心高度误差不超过
 15 mm，线速度不超过 0.05 m/s，执行中无无效机器人或携物碰撞，并且 Gazebo
 碰撞观测可用。
 
-`EpisodeResult` 记录 backend、simulator、planner、seed、pose source、感知耗时与位置误差、各状态规划/执行时间、
-物体 yaw 误差、候选数量与筛选代价、关节路径长度、轨迹点、跟踪误差、放置误差、
-物体速度、attach/release、碰撞和失败分类。
+`EpisodeResult` schema v5 记录 backend、simulator、planner、seed、pose source、三工件检测数量、
+选中对象、逐对象位置/yaw 误差与候选统计、选择分数、未选工件位移、各状态规划/执行时间、
+关节路径长度、轨迹点、跟踪误差、放置误差、物体速度、attach/release、碰撞和失败分类。
 缺失观测使用 `null`/NaN，不会被冒充为安全结果。
 
 ## 测试
@@ -271,8 +309,9 @@ colcon test --base-paths src/panda_pick_place_planning/packages \
 colcon test-result --verbose
 ```
 
-测试覆盖颜色分割、深度反投影、TF 变换、新帧约束、防真值泄漏、IK/坐标变换、规划器、
-后端合约、携物碰撞、消息序列化、MoveIt bridge、Gazebo 资产、reset、抓取门控、碰撞分类和结果审计。
+测试覆盖多连通域分割、深度反投影、TF 变换、实例排序、新帧约束、防真值泄漏、候选稳定
+排序、IK/坐标变换、规划器、schema v1-v5 兼容、后端合约、携物碰撞、MoveIt bridge、Gazebo
+三实体 reset/attach topic 映射、抓取门控、碰撞分类、保存确认和结果审计。
 
 ## 数据和版本说明
 
@@ -286,6 +325,7 @@ colcon test-result --verbose
 - 抓取使用 assisted 约束，不是纯接触物理抓取。
 - RGB-D 方法依赖已知颜色和尺寸；矩形工件只估计平面位置与 yaw，方块和圆形目标区不声明
   可观测方向；未做相机标定、YOLO 或通用 6D 位姿。
+- 多工件选择只在当前视觉候选集合中按确定性代价最优，不宣称全局任务规划最优。
 - 没有真机部署，不将仿真结果外推到真实硬件。
 - `physics_model_validated` 保持为 false，物理抓取模式 fail-closed。
 - ROS 2 Humble 中的 MoveIt 2.5.9 在任务和结果写入后，整套系统退出时可能在

@@ -12,3 +12,4 @@ float64 object_yaw_rad
 string perception_profile
 geometry_msgs/Point object_position
 geometry_msgs/Point target_position
+SceneObjectTask[] workpieces

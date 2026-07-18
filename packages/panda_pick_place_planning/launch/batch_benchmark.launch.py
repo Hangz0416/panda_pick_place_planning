@@ -1,12 +1,20 @@
 """Sequential ROS batch orchestration for an already-running backend stack."""
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, EmitEvent, RegisterEventHandler
+from launch.actions import (
+    DeclareLaunchArgument,
+    EmitEvent,
+    OpaqueFunction,
+    RegisterEventHandler,
+    TimerAction,
+)
 from launch.event_handlers import OnProcessExit
 from launch.events import Shutdown
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
+
+from panda_pick_place_planning.core.run_status import finalize_batch_run
 
 
 def generate_launch_description() -> LaunchDescription:
@@ -27,7 +35,38 @@ def generate_launch_description() -> LaunchDescription:
     pose_source = LaunchConfiguration("pose_source")
     perception_timeout = LaunchConfiguration("perception_timeout_sec")
     object_variant = LaunchConfiguration("object_variant")
+    workpiece_count = LaunchConfiguration("workpiece_count")
     perception_profile = LaunchConfiguration("perception_profile")
+
+    def finish_after_save_confirmation(event, context):
+        def verify_artifacts_and_shutdown(inner_context):
+            scene_count = len(
+                [item for item in scenes_csv.perform(inner_context).split(",") if item]
+            )
+            planner_count = len(
+                [item for item in planner.perform(inner_context).split(",") if item]
+            )
+            expected = int(episodes.perform(inner_context)) * scene_count * planner_count
+            finalize_batch_run(
+                output_path.perform(inner_context),
+                summary_path.perform(inner_context),
+                expected_episodes=expected,
+                batch_exit_code=int(event.returncode or 0),
+            )
+            return [
+                EmitEvent(
+                    event=Shutdown(reason="batch artifacts verified and saved")
+                )
+            ]
+
+        # Result publication reaches the generator and evaluator in parallel.
+        # Let the evaluator fsync the last row before validating the artifacts.
+        return [
+            TimerAction(
+                period=1.0,
+                actions=[OpaqueFunction(function=verify_artifacts_and_shutdown)],
+            )
+        ]
 
     common_time = {
         "use_sim_time": ParameterValue(use_gazebo, value_type=bool)
@@ -50,6 +89,7 @@ def generate_launch_description() -> LaunchDescription:
                 "simulator": simulator,
                 "grasp_mode": grasp_mode,
                 "object_variant": object_variant,
+                "workpiece_count": ParameterValue(workpiece_count, value_type=int),
                 "perception_profile": perception_profile,
                 "result_timeout_sec": ParameterValue(
                     result_timeout, value_type=float
@@ -71,6 +111,9 @@ def generate_launch_description() -> LaunchDescription:
                 "object_variant",
                 default_value="cube",
                 choices=["cube", "rect_prism"],
+            ),
+            DeclareLaunchArgument(
+                "workpiece_count", default_value="1", choices=["1", "3"]
             ),
             DeclareLaunchArgument("perception_profile", default_value="nominal"),
             DeclareLaunchArgument("use_gazebo", default_value="false"),
@@ -142,13 +185,7 @@ def generate_launch_description() -> LaunchDescription:
             RegisterEventHandler(
                 OnProcessExit(
                     target_action=batch_generator,
-                    on_exit=[
-                        EmitEvent(
-                            event=Shutdown(
-                                reason="batch task generator reached terminal status"
-                            )
-                        )
-                    ],
+                    on_exit=finish_after_save_confirmation,
                 )
             ),
         ]

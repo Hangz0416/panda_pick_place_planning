@@ -175,7 +175,7 @@ class ReportingTest(unittest.TestCase):
                     "object_position_error_m": 0.002,
                     "target_position_error_m": 0.003,
                     "obstacle_position_error_m": 0.004,
-                    "schema_version": 4,
+                    "schema_version": 5,
                     "object_variant": "rect_prism",
                     "perception_profile": "nominal",
                     "object_yaw_error_rad": 0.03,
@@ -184,6 +184,16 @@ class ReportingTest(unittest.TestCase):
                     "grasp_candidate_count": 2,
                     "selected_grasp_yaw_rad": -0.2,
                     "selected_grasp_path_length_rad": 1.1,
+                    "detected_workpiece_count": 3,
+                    "selected_object_id": "workpiece_1",
+                    "target_selection_success": True,
+                    "target_selection_latency_sec": 0.08,
+                    "selected_object_score": 1.14,
+                    "total_candidate_count": 6,
+                    "feasible_candidate_count": 5,
+                    "selected_object_position_error_m": 0.002,
+                    "selected_object_yaw_error_rad": 0.03,
+                    "max_nonselected_displacement_m": 0.001,
                 }
             )
             write_jsonl(input_path, [record])
@@ -200,6 +210,10 @@ class ReportingTest(unittest.TestCase):
                 "full_episode_yaw_error.svg",
                 "full_episode_grasp_selection.svg",
                 "full_episode_grasp_candidate_path.svg",
+                "full_episode_target_selection.svg",
+                "full_episode_candidate_counts.svg",
+                "full_episode_selection_cost.svg",
+                "full_episode_nonselected_motion.svg",
             }
             self.assertTrue(expected.issubset(chart_names))
             self.assertEqual(manifest["groups"][0]["pose_source"], "rgbd")
@@ -208,6 +222,12 @@ class ReportingTest(unittest.TestCase):
             )
             self.assertEqual(
                 manifest["groups"][0]["grasp_selection_success_rate"], 1.0
+            )
+            self.assertEqual(
+                manifest["groups"][0]["target_selection_success_rate"], 1.0
+            )
+            self.assertEqual(
+                manifest["groups"][0]["feasible_candidate_count_mean"], 5.0
             )
             for filename in expected:
                 ElementTree.parse(root / "report" / filename)

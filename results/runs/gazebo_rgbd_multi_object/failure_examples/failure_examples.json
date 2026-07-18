@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "scope": "Preserved failed multi-object benchmark attempts; excluded from final summaries.",
+  "examples": [
+    {
+      "id": "stale_moveit_attachment",
+      "source": "../rgbd_nominal_failed_attempt_stale_attachment/episodes.jsonl",
+      "observed": {
+        "clear_success": 50,
+        "clear_total": 50,
+        "obstacle_success": 37,
+        "obstacle_total": 50,
+        "failure_counts": {
+          "invalid_motion_plan": 1,
+          "goal_state_invalid": 12
+        }
+      },
+      "root_cause": "After a transfer failure with workpiece_2 attached, reset switched the selected ID to workpiece_0 before clearing the previous MoveIt AttachedCollisionObject. The stale workpiece_2 collision object invalidated later start and goal states.",
+      "fix": "Reset now detaches every previous and current workpiece ID, and candidate screening validates both pre-grasp and grasp targets."
+    },
+    {
+      "id": "controller_home_path_tolerance",
+      "source": "../ground_truth_nominal_failed_attempt_home_tolerance/episodes.jsonl",
+      "observed": {
+        "saved_episodes": 80,
+        "failure_counts": {
+          "multi_object_reset_failed": 2
+        },
+        "failed_task_seeds": [
+          100062,
+          100063
+        ]
+      },
+      "root_cause": "The trajectory controller aborted reset home because panda_joint1 briefly exceeded the configured 0.15 rad path tolerance by about 0.0014 rad.",
+      "fix": "Reset performs at most three bounded home attempts inside the same reset transaction, then still requires the strict final joint-position and velocity settle checks. The failed episode itself is never rerun."
+    },
+    {
+      "id": "pre_diagnostic_reset_transient",
+      "source": "../rgbd_nominal_failed_attempt_reset_transient/episodes.jsonl",
+      "observed": {
+        "saved_episodes": 62,
+        "failure_counts": {
+          "multi_object_reset_failed": 2
+        },
+        "failed_task_seeds": [
+          100051,
+          100052
+        ]
+      },
+      "root_cause": null,
+      "fix": "Reset service errors now preserve the manager error code and detail in the backend exception, so a recurrence is diagnosable instead of being flattened to the top-level failure type.",
+      "note": "This attempt predates detailed reset error propagation, so no unsupported root-cause claim is made."
+    }
+  ]
+}
