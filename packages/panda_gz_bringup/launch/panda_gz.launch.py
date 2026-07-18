@@ -34,6 +34,8 @@ from panda_gz_bringup.model_validation import (
 def _launch_setup(context):
     package_share = Path(get_package_share_directory("panda_gz_bringup"))
     scene = LaunchConfiguration("scene").perform(context)
+    object_variant = LaunchConfiguration("object_variant")
+    object_variant_value = object_variant.perform(context)
     headless = LaunchConfiguration("headless").perform(context).lower() == "true"
     grasp_mode = LaunchConfiguration("grasp_mode")
     grasp_mode_value = grasp_mode.perform(context)
@@ -96,7 +98,10 @@ def _launch_setup(context):
     robot_sdf = convert_urdf_to_sdf(robot_description)
     audit_model(robot_description, robot_sdf)
     world = compose_world_with_deferred_control(
-        base_world, robot_sdf, camera_config=camera_config
+        base_world,
+        robot_sdf,
+        camera_config=camera_config,
+        object_variant=object_variant_value,
     )
     gz_args = f"{'-s ' if headless else ''}-r -v 3 {world}"
     gazebo = IncludeLaunchDescription(
@@ -258,6 +263,7 @@ def _launch_setup(context):
                 "scene": scene,
                 "grasp_mode": grasp_mode,
                 "auto_reset": auto_reset,
+                "object_variant": object_variant,
                 "use_sim_time": use_sim_time,
             },
         ],
@@ -312,6 +318,11 @@ def generate_launch_description():
         [
             DeclareLaunchArgument(
                 "scene", default_value="clear", choices=["clear", "obstacle"]
+            ),
+            DeclareLaunchArgument(
+                "object_variant",
+                default_value="cube",
+                choices=["cube", "rect_prism"],
             ),
             DeclareLaunchArgument(
                 "grasp_mode",

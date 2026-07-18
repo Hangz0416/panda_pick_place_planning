@@ -11,6 +11,7 @@ def generate_task(
     planner: str,
     scene: str,
     planner_seed: int | None = None,
+    object_variant: str = "cube",
 ) -> TaskSpec:
     rng = random.Random(task_seed)
     if scene == "obstacle":
@@ -27,6 +28,9 @@ def generate_task(
         if rng.random() < 0.5:
             start_y, target_y = target_y, start_y
 
+    object_yaw = rng.uniform(-3.141592653589793 / 2.0, 3.141592653589793 / 2.0)
+    if object_variant == "cube":
+        object_yaw = 0.0
     return TaskSpec(
         episode_id=episode_id,
         task_seed=task_seed,
@@ -35,6 +39,8 @@ def generate_task(
         scene=scene,
         object_position=(x_position, start_y, 0.025),
         target_position=(x_position, target_y, 0.025),
+        object_variant=object_variant,
+        object_yaw_rad=object_yaw,
     )
 
 
@@ -73,6 +79,8 @@ def generate_backend_tasks(
     backend: str,
     simulator: str,
     grasp_mode: str = "assisted",
+    object_variant: str = "cube",
+    perception_profile: str = "nominal",
 ) -> list[TaskSpec]:
     """Generate deterministic backend tasks with shared geometry per planner.
 
@@ -100,6 +108,7 @@ def generate_backend_tasks(
                     planner=planner,
                     scene=scene,
                     planner_seed=planner_seed,
+                    object_variant=object_variant,
                 )
                 tasks.append(
                     TaskSpec.from_dict(
@@ -108,6 +117,7 @@ def generate_backend_tasks(
                             "backend": backend,
                             "simulator": simulator,
                             "grasp_mode": grasp_mode,
+                            "perception_profile": perception_profile,
                         }
                     )
                 )

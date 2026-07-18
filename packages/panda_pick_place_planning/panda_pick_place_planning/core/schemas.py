@@ -11,6 +11,10 @@ SUPPORTED_SCENES = {"clear", "obstacle"}
 SUPPORTED_BACKENDS = {"pybullet", "moveit"}
 SUPPORTED_GRASP_MODES = {"assisted", "physics"}
 SUPPORTED_POSE_SOURCES = {"ground_truth", "rgbd"}
+SUPPORTED_OBJECT_VARIANTS = {"cube", "rect_prism"}
+SUPPORTED_PERCEPTION_PROFILES = {
+    "nominal", "low_light", "rgb_noise", "depth_dropout", "combined"
+}
 
 
 @dataclass(frozen=True)
@@ -25,6 +29,9 @@ class TaskSpec:
     backend: str = "pybullet"
     grasp_mode: str = "assisted"
     simulator: str = ""
+    object_variant: str = "cube"
+    object_yaw_rad: float = 0.0
+    perception_profile: str = "nominal"
 
     def __post_init__(self) -> None:
         if self.planner not in SUPPORTED_PLANNERS:
@@ -35,6 +42,14 @@ class TaskSpec:
             raise ValueError(f"unsupported backend: {self.backend}")
         if self.grasp_mode not in SUPPORTED_GRASP_MODES:
             raise ValueError(f"unsupported grasp mode: {self.grasp_mode}")
+        if self.object_variant not in SUPPORTED_OBJECT_VARIANTS:
+            raise ValueError(f"unsupported object variant: {self.object_variant}")
+        if not math.isfinite(float(self.object_yaw_rad)):
+            raise ValueError("object_yaw_rad must be finite")
+        if self.perception_profile not in SUPPORTED_PERCEPTION_PROFILES:
+            raise ValueError(
+                f"unsupported perception profile: {self.perception_profile}"
+            )
         if len(self.object_position) != 3 or len(self.target_position) != 3:
             raise ValueError("object_position and target_position must be 3D")
 
@@ -57,6 +72,9 @@ class TaskSpec:
             backend=str(data.get("backend", "pybullet")),
             grasp_mode=str(data.get("grasp_mode", "assisted")),
             simulator=str(data.get("simulator", "")),
+            object_variant=str(data.get("object_variant", "cube")),
+            object_yaw_rad=float(data.get("object_yaw_rad", 0.0)),
+            perception_profile=str(data.get("perception_profile", "nominal")),
         )
 
     @classmethod
@@ -78,13 +96,14 @@ class PlanResult:
 
 @dataclass(frozen=True)
 class SceneObjectEstimate:
-    """One world-frame object position returned by a pose provider."""
+    """One world-frame object pose returned by a pose provider."""
 
     object_id: str
     position: tuple[float, float, float]
     confidence: float = 1.0
     valid_pixel_count: int = 0
     covariance: tuple[float, ...] = (0.0,) * 36
+    orientation_xyzw: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)
 
     def __post_init__(self) -> None:
         if not self.object_id:
@@ -93,12 +112,27 @@ class SceneObjectEstimate:
             math.isfinite(float(value)) for value in self.position
         ):
             raise ValueError("position must contain three finite values")
+        if len(self.orientation_xyzw) != 4 or not all(
+            math.isfinite(float(value)) for value in self.orientation_xyzw
+        ):
+            raise ValueError("orientation_xyzw must contain four finite values")
+        norm = math.sqrt(sum(float(value) ** 2 for value in self.orientation_xyzw))
+        if norm <= 1.0e-9:
+            raise ValueError("orientation quaternion must be non-zero")
         if not 0.0 <= float(self.confidence) <= 1.0:
             raise ValueError("confidence must be in [0, 1]")
         if int(self.valid_pixel_count) < 0:
             raise ValueError("valid_pixel_count must be non-negative")
         if len(self.covariance) != 36:
             raise ValueError("covariance must contain 36 values")
+
+    @property
+    def yaw_rad(self) -> float:
+        x, y, z, w = (float(value) for value in self.orientation_xyzw)
+        return math.atan2(
+            2.0 * (w * z + x * y),
+            1.0 - 2.0 * (y * y + z * z),
+        )
 
 
 @dataclass(frozen=True)
@@ -159,7 +193,7 @@ class EpisodeResult:
     object_initial_position: tuple[float, float, float]
     object_final_position: tuple[float, float, float]
     target_position: tuple[float, float, float]
-    schema_version: int = 3
+    schema_version: int = 4
     backend: str = "pybullet"
     simulator: str = "pybullet"
     planner_id: str = ""
@@ -171,6 +205,14 @@ class EpisodeResult:
     target_position_error_m: float | None = None
     obstacle_position_error_m: float | None = None
     minimum_perception_confidence: float | None = None
+    object_variant: str = "cube"
+    perception_profile: str = "nominal"
+    object_yaw_error_rad: float | None = None
+    grasp_selection_success: bool = False
+    grasp_selection_latency_sec: float | None = None
+    grasp_candidate_count: int = 0
+    selected_grasp_yaw_rad: float | None = None
+    selected_grasp_path_length_rad: float | None = None
     execution_time_sec: float = 0.0
     execution_success: bool = False
     trajectory_points: int = 0
@@ -199,15 +241,30 @@ class EpisodeResult:
 
         if self.pose_source not in SUPPORTED_POSE_SOURCES:
             raise ValueError(f"unsupported pose source: {self.pose_source}")
+        if self.object_variant not in SUPPORTED_OBJECT_VARIANTS:
+            raise ValueError(f"unsupported object variant: {self.object_variant}")
+        if self.perception_profile not in SUPPORTED_PERCEPTION_PROFILES:
+            raise ValueError(
+                f"unsupported perception profile: {self.perception_profile}"
+            )
         for name in (
             "perception_latency_sec",
             "object_position_error_m",
             "target_position_error_m",
             "obstacle_position_error_m",
+            "object_yaw_error_rad",
+            "grasp_selection_latency_sec",
+            "selected_grasp_path_length_rad",
         ):
             value = getattr(self, name)
             if value is not None and (not math.isfinite(value) or value < 0.0):
                 raise ValueError(f"{name} must be finite, non-negative, or null")
+        if self.grasp_candidate_count < 0:
+            raise ValueError("grasp_candidate_count must be non-negative")
+        if self.selected_grasp_yaw_rad is not None and not math.isfinite(
+            self.selected_grasp_yaw_rad
+        ):
+            raise ValueError("selected_grasp_yaw_rad must be finite or null")
         confidence = self.minimum_perception_confidence
         if confidence is not None and not 0.0 <= confidence <= 1.0:
             raise ValueError("minimum_perception_confidence must be in [0, 1]")
@@ -333,6 +390,24 @@ class EpisodeResult:
             ),
             minimum_perception_confidence=_optional_float(
                 data.get("minimum_perception_confidence")
+            ),
+            object_variant=str(data.get("object_variant", "cube")),
+            perception_profile=str(data.get("perception_profile", "nominal")),
+            object_yaw_error_rad=_optional_float(
+                data.get("object_yaw_error_rad")
+            ),
+            grasp_selection_success=bool(
+                data.get("grasp_selection_success", False)
+            ),
+            grasp_selection_latency_sec=_optional_float(
+                data.get("grasp_selection_latency_sec")
+            ),
+            grasp_candidate_count=int(data.get("grasp_candidate_count", 0)),
+            selected_grasp_yaw_rad=_optional_float(
+                data.get("selected_grasp_yaw_rad")
+            ),
+            selected_grasp_path_length_rad=_optional_float(
+                data.get("selected_grasp_path_length_rad")
             ),
             execution_time_sec=float(data.get("execution_time_sec", 0.0)),
             execution_success=bool(

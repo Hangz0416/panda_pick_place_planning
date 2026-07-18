@@ -90,3 +90,61 @@ def test_missing_required_object_is_classified():
             (0.0, 0.0, 0.0, 1.0),
             ["cube"],
         )
+
+
+def test_rect_prism_yaw_is_estimated_from_world_xy_points():
+    color, depth = synthetic_scene()
+    color[180:220, 280:320] = (60, 90, 130)
+    rectangle = ((300.0, 200.0), (60.0, 40.0), 30.0)
+    corners = cv2.boxPoints(rectangle).astype(np.int32)
+    cv2.fillConvexPoly(color, corners, (0, 0, 255))
+
+    result = detector().detect_scene(
+        color,
+        depth,
+        (500.0, 500.0, 320.0, 240.0),
+        (0.0, 0.0, 0.0),
+        (0.0, 0.0, 0.0, 1.0),
+        ["cube"],
+        object_variant="rect_prism",
+    )["cube"]
+
+    assert result.yaw_rad is not None
+    assert abs(np.degrees(result.yaw_rad) - 30.0) < 3.0
+    assert result.yaw_variance > 0.0
+
+
+def test_square_component_is_orientation_ambiguous_for_rect_prism():
+    color, depth = synthetic_scene()
+
+    with pytest.raises(DetectionError, match="orientation_ambiguous"):
+        detector().detect_scene(
+            color,
+            depth,
+            (500.0, 500.0, 320.0, 240.0),
+            (0.0, 0.0, 0.0),
+            (0.0, 0.0, 0.0, 1.0),
+            ["cube"],
+            object_variant="rect_prism",
+        )
+
+
+def test_combined_profile_is_deterministic():
+    color, depth = synthetic_scene()
+    arguments = (
+        color,
+        depth,
+        (500.0, 500.0, 320.0, 240.0),
+        (0.0, 0.0, 0.0),
+        (0.0, 0.0, 0.0, 1.0),
+        ["cube"],
+    )
+
+    first = detector().detect_scene(
+        *arguments, noise_seed=99, perception_profile="combined"
+    )
+    second = detector().detect_scene(
+        *arguments, noise_seed=99, perception_profile="combined"
+    )
+
+    assert first["cube"].position == second["cube"].position

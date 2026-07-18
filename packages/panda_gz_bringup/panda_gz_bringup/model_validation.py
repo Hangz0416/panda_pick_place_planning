@@ -132,6 +132,7 @@ def compose_world_with_deferred_control(
     *,
     output_directory: Path | None = None,
     camera_config: dict | None = None,
+    object_variant: str = "cube",
 ) -> Path:
     """Put Panda in the initial world but defer its control system plugin."""
     root = ET.parse(world_path).getroot()
@@ -158,6 +159,7 @@ def compose_world_with_deferred_control(
     robot_model.remove(plugins[0])
     if world.find("./model[@name='panda']") is not None:
         raise ValueError("base Gazebo world already contains a Panda model")
+    _configure_object_variant(world, object_variant)
     if camera_config is not None:
         _append_rgbd_camera(world, camera_config)
     world.append(robot_model)
@@ -171,6 +173,42 @@ def compose_world_with_deferred_control(
     if not output_path.exists() or output_path.read_text() != xml:
         output_path.write_text(xml, encoding="utf-8")
     return output_path
+
+
+def _configure_object_variant(world: ET.Element, object_variant: str) -> None:
+    """Select audited object geometry while preserving cube/cube_link names."""
+    sizes = {
+        "cube": (0.05, 0.05, 0.05),
+        "rect_prism": (0.06, 0.04, 0.05),
+    }
+    if object_variant not in sizes:
+        raise ValueError(f"unsupported object variant: {object_variant}")
+    model = world.find("./model[@name='cube']")
+    if model is None:
+        if object_variant == "cube":
+            return
+        raise ValueError("rect_prism world requires a cube model contract")
+    size = sizes[object_variant]
+    for size_node in model.findall(".//geometry/box/size"):
+        size_node.text = " ".join(str(value) for value in size)
+    mass = float(model.findtext("./link/inertial/mass", "0.05"))
+    x_size, y_size, z_size = size
+    inertia = model.find("./link/inertial/inertia")
+    if inertia is None:
+        raise ValueError("grasp object has no inertia")
+    values = {
+        "ixx": mass * (y_size**2 + z_size**2) / 12.0,
+        "iyy": mass * (x_size**2 + z_size**2) / 12.0,
+        "izz": mass * (x_size**2 + y_size**2) / 12.0,
+        "ixy": 0.0,
+        "ixz": 0.0,
+        "iyz": 0.0,
+    }
+    for name, value in values.items():
+        node = inertia.find(name)
+        if node is None:
+            raise ValueError(f"grasp object inertia has no {name}")
+        node.text = f"{value:.12g}"
 
 
 def _append_rgbd_camera(world: ET.Element, config: dict) -> None:

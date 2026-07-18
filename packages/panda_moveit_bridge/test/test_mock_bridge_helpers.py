@@ -137,3 +137,22 @@ def test_executed_pose_uses_single_ik_but_planning_only_keeps_pose_sampling():
     assert "setPoseTarget(pose_target, end_effector_link)" in target_body
     assert "result->failure_type = pose_uses_single_ik ?" in target_body
     assert '"no_ik_solution" : "target_rejected"' in target_body
+
+
+def test_goal_state_invalid_has_a_stable_failure_classification():
+    source = (MODULE_PATH.parents[1] / "src" / "moveit_bridge_node.cpp").read_text()
+
+    assert "case Codes::GOAL_STATE_INVALID:" in source
+    assert 'return "goal_state_invalid";' in source
+
+
+def test_executed_pose_has_budgeted_goal_state_invalid_fallback():
+    source = (MODULE_PATH.parents[1] / "src" / "moveit_bridge_node.cpp").read_text()
+
+    assert "pose_target_for_fallback" in source
+    assert (
+        "planning_code.val == moveit_msgs::msg::MoveItErrorCodes::GOAL_STATE_INVALID"
+        in source
+    )
+    assert "move_group_->setPoseTarget(pose_target_for_fallback" in source
+    assert "planning_budget_sec - elapsed_sec" in source

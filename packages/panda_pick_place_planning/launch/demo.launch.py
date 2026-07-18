@@ -20,6 +20,7 @@ def generate_launch_description() -> LaunchDescription:
     seed = LaunchConfiguration("seed")
     backend = LaunchConfiguration("backend")
     grasp_mode = LaunchConfiguration("grasp_mode")
+    object_variant = LaunchConfiguration("object_variant")
     use_gui = LaunchConfiguration("use_gui")
     use_gazebo = LaunchConfiguration("use_gazebo")
     moveit_execute = LaunchConfiguration("moveit_execute")
@@ -30,6 +31,7 @@ def generate_launch_description() -> LaunchDescription:
     output_path = LaunchConfiguration("output_path")
     pose_source = LaunchConfiguration("pose_source")
     perception_timeout = LaunchConfiguration("perception_timeout_sec")
+    perception_profile = LaunchConfiguration("perception_profile")
 
     return LaunchDescription(
         [
@@ -38,6 +40,11 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("seed", default_value="42"),
             DeclareLaunchArgument("backend", default_value="pybullet"),
             DeclareLaunchArgument("grasp_mode", default_value="assisted"),
+            DeclareLaunchArgument(
+                "object_variant",
+                default_value="cube",
+                choices=["cube", "rect_prism"],
+            ),
             DeclareLaunchArgument("use_gui", default_value="true"),
             DeclareLaunchArgument("use_gazebo", default_value="false"),
             DeclareLaunchArgument("moveit_execute", default_value="false"),
@@ -48,6 +55,7 @@ def generate_launch_description() -> LaunchDescription:
                 choices=["ground_truth", "rgbd"],
             ),
             DeclareLaunchArgument("perception_timeout_sec", default_value="3.0"),
+            DeclareLaunchArgument("perception_profile", default_value="nominal"),
             DeclareLaunchArgument(
                 "moveit_collision_monitor_available",
                 default_value="false",
@@ -108,6 +116,8 @@ def generate_launch_description() -> LaunchDescription:
                         "seed": ParameterValue(seed, value_type=int),
                         "backend": backend,
                         "grasp_mode": grasp_mode,
+                        "object_variant": object_variant,
+                        "perception_profile": perception_profile,
                         "use_gazebo": ParameterValue(
                             use_gazebo, value_type=bool
                         ),

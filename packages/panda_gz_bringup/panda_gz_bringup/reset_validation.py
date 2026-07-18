@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import asdict
 import json
+import math
 from pathlib import Path
 import time
 
@@ -20,6 +21,7 @@ from sensor_msgs.msg import JointState
 from panda_gz_bringup.reset_contract import (
     RESET_VALIDATION_THRESHOLDS,
     ResetValidationMetrics,
+    quaternion_angle_error,
     vector_norm,
 )
 
@@ -97,7 +99,7 @@ class ResetValidationNode(Node):
         return False
 
     def metrics(
-        self, scene: str, object_position, target_position
+        self, scene: str, object_position, object_yaw_rad: float, target_position
     ) -> ResetValidationMetrics:
         required = set(ARM_JOINTS + FINGER_JOINTS)
         if not required <= self.joints.keys():
@@ -122,6 +124,7 @@ class ResetValidationNode(Node):
             abs(self.joints[name][0] - OPEN_FINGER) for name in FINGER_JOINTS
         )
         cube = self.cube_pose.position
+        cube_orientation = self.cube_pose.orientation
         target = self.target_pose.position
         obstacle = self.obstacle_pose.position
         expected_obstacle = (0.54, 0.0 if scene == "obstacle" else 2.0, 0.14)
@@ -131,6 +134,20 @@ class ResetValidationNode(Node):
             gripper_position_error_m=gripper_error,
             cube_position_error_m=_position_error(
                 (cube.x, cube.y, cube.z), object_position
+            ),
+            cube_orientation_error_rad=quaternion_angle_error(
+                (
+                    cube_orientation.x,
+                    cube_orientation.y,
+                    cube_orientation.z,
+                    cube_orientation.w,
+                ),
+                (
+                    0.0,
+                    0.0,
+                    math.sin(0.5 * object_yaw_rad),
+                    math.cos(0.5 * object_yaw_rad),
+                ),
             ),
             target_position_error_m=_position_error(
                 (target.x, target.y, target.z),
@@ -154,6 +171,11 @@ def parse_args(args=None):
     parser.add_argument("--scene", choices=("clear", "obstacle"), default="clear")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
+        "--object-variant",
+        choices=("cube", "rect_prism"),
+        default="rect_prism",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=Path("results/runs/gazebo_assisted/reset_validation.json"),
@@ -175,7 +197,13 @@ def main(args=None) -> int:
     try:
         if not node.client.wait_for_service(timeout_sec=120.0):
             terminal_error = "reset_service_timeout"
-        task = generate_task(0, cli.seed, "rrt_connect", cli.scene)
+        task = generate_task(
+            0,
+            cli.seed,
+            "rrt_connect",
+            cli.scene,
+            object_variant=cli.object_variant,
+        )
         for index in range(cli.repetitions if not terminal_error else 0):
             request = ResetEpisode.Request()
             request.header.frame_id = "world"
@@ -183,6 +211,8 @@ def main(args=None) -> int:
             request.task_seed = task.task_seed
             request.scene = cli.scene
             request.grasp_mode = "assisted"
+            request.object_variant = task.object_variant
+            request.object_yaw_rad = task.object_yaw_rad
             (
                 request.object_position.x,
                 request.object_position.y,
@@ -207,7 +237,10 @@ def main(args=None) -> int:
                 record["failure_type"] = "post_reset_state_timeout"
             else:
                 metrics = node.metrics(
-                    cli.scene, task.object_position, task.target_position
+                    cli.scene,
+                    task.object_position,
+                    task.object_yaw_rad,
+                    task.target_position,
                 )
                 record.update(asdict(metrics))
                 record["service_success"] = True
@@ -240,6 +273,8 @@ def main(args=None) -> int:
         "schema_version": 1,
         "scene": cli.scene,
         "task_seed": cli.seed,
+        "object_variant": task.object_variant,
+        "object_yaw_rad": task.object_yaw_rad,
         "repetitions_requested": cli.repetitions,
         "repetitions_completed": len(records),
         "passed": passed,

@@ -58,4 +58,6 @@ class BatchSequencer:
             and result.scene == task.scene
             and result.backend == task.backend
             and result.simulator == task.simulator
+            and result.object_variant == task.object_variant
+            and result.perception_profile == task.perception_profile
         )

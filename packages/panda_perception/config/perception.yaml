@@ -20,6 +20,13 @@ processing:
   morphology_kernel_px: 5
   mad_scale: 3.5
   minimum_confidence: 0.35
+  orientation_min_eigenvalue_ratio: 1.25
+  perturbation_profiles:
+    nominal: {rgb_scale: 1.0, rgb_noise_stddev: 0.0, depth_dropout_rate: 0.0}
+    low_light: {rgb_scale: 0.65, rgb_noise_stddev: 0.0, depth_dropout_rate: 0.0}
+    rgb_noise: {rgb_scale: 1.0, rgb_noise_stddev: 8.0, depth_dropout_rate: 0.0}
+    depth_dropout: {rgb_scale: 1.0, rgb_noise_stddev: 0.0, depth_dropout_rate: 0.08}
+    combined: {rgb_scale: 0.65, rgb_noise_stddev: 8.0, depth_dropout_rate: 0.08}
   objects:
     cube:
       hsv_ranges: [[[0, 80, 40], [12, 255, 255]], [[168, 80, 40], [179, 255, 255]]]

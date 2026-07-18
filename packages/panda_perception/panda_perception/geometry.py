@@ -60,3 +60,23 @@ def transform_point(
     output = rotation @ np.asarray(point, dtype=np.float64)
     output += np.asarray(translation, dtype=np.float64)
     return tuple(float(value) for value in output)
+
+
+def transform_points(
+    points: np.ndarray,
+    translation: Sequence[float],
+    quaternion_xyzw: Sequence[float],
+) -> np.ndarray:
+    """Apply one parent-from-child transform to an Nx3 point array."""
+    values = np.asarray(points, dtype=np.float64)
+    if values.ndim != 2 or values.shape[1] != 3:
+        raise ValueError("points must be an Nx3 array")
+    origin = np.asarray(transform_point((0.0, 0.0, 0.0), translation, quaternion_xyzw))
+    axes = np.asarray(
+        [
+            transform_point(axis, translation, quaternion_xyzw)
+            for axis in ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
+        ]
+    )
+    rotation = (axes - origin).T
+    return values @ rotation.T + origin

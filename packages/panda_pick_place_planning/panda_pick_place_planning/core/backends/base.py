@@ -70,6 +70,16 @@ class ManipulationBackend(Protocol):
         timeout_sec: float = 1.0,
     ) -> BackendMotionReport: ...
 
+    def check_pose_feasibility(
+        self,
+        position: Sequence[float],
+        orientation: Sequence[float],
+        *,
+        planner: str = "rrt_connect",
+        seed: int = 0,
+        timeout_sec: float = 3.0,
+    ) -> BackendMotionReport: ...
+
     def move_home(self) -> BackendMotionReport: ...
 
     def set_gripper(self, width: float) -> None: ...

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import threading
 import time
+import math
 from typing import Any, Protocol, Sequence, runtime_checkable
 
 from panda_pick_place_planning.core.schemas import (
@@ -31,8 +32,13 @@ class GroundTruthPoseProvider:
         self.obstacle_position = tuple(float(value) for value in obstacle_position)
 
     def estimate(self, task: TaskSpec) -> SceneEstimate:
+        half_yaw = 0.5 * task.object_yaw_rad
         estimates = {
-            "cube": SceneObjectEstimate("cube", task.object_position),
+            "cube": SceneObjectEstimate(
+                "cube",
+                task.object_position,
+                orientation_xyzw=(0.0, 0.0, math.sin(half_yaw), math.cos(half_yaw)),
+            ),
             "target": SceneObjectEstimate("target", task.target_position),
         }
         if task.scene == "obstacle":
@@ -69,7 +75,9 @@ class RGBDScenePoseProvider:
 
         request = EstimateScene.Request()
         request.episode_id = task.episode_id
+        request.task_seed = task.task_seed
         request.scene = task.scene
+        request.object_variant = task.object_variant
         request.required_object_ids = ["cube", "target"]
         if task.scene == "obstacle":
             request.required_object_ids.append("obstacle")
@@ -112,12 +120,19 @@ class RGBDScenePoseProvider:
     @staticmethod
     def _from_ros(message: Any) -> SceneObjectEstimate:
         position = message.pose.pose.position
+        orientation = message.pose.pose.orientation
         return SceneObjectEstimate(
             object_id=str(message.object_id),
             position=(float(position.x), float(position.y), float(position.z)),
             confidence=float(message.confidence),
             valid_pixel_count=int(message.valid_pixel_count),
             covariance=tuple(float(value) for value in message.pose.covariance),
+            orientation_xyzw=(
+                float(orientation.x),
+                float(orientation.y),
+                float(orientation.z),
+                float(orientation.w),
+            ),
         )
 
     def _failure(

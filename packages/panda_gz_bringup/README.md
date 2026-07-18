@@ -27,7 +27,16 @@ ros2 launch panda_gz_bringup panda_gz.launch.py \
   scene:=obstacle grasp_mode:=assisted headless:=false
 ```
 
-The complete MoveIt + Gazebo stack has one entry point:
+底层组合入口为 `panda_moveit_gz.launch.py`；面向演示的唯一推荐入口是：
+
+```bash
+ros2 launch panda_gz_bringup panda_visual_pick_place.launch.py \
+  scene:=clear seed:=42 object_variant:=rect_prism \
+  pose_source:=rgbd perception_profile:=nominal \
+  headless:=false use_rviz:=true
+```
+
+只启动底层 MoveIt + Gazebo 栈、暂不启动任务时使用：
 
 ```bash
 ros2 launch panda_gz_bringup panda_moveit_gz.launch.py \
@@ -43,14 +52,16 @@ state publisher and Gazebo-created controller manager. With
 cube odometry, all three active controllers, reset/scene/collision services,
 and motion/arm/gripper actions before starting the shared FSM.
 
-Launch arguments are `scene:=clear|obstacle`,
-`grasp_mode:=assisted|physics`, `headless:=true|false`,
-`use_sim_time:=true|false`, and `auto_reset:=true|false`.
+The recommended wrapper exposes `scene`, `seed`, `object_variant`, `pose_source`,
+`perception_profile`, `headless`, and `use_rviz`. Lower-level bringup also
+accepts `grasp_mode:=assisted|physics`, `use_sim_time`, and `auto_reset`; these
+are intentionally fixed by the recommended visual workflow.
 
 Management interfaces:
 
 - `/panda_gz/reset_episode` (`panda_pick_place_interfaces/srv/ResetEpisode`),
-  carrying episode ID, task seed, scene, grasp mode, object position and target
+  carrying episode ID, task seed, scene, grasp mode, object variant/yaw,
+  object position and target
 - `/panda_gz/attach_object` (`std_srvs/srv/Trigger`)
 - `/panda_gz/detach_object` (`std_srvs/srv/Trigger`)
 - `/panda_gz/get_physical_grasp_state`
@@ -60,12 +71,13 @@ Management interfaces:
 - `/panda_gz/reset_status` and `/panda_gz/grasp_status`
   (`diagnostic_msgs/msg/DiagnosticArray`, including stable numeric status codes)
 
-Assisted attach is rejected unless the hand-to-cube offset, hand orientation,
-distance, and gripper clearance all pass. The default pre-attach opening is
-60 mm (configurable, with an 8 mm total tolerance) around the 50 mm cube
-because Gazebo's DetachableJoint cannot reattach models while they are already
-in contact. `physics` mode never sends an attach command; finger collision and
-friction alone determine the grasp.
+Assisted attach is rejected unless the hand-to-object offset, relative
+orientation, distance, and gripper clearance all pass. The default pre-attach
+command is 38 mm per finger, i.e. 76 mm total opening; the orientation gate
+accepts the gripper's pi-symmetric relative pose for the 60x40x50 mm rectangular
+workpiece. Gazebo's DetachableJoint cannot reattach models while they are
+already in contact. `physics` mode never sends an attach command; finger
+collision and friction alone determine the grasp.
 
 The physics monitor requires sustained left and right finger contacts, records
 the first `panda_grasptarget -> cube` relative pose, and reports translation
@@ -113,6 +125,14 @@ velocity tolerances, reapplies task poses while paused, and resets both monitor
 states. Humble's stock bridge does not convert `SetEntityPose`; the package's
 small C++ `entity_pose_bridge` maps the standard ROS service to Fortress's
 native Transport service. No joint state is mutated behind `ros2_control`.
+
+With a matching `rect_prism` stack running, the deterministic ten-reset audit is:
+
+```bash
+ros2 run panda_gz_bringup validate_episode_reset \
+  --repetitions 10 --scene clear --seed 42 --object-variant rect_prism \
+  --output results/runs/gazebo_rgbd_grasp_pose/reset_validation.json
+```
 
 The Gazebo collision table matches the PyBullet 1.5 x 1.0 x 0.05 m slab with its top
 at z=0; table legs are visual-only. Assisted and physical results must be

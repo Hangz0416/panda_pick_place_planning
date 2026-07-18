@@ -43,6 +43,7 @@ class SceneEstimatorNode(Node):
         group = ReentrantCallbackGroup()
         self.declare_parameter("config_path", str(default_config_path()))
         self.declare_parameter("use_debug_overlay", True)
+        self.declare_parameter("perception_profile", "nominal")
         self.declare_parameter(
             "color_topic", "/panda_perception/color/image_raw"
         )
@@ -181,10 +182,21 @@ class SceneEstimatorNode(Node):
                 (translation.x, translation.y, translation.z),
                 (rotation.x, rotation.y, rotation.z, rotation.w),
                 list(request.required_object_ids),
-                noise_seed=int(request.episode_id),
+                noise_seed=(int(request.episode_id) * 1_000_003) ^ int(request.task_seed),
+                object_variant=str(request.object_variant or "cube"),
+                perception_profile=str(
+                    self.get_parameter("perception_profile").value
+                ),
             )
         except DetectionError as exc:
             return self._failure(response, exc.failure_type, started_at)
+        except (TypeError, ValueError):
+            failure = (
+                "invalid_orientation"
+                if str(request.object_variant) == "rect_prism"
+                else "invalid_depth"
+            )
+            return self._failure(response, failure, started_at)
 
         response.success = True
         response.failure_type = ""
@@ -202,16 +214,21 @@ class SceneEstimatorNode(Node):
             message.pose.pose.position.x = detection.position[0]
             message.pose.pose.position.y = detection.position[1]
             message.pose.pose.position.z = detection.position[2]
-            message.pose.pose.orientation.w = 1.0
+            orientation = detection.orientation_xyzw
+            message.pose.pose.orientation.x = orientation[0]
+            message.pose.pose.orientation.y = orientation[1]
+            message.pose.pose.orientation.z = orientation[2]
+            message.pose.pose.orientation.w = orientation[3]
             variance = max(1.0e-6, (1.0 - detection.confidence) * 1.0e-4)
             for index in (0, 7, 14):
                 message.pose.covariance[index] = variance
+            message.pose.covariance[35] = detection.yaw_variance
             message.confidence = detection.confidence
             message.valid_pixel_count = detection.valid_pixel_count
             response.estimates.append(message)
             pose = Pose()
             pose.position = message.pose.pose.position
-            pose.orientation.w = 1.0
+            pose.orientation = message.pose.pose.orientation
             pose_array.poses.append(pose)
         self.estimate_publisher.publish(pose_array)
         if bool(self.get_parameter("use_debug_overlay").value):
@@ -235,6 +252,20 @@ class SceneEstimatorNode(Node):
                 f"{object_id} ({detection.position[0]:.3f},"
                 f" {detection.position[1]:.3f}, {detection.position[2]:.3f})"
             )
+            if detection.yaw_rad is not None:
+                label += (
+                    f" yaw={np.degrees(detection.yaw_rad):.1f}deg"
+                    f" orient={detection.orientation_confidence:.2f}"
+                )
+                if detection.axis_uv is not None:
+                    cv2.line(
+                        overlay,
+                        detection.axis_uv[0],
+                        detection.axis_uv[1],
+                        colors[object_id],
+                        2,
+                        cv2.LINE_AA,
+                    )
             cv2.circle(overlay, (u, v), 4, colors[object_id], -1)
             cv2.putText(
                 overlay,

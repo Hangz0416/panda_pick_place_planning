@@ -92,6 +92,9 @@ def test_one_shared_xacro_selects_mock_or_modern_gazebo():
     assert "compose_world_with_deferred_control(" in launch_text
     assert "camera_config=camera_config" in launch_text
     assert 'executable="control_system_loader"' in launch_text
+    loader = (ROOT / "src" / "control_system_loader.cpp").read_text()
+    assert "std::chrono::duration<double>(timeout_sec)" in loader
+    assert "wait_for_service(std::chrono::seconds(10))" not in loader
     assert "start_controllers_if_loaded" in launch_text
     assert "event.returncode == 0" in launch_text
     assert 'executable="create"' not in launch_text
@@ -225,6 +228,8 @@ def test_typed_reset_and_model_mapping_contract():
         "uint64 task_seed",
         "string scene",
         "string grasp_mode",
+        "string object_variant",
+        "float64 object_yaw_rad",
         "geometry_msgs/Point object_position",
         "geometry_msgs/Point target_position",
         "uint16 status_code",
@@ -274,12 +279,18 @@ def test_typed_rgbd_interfaces_and_single_camera_config():
     ):
         assert field in message
     assert "string[] required_object_ids" in service
+    assert "string object_variant" in service
     assert "SceneObjectEstimate[] estimates" in service
     for field in (
         "string pose_source",
+        "string object_variant",
+        "string perception_profile",
         "bool perception_success",
         "float64 perception_latency_sec",
         "float64 object_position_error_m",
+        "float64 object_yaw_error_rad",
+        "bool grasp_selection_success",
+        "uint32 grasp_candidate_count",
     ):
         assert field in result
     assert camera["width"] == 640

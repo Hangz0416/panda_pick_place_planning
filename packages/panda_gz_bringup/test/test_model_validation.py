@@ -163,6 +163,24 @@ def test_generated_world_camera_matches_shared_yaml(tmp_path):
     assert sensor.findtext("camera/image/height") == str(camera["height"])
 
 
+def test_rect_prism_world_preserves_entity_contract_and_updates_inertia(tmp_path):
+    output = compose_world_with_deferred_control(
+        ROOT / "worlds" / "panda_pick_place.sdf",
+        _sdf(),
+        output_directory=tmp_path,
+        object_variant="rect_prism",
+    )
+
+    root = ET.parse(output).getroot()
+    model = root.find("./world/model[@name='cube']")
+    assert model.find("./link[@name='cube_link']") is not None
+    sizes = {node.text for node in model.findall(".//geometry/box/size")}
+    assert sizes == {"0.06 0.04 0.05"}
+    assert float(model.findtext("./link/inertial/inertia/ixx")) > 0.0
+    assert float(model.findtext("./link/inertial/inertia/iyy")) > 0.0
+    assert float(model.findtext("./link/inertial/inertia/izz")) > 0.0
+
+
 def test_shared_gazebo_xacro_converts_to_valid_sdf():
     document = xacro.process_file(
         str(MOVEIT / "config" / "panda.urdf.xacro"),

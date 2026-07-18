@@ -1,4 +1,5 @@
 import unittest
+import math
 
 from panda_pick_place_planning.core.tasks import generate_paired_tasks, generate_task
 
@@ -30,6 +31,18 @@ class TaskGenerationTest(unittest.TestCase):
         self.assertLess(task.object_position[1] * task.target_position[1], 0.0)
         self.assertGreater(task.object_position[1], 0.0)
         self.assertLess(task.target_position[1], 0.0)
+
+    def test_rect_prism_yaw_is_seeded_and_in_symmetric_interval(self):
+        first = generate_task(
+            0, 42, "rrt_connect", "clear", object_variant="rect_prism"
+        )
+        second = generate_task(
+            1, 42, "rrt_connect", "clear", object_variant="rect_prism"
+        )
+
+        self.assertEqual(first.object_yaw_rad, second.object_yaw_rad)
+        self.assertGreaterEqual(first.object_yaw_rad, -math.pi / 2.0)
+        self.assertLess(first.object_yaw_rad, math.pi / 2.0)
 
 
 if __name__ == "__main__":

@@ -88,6 +88,8 @@ def test_rgbd_provider_requests_scene_specific_required_objects():
     assert result.pose_source == "rgbd"
     assert result.require("cube").position == (0.58, -0.16, 0.025)
     assert client.requests[0].episode_id == 7
+    assert client.requests[0].task_seed == 42
+    assert client.requests[0].object_variant == "cube"
     assert list(client.requests[0].required_object_ids) == [
         "cube",
         "target",

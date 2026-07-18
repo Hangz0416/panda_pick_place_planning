@@ -67,7 +67,7 @@ def summarize_results(results: Iterable[EpisodeResult]) -> dict:
         for key, items in sorted(backend_grouped.items())
     }
     return {
-        "schema_version": 3,
+        "schema_version": 4,
         "total_episodes": len(rows),
         "groups": groups,
         "backend_groups": backend_groups,
@@ -125,6 +125,16 @@ def _summarize_group(items: list[EpisodeResult]) -> dict:
             if len({item.pose_source for item in items}) == 1
             else "mixed"
         ),
+        "object_variant": (
+            items[0].object_variant
+            if len({item.object_variant for item in items}) == 1
+            else "mixed"
+        ),
+        "perception_profile": (
+            items[0].perception_profile
+            if len({item.perception_profile for item in items}) == 1
+            else "mixed"
+        ),
         "perception_success_rate": _rate(
             item.perception_success for item in items
         ),
@@ -148,6 +158,21 @@ def _summarize_group(items: list[EpisodeResult]) -> dict:
         ),
         "avg_minimum_perception_confidence": _optional_mean(
             item.minimum_perception_confidence for item in items
+        ),
+        "object_yaw_error_rad": _optional_distribution(
+            item.object_yaw_error_rad for item in items
+        ),
+        "grasp_selection_success_rate": _rate(
+            item.grasp_selection_success for item in items
+        ),
+        "grasp_selection_latency_sec": _optional_distribution(
+            item.grasp_selection_latency_sec for item in items
+        ),
+        "avg_grasp_candidate_count": _mean(
+            item.grasp_candidate_count for item in items
+        ),
+        "selected_grasp_path_length_rad": _optional_distribution(
+            item.selected_grasp_path_length_rad for item in items
         ),
         "failure_counts": dict(
             Counter(item.failure_type or "success" for item in items)

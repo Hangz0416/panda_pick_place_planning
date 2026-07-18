@@ -36,6 +36,8 @@ def _launch_setup(_context):
     pose_source = LaunchConfiguration("pose_source")
     perception_timeout = LaunchConfiguration("perception_timeout_sec")
     use_perception_debug = LaunchConfiguration("use_perception_debug")
+    object_variant = LaunchConfiguration("object_variant")
+    perception_profile = LaunchConfiguration("perception_profile")
 
     stack = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -43,6 +45,7 @@ def _launch_setup(_context):
         ),
         launch_arguments={
             "scene": "clear",
+            "object_variant": object_variant,
             "seed": seed,
             "grasp_mode": "assisted",
             "headless": headless,
@@ -52,6 +55,7 @@ def _launch_setup(_context):
             "readiness_timeout_sec": readiness_timeout,
             "pose_source": pose_source,
             "perception_timeout_sec": perception_timeout,
+            "perception_profile": perception_profile,
             "use_perception_debug": use_perception_debug,
         }.items(),
     )
@@ -85,6 +89,7 @@ def _launch_setup(_context):
             "backend": "moveit",
             "simulator": "gazebo",
             "grasp_mode": "assisted",
+            "object_variant": object_variant,
             "use_gazebo": "true",
             "moveit_execute": "true",
             "moveit_command_gripper": "true",
@@ -92,6 +97,7 @@ def _launch_setup(_context):
             "summary_path": summary_path,
             "pose_source": pose_source,
             "perception_timeout_sec": perception_timeout,
+            "perception_profile": perception_profile,
         }.items(),
     )
 
@@ -130,11 +136,15 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "output_path",
-                default_value="results/runs/gazebo_rgbd/episodes.jsonl",
+                default_value=(
+                    "results/runs/gazebo_rgbd_grasp_pose/episodes.jsonl"
+                ),
             ),
             DeclareLaunchArgument(
                 "summary_path",
-                default_value="results/runs/gazebo_rgbd/summary.json",
+                default_value=(
+                    "results/runs/gazebo_rgbd_grasp_pose/summary.json"
+                ),
             ),
             DeclareLaunchArgument(
                 "readiness_timeout_sec", default_value="120.0"
@@ -143,6 +153,22 @@ def generate_launch_description() -> LaunchDescription:
                 "pose_source",
                 default_value="rgbd",
                 choices=["ground_truth", "rgbd"],
+            ),
+            DeclareLaunchArgument(
+                "object_variant",
+                default_value="rect_prism",
+                choices=["cube", "rect_prism"],
+            ),
+            DeclareLaunchArgument(
+                "perception_profile",
+                default_value="nominal",
+                choices=[
+                    "nominal",
+                    "low_light",
+                    "rgb_noise",
+                    "depth_dropout",
+                    "combined",
+                ],
             ),
             DeclareLaunchArgument("perception_timeout_sec", default_value="3.0"),
             DeclareLaunchArgument(

@@ -3,6 +3,8 @@ uint64 episode_id
 uint64 task_seed
 string scene
 string grasp_mode
+string object_variant
+float64 object_yaw_rad
 geometry_msgs/Point object_position
 geometry_msgs/Point target_position
 ---
@@ -12,3 +14,4 @@ string failure_type
 string message
 geometry_msgs/Point applied_object_position
 geometry_msgs/Point applied_target_position
+float64 applied_object_yaw_rad

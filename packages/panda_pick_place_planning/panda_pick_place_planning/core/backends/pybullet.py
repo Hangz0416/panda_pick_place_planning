@@ -3,7 +3,10 @@ from __future__ import annotations
 import time
 from typing import Sequence
 
-from panda_pick_place_planning.core.backends.base import BackendMotionReport
+from panda_pick_place_planning.core.backends.base import (
+    BackendMotionReport,
+    BackendOperationError,
+)
 from panda_pick_place_planning.core.planners import LinearPlanner, RRTConnectPlanner
 from panda_pick_place_planning.core.planners.base import PlanningRequest
 from panda_pick_place_planning.core.pybullet_env import PyBulletPandaEnv, SceneConfig
@@ -62,6 +65,8 @@ class PyBulletBackend:
         return self.env.collision_count > 0
 
     def reset(self, task: TaskSpec) -> None:
+        if task.object_variant != "cube":
+            raise BackendOperationError("unsupported_object_variant")
         self.planner_id = task.planner
         self.env.reset(task)
 
@@ -90,6 +95,41 @@ class PyBulletBackend:
             planner="linear",
             seed=0,
             timeout_sec=1.0,
+        )
+
+    def check_pose_feasibility(
+        self,
+        position: Sequence[float],
+        orientation: Sequence[float],
+        *,
+        planner: str = "rrt_connect",
+        seed: int = 0,
+        timeout_sec: float = 3.0,
+    ) -> BackendMotionReport:
+        solution = self.env.solve_ik(position, orientation)
+        if not solution.success:
+            return self._failure("ik_failed")
+        request = self._planning_request(
+            solution.joints,
+            seed=seed,
+            timeout_sec=timeout_sec,
+        )
+        if planner == "linear":
+            plan = LinearPlanner().plan(request)
+        elif planner == "rrt_connect":
+            plan = RRTConnectPlanner().plan(request)
+        else:
+            return self._failure("unsupported_planner")
+        if not plan.success:
+            return self._failure(self._classify_planning_failure(plan), plan)
+        from panda_pick_place_planning.core.planners.base import path_length
+
+        return BackendMotionReport(
+            success=True,
+            planning_success=True,
+            plan_result=plan,
+            path_length_rad=path_length(plan.path),
+            trajectory_points=len(plan.path),
         )
 
     def set_gripper(self, width: float) -> None:

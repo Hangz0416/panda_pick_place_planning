@@ -108,10 +108,29 @@ def source_tree_hash(repo: Path) -> tuple[str, int]:
     return digest.hexdigest(), included
 
 
-def capture_environment(repo: Path, simulator: str) -> dict:
+def capture_environment(
+    repo: Path,
+    simulator: str,
+    *,
+    object_variant: str = "cube",
+    pose_source: str = "rgbd",
+    perception_profile: str = "nominal",
+) -> dict:
     """Build the environment document shared by final mock/Gazebo outputs."""
     if simulator not in {"moveit_mock", "gazebo"}:
         raise ValueError(f"unsupported simulator: {simulator}")
+    if object_variant not in {"cube", "rect_prism"}:
+        raise ValueError(f"unsupported object variant: {object_variant}")
+    if pose_source not in {"ground_truth", "rgbd"}:
+        raise ValueError(f"unsupported pose source: {pose_source}")
+    if perception_profile not in {
+        "nominal",
+        "low_light",
+        "rgb_noise",
+        "depth_dropout",
+        "combined",
+    }:
+        raise ValueError(f"unsupported perception profile: {perception_profile}")
     os_release = {}
     for line in Path("/etc/os-release").read_text(encoding="utf-8").splitlines():
         if "=" in line:
@@ -138,7 +157,9 @@ def capture_environment(repo: Path, simulator: str) -> dict:
             "robot_collision_padding_m": 0.010,
             "task_seed_base": 42,
             "grasp_mode": "assisted",
-            "pose_source": "rgbd",
+            "object_variant": object_variant,
+            "pose_source": pose_source,
+            "perception_profile": perception_profile,
             "physics_model_validated": False,
             "camera": {
                 "resolution": [640, 480],
@@ -162,9 +183,32 @@ def main(args=None) -> int:
     parser.add_argument(
         "--simulator", choices=("moveit_mock", "gazebo"), required=True
     )
+    parser.add_argument(
+        "--object-variant", choices=("cube", "rect_prism"), default="cube"
+    )
+    parser.add_argument(
+        "--pose-source", choices=("ground_truth", "rgbd"), default="rgbd"
+    )
+    parser.add_argument(
+        "--perception-profile",
+        choices=(
+            "nominal",
+            "low_light",
+            "rgb_noise",
+            "depth_dropout",
+            "combined",
+        ),
+        default="nominal",
+    )
     parser.add_argument("--output", type=Path, required=True)
     parsed = parser.parse_args(args)
-    document = capture_environment(parsed.repo.resolve(), parsed.simulator)
+    document = capture_environment(
+        parsed.repo.resolve(),
+        parsed.simulator,
+        object_variant=parsed.object_variant,
+        pose_source=parsed.pose_source,
+        perception_profile=parsed.perception_profile,
+    )
     parsed.output.parent.mkdir(parents=True, exist_ok=True)
     parsed.output.write_text(
         json.dumps(document, indent=2, ensure_ascii=False) + "\n",

@@ -1,5 +1,7 @@
 uint64 episode_id
+uint64 task_seed
 string scene
+string object_variant
 string[] required_object_ids
 float64 timeout_sec
 ---

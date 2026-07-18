@@ -25,6 +25,8 @@ class TaskGeneratorNode(Node):
         self.declare_parameter("scene", "obstacle")
         self.declare_parameter("backend", "pybullet")
         self.declare_parameter("grasp_mode", "assisted")
+        self.declare_parameter("object_variant", "cube")
+        self.declare_parameter("perception_profile", "nominal")
         self.declare_parameter("use_gazebo", False)
         self.declare_parameter("simulator", "")
         self.publisher = self.create_publisher(
@@ -41,6 +43,8 @@ class TaskGeneratorNode(Node):
         scene = str(self.get_parameter("scene").value)
         backend = str(self.get_parameter("backend").value)
         grasp_mode = str(self.get_parameter("grasp_mode").value)
+        object_variant = str(self.get_parameter("object_variant").value)
+        perception_profile = str(self.get_parameter("perception_profile").value)
         use_gazebo = bool(self.get_parameter("use_gazebo").value)
         simulator = str(self.get_parameter("simulator").value) or (
             "pybullet"
@@ -49,13 +53,14 @@ class TaskGeneratorNode(Node):
             if use_gazebo
             else "moveit_mock"
         )
-        task = generate_task(0, seed, planner, scene)
+        task = generate_task(0, seed, planner, scene, object_variant=object_variant)
         task = task.__class__(
             **{
                 **task.to_dict(),
                 "backend": backend,
                 "grasp_mode": grasp_mode,
                 "simulator": simulator,
+                "perception_profile": perception_profile,
             }
         )
         message = task_to_ros(task)

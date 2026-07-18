@@ -32,6 +32,7 @@ def _launch_setup(context):
     )
 
     scene = LaunchConfiguration("scene")
+    object_variant = LaunchConfiguration("object_variant")
     seed = LaunchConfiguration("seed")
     backend = LaunchConfiguration("backend")
     grasp_mode = LaunchConfiguration("grasp_mode")
@@ -44,6 +45,7 @@ def _launch_setup(context):
     pose_source = LaunchConfiguration("pose_source")
     perception_timeout = LaunchConfiguration("perception_timeout_sec")
     use_perception_debug = LaunchConfiguration("use_perception_debug")
+    perception_profile = LaunchConfiguration("perception_profile")
     grasp_mode_value = grasp_mode.perform(context)
     controllers = bringup_share / "config" / "controllers.yaml"
 
@@ -81,6 +83,7 @@ def _launch_setup(context):
         ),
         launch_arguments={
             "scene": scene,
+            "object_variant": object_variant,
             "grasp_mode": grasp_mode,
             "headless": headless,
             "use_sim_time": "true",
@@ -145,6 +148,7 @@ def _launch_setup(context):
         launch_arguments={
             "use_sim_time": "true",
             "use_debug_overlay": use_perception_debug,
+            "perception_profile": perception_profile,
         }.items(),
         condition=IfCondition(
             PythonExpression(["'", pose_source, "' == 'rgbd'"])
@@ -158,6 +162,7 @@ def _launch_setup(context):
         launch_arguments={
             "planner": "rrt_connect",
             "scene": scene,
+            "object_variant": object_variant,
             "seed": seed,
             "backend": backend,
             "grasp_mode": grasp_mode,
@@ -169,6 +174,7 @@ def _launch_setup(context):
             "output_path": output_path,
             "pose_source": pose_source,
             "perception_timeout_sec": perception_timeout,
+            "perception_profile": perception_profile,
         }.items(),
     )
     ready_gate = Node(
@@ -228,6 +234,11 @@ def generate_launch_description() -> LaunchDescription:
                 default_value="clear",
                 choices=["clear", "obstacle"],
             ),
+            DeclareLaunchArgument(
+                "object_variant",
+                default_value="cube",
+                choices=["cube", "rect_prism"],
+            ),
             DeclareLaunchArgument("seed", default_value="42"),
             DeclareLaunchArgument(
                 "grasp_mode",
@@ -267,6 +278,17 @@ def generate_launch_description() -> LaunchDescription:
                 "use_perception_debug",
                 default_value="true",
                 choices=["true", "false"],
+            ),
+            DeclareLaunchArgument(
+                "perception_profile",
+                default_value="nominal",
+                choices=[
+                    "nominal",
+                    "low_light",
+                    "rgb_noise",
+                    "depth_dropout",
+                    "combined",
+                ],
             ),
             OpaqueFunction(function=_launch_setup),
         ]

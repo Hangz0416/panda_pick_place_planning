@@ -29,6 +29,9 @@ def task_to_ros(task: TaskSpec):
     message.planner_seed = task.planner_seed
     message.scene = task.scene
     message.grasp_mode = task.grasp_mode
+    message.object_variant = task.object_variant
+    message.object_yaw_rad = task.object_yaw_rad
+    message.perception_profile = task.perception_profile
     _set_point(message.object_position, task.object_position)
     _set_point(message.target_position, task.target_position)
     return message
@@ -57,6 +60,9 @@ def task_from_ros(message: Any) -> TaskSpec:
         backend=str(message.backend or "pybullet"),
         grasp_mode=str(message.grasp_mode or "assisted"),
         simulator=str(message.simulator),
+        object_variant=str(message.object_variant or "cube"),
+        object_yaw_rad=float(message.object_yaw_rad),
+        perception_profile=str(message.perception_profile or "nominal"),
     )
 
 
@@ -74,6 +80,8 @@ def episode_to_ros(result: EpisodeResult):
     message.scene = result.scene
     message.grasp_mode = result.grasp_mode
     message.pose_source = result.pose_source
+    message.object_variant = result.object_variant
+    message.perception_profile = result.perception_profile
     message.planning_success = result.planning_success
     message.execution_success = result.execution_success
     message.task_success = result.task_success
@@ -111,6 +119,20 @@ def episode_to_ros(result: EpisodeResult):
     )
     message.minimum_perception_confidence = _optional_float_to_ros(
         result.minimum_perception_confidence
+    )
+    message.object_yaw_error_rad = _optional_float_to_ros(
+        result.object_yaw_error_rad
+    )
+    message.grasp_selection_success = result.grasp_selection_success
+    message.grasp_selection_latency_sec = _optional_float_to_ros(
+        result.grasp_selection_latency_sec
+    )
+    message.grasp_candidate_count = result.grasp_candidate_count
+    message.selected_grasp_yaw_rad = _optional_float_to_ros(
+        result.selected_grasp_yaw_rad
+    )
+    message.selected_grasp_path_length_rad = _optional_float_to_ros(
+        result.selected_grasp_path_length_rad
     )
     message.collision_count = result.collision_count
     message.failed_state = result.failure_state
@@ -197,6 +219,22 @@ def episode_from_ros(message: Any) -> EpisodeResult:
         ),
         minimum_perception_confidence=_optional_float_from_ros(
             message.minimum_perception_confidence
+        ),
+        object_variant=str(message.object_variant or "cube"),
+        perception_profile=str(message.perception_profile or "nominal"),
+        object_yaw_error_rad=_optional_float_from_ros(
+            message.object_yaw_error_rad
+        ),
+        grasp_selection_success=bool(message.grasp_selection_success),
+        grasp_selection_latency_sec=_optional_float_from_ros(
+            message.grasp_selection_latency_sec
+        ),
+        grasp_candidate_count=int(message.grasp_candidate_count),
+        selected_grasp_yaw_rad=_optional_float_from_ros(
+            message.selected_grasp_yaw_rad
+        ),
+        selected_grasp_path_length_rad=_optional_float_from_ros(
+            message.selected_grasp_path_length_rad
         ),
         execution_time_sec=float(message.execution_time_sec),
         execution_success=bool(message.execution_success),

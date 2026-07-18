@@ -14,6 +14,7 @@ class GateLimits:
     max_hand_object_distance_m: float
     expected_gripper_width_m: float
     gripper_width_tolerance_m: float
+    allow_pi_symmetry: bool = True
 
 
 @dataclass(frozen=True)
@@ -45,12 +46,24 @@ def quaternion_angle_error(
     return 2.0 * math.acos(min(1.0, max(0.0, abs(dot))))
 
 
+def _quaternion_multiply(left: Sequence[float], right: Sequence[float]):
+    lx, ly, lz, lw = (float(value) for value in left)
+    rx, ry, rz, rw = (float(value) for value in right)
+    return (
+        lw * rx + lx * rw + ly * rz - lz * ry,
+        lw * ry - lx * rz + ly * rw + lz * rx,
+        lw * rz + lx * ry - ly * rx + lz * rw,
+        lw * rw - lx * rx - ly * ry - lz * rz,
+    )
+
+
 def evaluate_gate(
     hand_xyz: Sequence[float],
     hand_quaternion_xyzw: Sequence[float],
     object_xyz: Sequence[float],
     gripper_width_m: float,
     limits: GateLimits,
+    object_quaternion_xyzw: Sequence[float] = (0.0, 0.0, 0.0, 1.0),
 ) -> GateResult:
     """Evaluate proximity, pose, and gripper-clearance requirements."""
     hand_object = tuple(float(h) - float(o) for h, o in zip(hand_xyz, object_xyz))
@@ -63,8 +76,20 @@ def evaluate_gate(
         )
     )
     distance = _norm(hand_object)
-    orientation_error = quaternion_angle_error(
-        hand_quaternion_xyzw, limits.expected_hand_quaternion_xyzw
+    ox, oy, oz, ow = (float(value) for value in object_quaternion_xyzw)
+    object_inverse = (-ox, -oy, -oz, ow)
+    relative_hand = _quaternion_multiply(object_inverse, hand_quaternion_xyzw)
+    expected_orientations = [limits.expected_hand_quaternion_xyzw]
+    if limits.allow_pi_symmetry:
+        expected_orientations.append(
+            _quaternion_multiply(
+                (0.0, 0.0, 1.0, 0.0),
+                limits.expected_hand_quaternion_xyzw,
+            )
+        )
+    orientation_error = min(
+        quaternion_angle_error(relative_hand, expected)
+        for expected in expected_orientations
     )
 
     checks = (

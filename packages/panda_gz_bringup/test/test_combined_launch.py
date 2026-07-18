@@ -10,6 +10,7 @@ ROOT = Path(__file__).parents[1]
 COMBINED = ROOT / "launch" / "panda_moveit_gz.launch.py"
 STANDALONE = ROOT / "launch" / "panda_gz.launch.py"
 BATCH = ROOT / "launch" / "gazebo_batch.launch.py"
+VISUAL = ROOT / "launch" / "panda_visual_pick_place.launch.py"
 
 
 def test_combined_launch_static_generation_contract():
@@ -90,6 +91,7 @@ def test_combined_launch_description_generates_when_ros_is_available(monkeypatch
     assert {
         "backend",
         "scene",
+        "object_variant",
         "seed",
         "grasp_mode",
         "headless",
@@ -101,6 +103,7 @@ def test_combined_launch_description_generates_when_ros_is_available(monkeypatch
         "pose_source",
         "perception_timeout_sec",
         "use_perception_debug",
+        "perception_profile",
     } <= argument_names
 
 
@@ -147,5 +150,35 @@ def test_gazebo_batch_wrapper_is_fail_closed_and_assisted_only():
         "pose_source",
         "perception_timeout_sec",
         "use_perception_debug",
+        "object_variant",
+        "perception_profile",
     } <= declared_arguments
     assert 'DeclareLaunchArgument("grasp_mode"' not in source
+
+
+def test_visual_pick_place_is_the_minimal_recommended_entrypoint():
+    source = VISUAL.read_text()
+    tree = ast.parse(source)
+    assert '"panda_moveit_gz.launch.py"' in source
+    assert '"grasp_mode": "assisted"' in source
+    assert '"start_application": "true"' in source
+    assert 'default_value="rect_prism"' in source
+    assert 'default_value="rgbd"' in source
+    declared_arguments = {
+        node.args[0].value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "DeclareLaunchArgument"
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+    }
+    assert declared_arguments == {
+        "scene",
+        "seed",
+        "object_variant",
+        "pose_source",
+        "perception_profile",
+        "headless",
+        "use_rviz",
+    }

@@ -54,3 +54,26 @@ def test_quaternion_error_is_sign_invariant():
     quaternion = (0.5, 0.5, 0.5, 0.5)
     opposite = tuple(-value for value in quaternion)
     assert math.isclose(quaternion_angle_error(quaternion, opposite), 0.0)
+
+
+def test_gate_accepts_same_hand_orientation_relative_to_rotated_object():
+    yaw = math.radians(40.0)
+    yaw_quaternion = (0.0, 0.0, math.sin(yaw / 2.0), math.cos(yaw / 2.0))
+    x_value, y_value, z_value, w_value = LIMITS.expected_hand_quaternion_xyzw
+    hand = (
+        yaw_quaternion[3] * x_value - yaw_quaternion[2] * y_value,
+        yaw_quaternion[3] * y_value + yaw_quaternion[2] * x_value,
+        yaw_quaternion[2] * w_value,
+        yaw_quaternion[3] * w_value,
+    )
+
+    result = evaluate_gate(
+        (0.6, 0.2, 0.10),
+        hand,
+        (0.6, 0.2, 0.025),
+        0.06,
+        LIMITS,
+        yaw_quaternion,
+    )
+
+    assert result.accepted

@@ -81,6 +81,14 @@ class ReportGroup:
     target_position_error_p95_m: float | None
     obstacle_position_error_mean_m: float | None
     obstacle_position_error_p95_m: float | None
+    object_variant: str
+    perception_profile: str
+    object_yaw_error_mean_rad: float | None
+    object_yaw_error_p95_rad: float | None
+    grasp_selection_success_rate: float | None
+    grasp_selection_latency_mean_sec: float | None
+    grasp_candidate_count_mean: float | None
+    selected_grasp_path_length_mean_rad: float | None
     failure_counts: dict[str, int] = field(default_factory=dict)
     metric_sample_counts: dict[str, int | None] = field(default_factory=dict)
     metric_origins: dict[str, str] = field(default_factory=dict)
@@ -286,6 +294,24 @@ def generate_report(
                             f"{title} — Full episode RGB-D perception latency",
                             scoped,
                         ),
+                        (
+                            output_dir / "full_episode_yaw_error.svg",
+                            "yaw_error",
+                            f"{title} — Full episode object yaw error",
+                            scoped,
+                        ),
+                        (
+                            output_dir / "full_episode_grasp_selection.svg",
+                            "grasp_selection",
+                            f"{title} — Full episode grasp selection",
+                            scoped,
+                        ),
+                        (
+                            output_dir / "full_episode_grasp_candidate_path.svg",
+                            "grasp_candidate_path",
+                            f"{title} — Selected grasp candidate path cost",
+                            scoped,
+                        ),
                     ]
                 )
 
@@ -438,6 +464,8 @@ def _dataset_from_records(
             record["planner_id"],
             record["grasp_mode"],
             record["pose_source"],
+            record["object_variant"],
+            record["perception_profile"],
         )
         grouped[key].append(record)
 
@@ -481,6 +509,8 @@ def _normalize_record(
         "planner_id": str(record.get("planner_id") or record.get("planner", "unknown")),
         "grasp_mode": str(record.get("grasp_mode", "assisted")),
         "pose_source": str(record.get("pose_source", "")),
+        "object_variant": str(record.get("object_variant", "cube")),
+        "perception_profile": str(record.get("perception_profile", "nominal")),
         "planning_success": planning_success,
         "planning_time_sec": _record_number(record, "planning_time_sec", path, index),
         "path_length_rad": _record_number(record, "path_length_rad", path, index),
@@ -504,6 +534,21 @@ def _normalize_record(
         ),
         "obstacle_position_error_m": _record_number(
             record, "obstacle_position_error_m", path, index
+        ),
+        "object_yaw_error_rad": _record_number(
+            record, "object_yaw_error_rad", path, index
+        ),
+        "grasp_selection_success": _record_bool(
+            record, "grasp_selection_success", path, index
+        ),
+        "grasp_selection_latency_sec": _record_number(
+            record, "grasp_selection_latency_sec", path, index
+        ),
+        "grasp_candidate_count": _record_number(
+            record, "grasp_candidate_count", path, index
+        ),
+        "selected_grasp_path_length_rad": _record_number(
+            record, "selected_grasp_path_length_rad", path, index
         ),
     }
     xy_error = _record_number(record, "final_xy_error_m", path, index)
@@ -589,7 +634,10 @@ def _summarize_records(
     key: tuple[str, ...],
     records: list[dict[str, Any]],
 ) -> ReportGroup:
-    mode, backend, simulator, scene, planner_id, grasp_mode, pose_source = key
+    (
+        mode, backend, simulator, scene, planner_id, grasp_mode, pose_source,
+        object_variant, perception_profile,
+    ) = key
     planning_times = _reported(records, "planning_time_sec")
     path_lengths = [
         record["path_length_rad"]
@@ -603,6 +651,10 @@ def _summarize_records(
     object_errors = _reported(records, "object_position_error_m")
     target_errors = _reported(records, "target_position_error_m")
     obstacle_errors = _reported(records, "obstacle_position_error_m")
+    yaw_errors = _reported(records, "object_yaw_error_rad")
+    selection_latencies = _reported(records, "grasp_selection_latency_sec")
+    candidate_counts = _reported(records, "grasp_candidate_count")
+    selected_path_lengths = _reported(records, "selected_grasp_path_length_rad")
     failure_counts: Counter[str] = Counter()
     for record in records:
         if mode == PLANNING_ONLY:
@@ -619,12 +671,16 @@ def _summarize_records(
     origin_values = {record["place_error_origin"] for record in records}
     place_origin = origin_values.pop() if len(origin_values) == 1 else "mixed"
     display = _display_label(
-        dataset, backend, simulator, scene, planner_id, grasp_mode, pose_source
+        dataset, backend, simulator, scene, planner_id, grasp_mode, pose_source,
+        object_variant, perception_profile,
     )
     return ReportGroup(
         dataset=dataset,
         group_key="/".join(
-            (backend, simulator, scene, planner_id, grasp_mode, pose_source)
+            (
+                backend, simulator, scene, planner_id, grasp_mode, pose_source,
+                object_variant, perception_profile,
+            )
         ),
         display_label=display,
         evaluation_mode=mode,
@@ -655,6 +711,16 @@ def _summarize_records(
         target_position_error_p95_m=_percentile(target_errors, 0.95),
         obstacle_position_error_mean_m=_safe_mean(obstacle_errors),
         obstacle_position_error_p95_m=_percentile(obstacle_errors, 0.95),
+        object_variant=object_variant,
+        perception_profile=perception_profile,
+        object_yaw_error_mean_rad=_safe_mean(yaw_errors),
+        object_yaw_error_p95_rad=_percentile(yaw_errors, 0.95),
+        grasp_selection_success_rate=_bool_rate(
+            records, "grasp_selection_success"
+        ),
+        grasp_selection_latency_mean_sec=_safe_mean(selection_latencies),
+        grasp_candidate_count_mean=_safe_mean(candidate_counts),
+        selected_grasp_path_length_mean_rad=_safe_mean(selected_path_lengths),
         failure_counts=dict(sorted(failure_counts.items())),
         metric_sample_counts={
             "planning_success_rate": len(records),
@@ -676,6 +742,9 @@ def _summarize_records(
             "object_position_error": len(object_errors),
             "target_position_error": len(target_errors),
             "obstacle_position_error": len(obstacle_errors),
+            "object_yaw_error": len(yaw_errors),
+            "grasp_selection_latency": len(selection_latencies),
+            "selected_grasp_path_length": len(selected_path_lengths),
         },
         metric_origins={
             "planning_time": "reported_episode_values",
@@ -720,6 +789,8 @@ def _dataset_from_summary(
                     planner,
                     "",
                     str(values.get("pose_source", "")),
+                    str(values.get("object_variant", "cube")),
+                    str(values.get("perception_profile", "nominal")),
                 ),
                 evaluation_mode=mode,
                 episodes=_summary_int(values.get("episodes"), "episodes", path),
@@ -832,6 +903,32 @@ def _dataset_from_summary(
                 ),
                 obstacle_position_error_p95_m=_nested_summary_number(
                     values, "obstacle_position_error_m", "p95", path
+                ),
+                object_variant=str(values.get("object_variant", "cube")),
+                perception_profile=str(
+                    values.get("perception_profile", "nominal")
+                ),
+                object_yaw_error_mean_rad=_nested_summary_number(
+                    values, "object_yaw_error_rad", "mean", path
+                ),
+                object_yaw_error_p95_rad=_nested_summary_number(
+                    values, "object_yaw_error_rad", "p95", path
+                ),
+                grasp_selection_success_rate=_summary_number(
+                    values.get("grasp_selection_success_rate"),
+                    "grasp_selection_success_rate",
+                    path,
+                ),
+                grasp_selection_latency_mean_sec=_nested_summary_number(
+                    values, "grasp_selection_latency_sec", "mean", path
+                ),
+                grasp_candidate_count_mean=_summary_number(
+                    values.get("avg_grasp_candidate_count"),
+                    "avg_grasp_candidate_count",
+                    path,
+                ),
+                selected_grasp_path_length_mean_rad=_nested_summary_number(
+                    values, "selected_grasp_path_length_rad", "mean", path
                 ),
                 failure_counts=failure_counts,
                 metric_sample_counts={
@@ -981,12 +1078,18 @@ def _display_label(
     planner: str,
     grasp_mode: str,
     pose_source: str,
+    object_variant: str = "",
+    perception_profile: str = "",
 ) -> str:
     parts = [dataset, f"{backend}/{simulator}", scene, planner]
     if grasp_mode and grasp_mode != "assisted":
         parts.append(grasp_mode)
     if pose_source:
         parts.append(pose_source)
+    if object_variant and object_variant != "cube":
+        parts.append(object_variant)
+    if perception_profile and perception_profile != "nominal":
+        parts.append(perception_profile)
     return " · ".join(parts)
 
 
@@ -1189,6 +1292,56 @@ def _write_chart(
             values,
             axis_label="P95 position error (mm)",
             value_format=lambda value: f"{value:.3g} mm",
+        )
+        return
+
+    if chart_kind == "yaw_error":
+        _render_grouped_horizontal(
+            path,
+            title,
+            "Mean and P95 planar yaw error for asymmetric workpieces.",
+            groups,
+            ["Mean", "P95"],
+            [
+                [
+                    _scale_optional(group.object_yaw_error_mean_rad, 180.0 / math.pi),
+                    _scale_optional(group.object_yaw_error_p95_rad, 180.0 / math.pi),
+                ]
+                for group in groups
+            ],
+            axis_label="yaw error (deg)",
+            value_format=lambda value: f"{value:.3g} deg",
+        )
+        return
+
+    if chart_kind == "grasp_selection":
+        _render_grouped_horizontal(
+            path,
+            title,
+            "Planning-only pre-grasp candidate selection success rate.",
+            groups,
+            ["Selection success"],
+            [
+                [_scale_optional(group.grasp_selection_success_rate, 100.0)]
+                for group in groups
+            ],
+            axis_max=100.0,
+            axis_label="success rate (%)",
+            value_format=lambda value: f"{value:.1f}%",
+            tick_format=lambda value: f"{value:.0f}%",
+        )
+        return
+
+    if chart_kind == "grasp_candidate_path":
+        _render_grouped_horizontal(
+            path,
+            title,
+            "Mean planning-only joint-path length of the selected pre-grasp candidate.",
+            groups,
+            ["Selected candidate"],
+            [[group.selected_grasp_path_length_mean_rad] for group in groups],
+            axis_label="joint-path length (rad)",
+            value_format=lambda value: f"{value:.3g} rad",
         )
         return
 

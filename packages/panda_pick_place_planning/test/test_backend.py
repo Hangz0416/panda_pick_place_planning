@@ -1,4 +1,5 @@
 from pathlib import Path
+import math
 import unittest
 
 from panda_pick_place_planning.core.backends import (
@@ -31,6 +32,7 @@ class FakeBackend:
         self.released = False
         self.target_position = (0.6, 0.2, 0.025)
         self.motion_targets = []
+        self.motion_orientations = []
         self.applied_estimate = None
 
     def reset(self, task):
@@ -46,6 +48,7 @@ class FakeBackend:
         timeout_sec=1.0,
     ):
         self.motion_targets.append(tuple(position))
+        self.motion_orientations.append(tuple(orientation))
         self.simulation_steps += 3
         plan = PlanResult(
             True,
@@ -57,6 +60,29 @@ class FakeBackend:
 
     def move_home(self):
         return self.move_to_pose((0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0))
+
+    def check_pose_feasibility(
+        self,
+        position,
+        orientation,
+        *,
+        planner="rrt_connect",
+        seed=0,
+        timeout_sec=3.0,
+    ):
+        plan = PlanResult(
+            True,
+            path=[[0.0], [1.0]],
+            planning_time_sec=0.01,
+            explored_nodes=2,
+        )
+        return BackendMotionReport(
+            True,
+            True,
+            plan_result=plan,
+            path_length_rad=1.0,
+            trajectory_points=2,
+        )
 
     def set_gripper(self, width):
         self.gripper_commands.append(width)
@@ -111,6 +137,7 @@ class BackendContractTest(unittest.TestCase):
         self.assertEqual(result.backend, "pybullet")
         self.assertEqual(result.planner_id, "rrt_connect")
         self.assertIn("transfer", result.stage_metrics)
+        self.assertIn("grasp_selection", result.stage_metrics)
         self.assertIn(backend.open_gripper_width, backend.gripper_commands)
         self.assertIn(backend.closed_gripper_width, backend.gripper_commands)
 
@@ -166,7 +193,16 @@ class BackendContractTest(unittest.TestCase):
                     latency_sec=0.02,
                     estimates={
                         "cube": SceneObjectEstimate(
-                            "cube", (0.52, -0.18, 0.025), 0.9, 200
+                            "cube",
+                            (0.52, -0.18, 0.025),
+                            0.9,
+                            200,
+                            orientation_xyzw=(
+                                0.0,
+                                0.0,
+                                math.sin(0.2),
+                                math.cos(0.2),
+                            ),
                         ),
                         "target": SceneObjectEstimate(
                             "target", (0.58, 0.18, 0.025), 0.8, 500
@@ -183,18 +219,31 @@ class BackendContractTest(unittest.TestCase):
             scene="clear",
             object_position=(0.5, -0.2, 0.025),
             target_position=(0.6, 0.2, 0.025),
+            object_variant="rect_prism",
+            object_yaw_rad=1.0,
         )
 
         result = PickPlaceRunner(backend, OffsetVisualProvider()).run(task)
 
         self.assertEqual(backend.motion_targets[0][:2], (0.52, -0.18))
         self.assertEqual(backend.motion_targets[3][:2], (0.58, 0.18))
+        self.assertTrue(
+            all(
+                orientation == backend.motion_orientations[0]
+                for orientation in backend.motion_orientations
+            )
+        )
+        self.assertNotEqual(
+            backend.motion_orientations[0], backend.downward_orientation()
+        )
         self.assertEqual(backend.applied_estimate[1], "clear")
         self.assertEqual(result.target_position, task.target_position)
         self.assertAlmostEqual(result.object_position_error_m, 0.02 * 2 ** 0.5)
         self.assertAlmostEqual(result.target_position_error_m, 0.02 * 2 ** 0.5)
         self.assertEqual(result.minimum_perception_confidence, 0.8)
         self.assertEqual(result.pose_source, "rgbd")
+        self.assertAlmostEqual(result.selected_grasp_yaw_rad, 0.4)
+        self.assertAlmostEqual(result.object_yaw_error_rad, 0.6)
 
     def test_perception_failure_stops_before_motion(self):
         class FailedProvider:

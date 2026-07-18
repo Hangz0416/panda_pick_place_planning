@@ -88,6 +88,11 @@ class TaskSpecTest(unittest.TestCase):
         self.assertEqual(restored.pose_source, "ground_truth")
         self.assertTrue(restored.perception_success)
         self.assertIsNone(restored.perception_latency_sec)
+        self.assertEqual(restored.object_variant, "cube")
+        self.assertEqual(restored.perception_profile, "nominal")
+        self.assertFalse(restored.grasp_selection_success)
+        self.assertEqual(restored.grasp_candidate_count, 0)
+        self.assertIsNone(restored.object_yaw_error_rad)
 
     def test_unavailable_metrics_serialize_as_json_null(self):
         result = EpisodeResult(
@@ -116,7 +121,7 @@ class TaskSpecTest(unittest.TestCase):
         self.assertIsNone(payload["final_xy_error_m"])
         self.assertIsNone(payload["final_z_error_m"])
         self.assertIsNone(payload["final_object_speed_mps"])
-        self.assertEqual(payload["schema_version"], 3)
+        self.assertEqual(payload["schema_version"], 4)
         self.assertIsNone(payload["perception_latency_sec"])
 
     def test_schema_v3_preserves_visual_metrics(self):
@@ -154,6 +159,47 @@ class TaskSpecTest(unittest.TestCase):
         self.assertAlmostEqual(restored.perception_latency_sec, 0.025)
         self.assertAlmostEqual(restored.obstacle_position_error_m, 0.009)
         self.assertAlmostEqual(restored.minimum_perception_confidence, 0.82)
+        self.assertFalse(restored.grasp_selection_success)
+
+    def test_schema_v4_preserves_yaw_and_grasp_selection_metrics(self):
+        base = EpisodeResult(
+            episode_id=1,
+            task_seed=2,
+            planner="rrt_connect",
+            planner_seed=3,
+            scene="obstacle",
+            planning_success=True,
+            planning_time_sec=0.1,
+            explored_nodes=3,
+            path_waypoints=9,
+            path_length_rad=0.7,
+            execution_sim_steps=100,
+            task_success=True,
+            collision_count=0,
+            failure_type="",
+            object_initial_position=(0.5, 0.1, 0.025),
+            object_final_position=(0.5, -0.1, 0.025),
+            target_position=(0.5, -0.1, 0.025),
+            pose_source="rgbd",
+            object_variant="rect_prism",
+            perception_profile="combined",
+            object_yaw_error_rad=0.04,
+            grasp_selection_success=True,
+            grasp_selection_latency_sec=0.08,
+            grasp_candidate_count=2,
+            selected_grasp_yaw_rad=-0.3,
+            selected_grasp_path_length_rad=1.2,
+        )
+
+        restored = EpisodeResult.from_json(base.to_json())
+
+        self.assertEqual(restored.schema_version, 4)
+        self.assertEqual(restored.object_variant, "rect_prism")
+        self.assertEqual(restored.perception_profile, "combined")
+        self.assertTrue(restored.grasp_selection_success)
+        self.assertAlmostEqual(restored.object_yaw_error_rad, 0.04)
+        self.assertEqual(restored.grasp_candidate_count, 2)
+        self.assertAlmostEqual(restored.selected_grasp_yaw_rad, -0.3)
 
     def test_promotes_physical_and_collision_metrics_from_stages(self):
         result = EpisodeResult(

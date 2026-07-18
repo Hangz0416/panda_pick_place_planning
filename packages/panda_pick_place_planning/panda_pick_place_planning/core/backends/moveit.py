@@ -137,6 +137,7 @@ class MoveItBackend:
         self.last_motion_report: BackendMotionReport | None = None
         self._task: TaskSpec | None = None
         self._object_position = (0.0, 0.0, self.scene_config.cube_half_extent)
+        self._object_orientation = (0.0, 0.0, 0.0, 1.0)
         self._object_velocity = (
             self._unknown_velocity()
             if self.config.use_gazebo
@@ -201,6 +202,13 @@ class MoveItBackend:
     def reset(self, task: TaskSpec) -> None:
         self._task = task
         self._object_position = tuple(task.object_position)
+        half_yaw = 0.5 * task.object_yaw_rad
+        self._object_orientation = (
+            0.0,
+            0.0,
+            math.sin(half_yaw),
+            math.cos(half_yaw),
+        )
         self._object_velocity = (
             self._unknown_velocity()
             if self.config.use_gazebo
@@ -281,7 +289,7 @@ class MoveItBackend:
             self.scene_config.table_size,
             allowed_collision_links=("panda_link0",),
         )
-        cube_size = (2.0 * self.scene_config.cube_half_extent,) * 3
+        cube_size = self._object_size(task.object_variant)
         cube_allowed_collisions = self.config.touch_links
         if self.config.use_gazebo:
             # A resting object is intentionally in contact with its support
@@ -292,6 +300,7 @@ class MoveItBackend:
             "cube",
             task.object_position,
             cube_size,
+            orientation=self._object_orientation,
             allowed_collision_links=cube_allowed_collisions,
         )
         if task.scene == "obstacle":
@@ -371,7 +380,9 @@ class MoveItBackend:
             return False
         try:
             cube = estimate.require("cube")
-            cube_size = (2.0 * self.scene_config.cube_half_extent,) * 3
+            cube_size = self._object_size(
+                self._task.object_variant if self._task is not None else "cube"
+            )
             allowed = self.config.touch_links
             if self.config.use_gazebo:
                 allowed += ("table",)
@@ -379,6 +390,7 @@ class MoveItBackend:
                 "cube",
                 cube.position,
                 cube_size,
+                orientation=cube.orientation_xyzw,
                 allowed_collision_links=allowed,
             )
             if scene == "obstacle":
@@ -400,6 +412,32 @@ class MoveItBackend:
             return False
         self.planning_scene_sync_success = True
         return True
+
+    def check_pose_feasibility(
+        self,
+        position: Sequence[float],
+        orientation: Sequence[float],
+        *,
+        planner: str = "rrt_connect",
+        seed: int = 0,
+        timeout_sec: float = 3.0,
+    ) -> BackendMotionReport:
+        """Plan to a candidate pose without moving the robot."""
+        del seed
+        goal = self._new_motion_goal()
+        goal.target_type = goal.TARGET_TYPE_POSE
+        goal.pose_target.header.frame_id = self.config.world_frame
+        goal.pose_target.pose.position.x = float(position[0])
+        goal.pose_target.pose.position.y = float(position[1])
+        goal.pose_target.pose.position.z = float(position[2])
+        goal.pose_target.pose.orientation.x = float(orientation[0])
+        goal.pose_target.pose.orientation.y = float(orientation[1])
+        goal.pose_target.pose.orientation.z = float(orientation[2])
+        goal.pose_target.pose.orientation.w = float(orientation[3])
+        goal.end_effector_link = self.config.end_effector_link
+        self._configure_motion_goal(goal, planner, timeout_sec)
+        goal.execute = False
+        return self._send_motion(goal)
 
     def move_home(self) -> BackendMotionReport:
         goal = self._new_motion_goal()
@@ -571,8 +609,15 @@ class MoveItBackend:
                     self._pose_condition.wait(
                         timeout=max(0.0, min(0.05, deadline - now))
                     )
-        cube_size = (2.0 * self.scene_config.cube_half_extent,) * 3
-        self._upsert_box("cube", self._object_position, cube_size)
+        cube_size = self._object_size(
+            self._task.object_variant if self._task is not None else "cube"
+        )
+        self._upsert_box(
+            "cube",
+            self._object_position,
+            cube_size,
+            orientation=self._object_orientation,
+        )
 
     def object_state(
         self,
@@ -1043,6 +1088,13 @@ class MoveItBackend:
                 (sample_time, position) if sample_is_monotonic else None
             )
             self._object_position = position
+            rotation = pose.orientation
+            self._object_orientation = (
+                float(rotation.x),
+                float(rotation.y),
+                float(rotation.z),
+                float(rotation.w),
+            )
             self._pose_generation += 1
             self.object_state_known = velocity_known
             self._pose_condition.notify_all()
@@ -1250,6 +1302,7 @@ class MoveItBackend:
         size: Sequence[float],
         *,
         allowed_collision_links: Sequence[str] = (),
+        orientation: Sequence[float] = (0.0, 0.0, 0.0, 1.0),
     ) -> None:
         from moveit_msgs.msg import CollisionObject
         from panda_pick_place_interfaces.srv import UpsertWorldObject
@@ -1270,7 +1323,10 @@ class MoveItBackend:
         pose.position.x = float(position[0])
         pose.position.y = float(position[1])
         pose.position.z = float(position[2])
-        pose.orientation.w = 1.0
+        pose.orientation.x = float(orientation[0])
+        pose.orientation.y = float(orientation[1])
+        pose.orientation.z = float(orientation[2])
+        pose.orientation.w = float(orientation[3])
         collision.primitives = [primitive]
         collision.primitive_poses = [pose]
         request.collision_object = collision
@@ -1279,6 +1335,14 @@ class MoveItBackend:
             request,
             f"planning_scene_upsert_failed:{object_id}",
         )
+
+    @staticmethod
+    def _object_size(object_variant: str) -> tuple[float, float, float]:
+        if object_variant == "cube":
+            return (0.05, 0.05, 0.05)
+        if object_variant == "rect_prism":
+            return (0.06, 0.04, 0.05)
+        raise ValueError(f"unsupported object variant: {object_variant}")
 
     def _require_world_object_removed(
         self,
@@ -1341,6 +1405,8 @@ class MoveItBackend:
         request.task_seed = task.task_seed
         request.scene = task.scene
         request.grasp_mode = task.grasp_mode
+        request.object_variant = task.object_variant
+        request.object_yaw_rad = task.object_yaw_rad
         request.object_position.x = task.object_position[0]
         request.object_position.y = task.object_position[1]
         request.object_position.z = task.object_position[2]
@@ -1359,9 +1425,19 @@ class MoveItBackend:
         except AttributeError:
             return False
         tolerance = self.config.reset_pose_tolerance_m
+        applied_yaw = float(
+            getattr(response, "applied_object_yaw_rad", task.object_yaw_rad)
+        )
+        yaw_error = abs(
+            math.atan2(
+                math.sin(applied_yaw - task.object_yaw_rad),
+                math.cos(applied_yaw - task.object_yaw_rad),
+            )
+        )
         return (
             math.dist(applied_object, task.object_position) <= tolerance
             and math.dist(applied_target, task.target_position) <= tolerance
+            and yaw_error <= 0.05
         )
 
     def _require_service_success(

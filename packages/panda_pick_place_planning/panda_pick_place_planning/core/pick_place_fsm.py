@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from enum import Enum
 import math
+import time
 from typing import Any
 
 from panda_pick_place_planning.core.backends import (
@@ -10,6 +11,12 @@ from panda_pick_place_planning.core.backends import (
     PyBulletBackend,
 )
 from panda_pick_place_planning.core.planners.base import path_length
+from panda_pick_place_planning.core.grasp_pose import (
+    GraspPoseGenerator,
+    GraspSelection,
+    normalize_symmetric_yaw,
+    select_feasible_grasp,
+)
 from panda_pick_place_planning.core.pybullet_env import PyBulletPandaEnv
 from panda_pick_place_planning.core.schemas import EpisodeResult, PlanResult, TaskSpec
 from panda_pick_place_planning.core.scene_pose_provider import (
@@ -21,6 +28,7 @@ from panda_pick_place_planning.core.scene_pose_provider import (
 class PickPlaceState(str, Enum):
     RESET = "reset"
     PERCEPTION = "perception"
+    GRASP_SELECTION = "grasp_selection"
     PRE_GRASP = "pre_grasp"
     GRASP = "grasp"
     LIFT = "lift"
@@ -42,6 +50,7 @@ class PickPlaceRunner:
         self,
         backend: ManipulationBackend | PyBulletPandaEnv,
         pose_provider: ScenePoseProvider | None = None,
+        grasp_pose_generator: GraspPoseGenerator | None = None,
     ) -> None:
         if isinstance(backend, PyBulletPandaEnv):
             backend = PyBulletBackend(backend)
@@ -57,11 +66,14 @@ class PickPlaceRunner:
         if not isinstance(pose_provider, ScenePoseProvider):
             raise TypeError("pose_provider does not implement ScenePoseProvider")
         self.pose_provider = pose_provider
+        self.grasp_pose_generator = grasp_pose_generator or GraspPoseGenerator()
         self.state = PickPlaceState.RESET
         self._object_was_attached = False
         self._object_was_released = False
         self._stage_metrics: dict[str, dict[str, Any]] = {}
         self._scene_estimate = None
+        self._grasp_selection: GraspSelection | None = None
+        self._grasp_selection_latency_sec: float | None = None
 
     def run(self, task: TaskSpec) -> EpisodeResult:
         self.state = PickPlaceState.RESET
@@ -69,11 +81,12 @@ class PickPlaceRunner:
         self._object_was_released = False
         self._stage_metrics = {}
         self._scene_estimate = None
+        self._grasp_selection = None
+        self._grasp_selection_latency_sec = None
         self.backend.reset(task)
         episode_start_steps = self.backend.simulation_steps
         episode_start_collisions = self.backend.collision_count
         object_initial_position, _ = self.backend.object_state()
-        orientation = self.backend.downward_orientation()
 
         self.state = PickPlaceState.PERCEPTION
         scene_estimate = self.pose_provider.estimate(task)
@@ -135,12 +148,53 @@ class PickPlaceRunner:
                     episode_start_collisions,
                 )
 
+        self.state = PickPlaceState.GRASP_SELECTION
+        selection_started = time.perf_counter()
+        try:
+            candidates = self.grasp_pose_generator.generate(
+                scene_estimate.require("cube"),
+                task.object_variant,
+                self.backend.downward_orientation(),
+                hover_height=self.backend.hover_height,
+                grasp_height=self.backend.grasp_height,
+            )
+            selection = select_feasible_grasp(
+                candidates,
+                self.backend,
+                planner=task.planner,
+                seed=task.planner_seed,
+                timeout_sec=3.0,
+            )
+        except (AttributeError, TypeError, ValueError):
+            selection = GraspSelection(
+                False,
+                failure_type="grasp_pose_generation_failed",
+            )
+        self._grasp_selection = selection
+        self._grasp_selection_latency_sec = time.perf_counter() - selection_started
+        self._stage_metrics[self.state.value] = {
+            "grasp_selection_success": selection.success,
+            "grasp_selection_latency_sec": self._grasp_selection_latency_sec,
+            "grasp_candidate_count": selection.candidate_count,
+            "selected_grasp_yaw_rad": (
+                selection.candidate.yaw_rad if selection.candidate is not None else None
+            ),
+            "selected_grasp_path_length_rad": selection.path_length_rad,
+            "failure_type": selection.failure_type,
+        }
+        if not selection.success or selection.candidate is None:
+            return self._failure(
+                task,
+                object_initial_position,
+                selection.failure_type or "grasp_candidate_planning_failed",
+                episode_start_steps,
+                episode_start_collisions,
+            )
+        candidate = selection.candidate
+        orientation = candidate.orientation_xyzw
+
         self.state = PickPlaceState.PRE_GRASP
-        pre_grasp = (
-            object_position[0],
-            object_position[1],
-            self.backend.hover_height,
-        )
+        pre_grasp = candidate.pre_grasp_position
         report = self._move_to_pose(pre_grasp, orientation)
         if not report.success:
             return self._failure(
@@ -152,11 +206,7 @@ class PickPlaceRunner:
             )
 
         self.backend.set_gripper(self.backend.open_gripper_width)
-        grasp_pose = (
-            object_position[0],
-            object_position[1],
-            self.backend.grasp_height,
-        )
+        grasp_pose = candidate.grasp_position
         report = self._move_to_pose(grasp_pose, orientation)
         if not report.success:
             return self._failure(
@@ -188,11 +238,7 @@ class PickPlaceRunner:
         self._capture_grasp_metrics(PickPlaceState.GRASP)
 
         self.state = PickPlaceState.LIFT
-        lift_pose = (
-            object_position[0],
-            object_position[1],
-            self.backend.hover_height,
-        )
+        lift_pose = candidate.retreat_position
         report = self._move_to_pose(lift_pose, orientation)
         if not report.success:
             return self._failure(
@@ -506,6 +552,9 @@ class PickPlaceRunner:
             return {
                 "pose_source": getattr(self.pose_provider, "pose_source", "ground_truth"),
                 "perception_success": False,
+                "object_variant": task.object_variant,
+                "perception_profile": task.perception_profile,
+                **self._grasp_selection_kwargs(),
             }
 
         def error(object_id: str, truth) -> float | None:
@@ -531,6 +580,36 @@ class PickPlaceRunner:
             "target_position_error_m": error("target", task.target_position),
             "obstacle_position_error_m": obstacle_error,
             "minimum_perception_confidence": self._minimum_confidence(),
+            "object_variant": task.object_variant,
+            "perception_profile": task.perception_profile,
+            "object_yaw_error_rad": self._object_yaw_error(task),
+            **self._grasp_selection_kwargs(),
+        }
+
+    def _object_yaw_error(self, task: TaskSpec) -> float | None:
+        if task.object_variant != "rect_prism" or self._scene_estimate is None:
+            return None
+        estimate = self._scene_estimate.estimates.get("cube")
+        if estimate is None:
+            return None
+        return abs(
+            normalize_symmetric_yaw(estimate.yaw_rad - task.object_yaw_rad)
+        )
+
+    def _grasp_selection_kwargs(self) -> dict[str, Any]:
+        selection = self._grasp_selection
+        return {
+            "grasp_selection_success": bool(selection and selection.success),
+            "grasp_selection_latency_sec": self._grasp_selection_latency_sec,
+            "grasp_candidate_count": 0 if selection is None else selection.candidate_count,
+            "selected_grasp_yaw_rad": (
+                None
+                if selection is None or selection.candidate is None
+                else selection.candidate.yaw_rad
+            ),
+            "selected_grasp_path_length_rad": (
+                None if selection is None else selection.path_length_rad
+            ),
         }
 
     @staticmethod

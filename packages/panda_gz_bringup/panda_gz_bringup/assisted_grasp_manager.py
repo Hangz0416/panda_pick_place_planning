@@ -191,6 +191,7 @@ class AssistedGraspManager(Node):
         translation = transform.transform.translation
         rotation = transform.transform.rotation
         object_position = self._cube_pose.position
+        object_orientation = self._cube_pose.orientation
         gripper_width = sum(
             abs(float(self._joint_positions[name])) for name in finger_names
         )
@@ -200,6 +201,12 @@ class AssistedGraspManager(Node):
             (object_position.x, object_position.y, object_position.z),
             gripper_width,
             self._limits(),
+            (
+                object_orientation.x,
+                object_orientation.y,
+                object_orientation.z,
+                object_orientation.w,
+            ),
         )
 
     def _attach(self, _request: Trigger.Request, response: Trigger.Response):

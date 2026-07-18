@@ -7,12 +7,14 @@ from typing import Sequence
 
 SUPPORTED_SCENES = frozenset({"clear", "obstacle"})
 SUPPORTED_GRASP_MODES = frozenset({"assisted", "physics"})
+SUPPORTED_OBJECT_VARIANTS = frozenset({"cube", "rect_prism"})
 SUPPORTED_RESET_FRAMES = frozenset({"", "world"})
 RESET_VALIDATION_THRESHOLDS = {
     "joint_position_error_rad": 0.025,
     "joint_velocity_rad_s": 0.025,
     "gripper_position_error_m": 0.003,
     "cube_position_error_m": 0.005,
+    "cube_orientation_error_rad": 0.050,
     "target_position_error_m": 0.005,
     "obstacle_position_error_m": 0.005,
     "cube_linear_speed_mps": 0.010,
@@ -28,6 +30,7 @@ class ResetValidationMetrics:
     joint_velocity_rad_s: float
     gripper_position_error_m: float
     cube_position_error_m: float
+    cube_orientation_error_rad: float
     target_position_error_m: float
     obstacle_position_error_m: float
     cube_linear_speed_mps: float
@@ -106,6 +109,8 @@ class ResetSpec:
     grasp_mode: str
     object_position: tuple[float, float, float]
     target_position: tuple[float, float, float]
+    object_variant: str = "cube"
+    object_yaw_rad: float = 0.0
 
     @classmethod
     def create(
@@ -117,6 +122,8 @@ class ResetSpec:
         grasp_mode: str,
         object_position: Sequence[float],
         target_position: Sequence[float],
+        object_variant: str = "cube",
+        object_yaw_rad: float = 0.0,
     ) -> "ResetSpec":
         if scene not in SUPPORTED_SCENES:
             raise ValueError(f"unsupported scene: {scene}")
@@ -124,6 +131,10 @@ class ResetSpec:
             raise ValueError(f"unsupported grasp_mode: {grasp_mode}")
         if int(episode_id) < 0 or int(task_seed) < 0:
             raise ValueError("episode_id and task_seed must be non-negative")
+        if object_variant not in SUPPORTED_OBJECT_VARIANTS:
+            raise ValueError(f"unsupported object_variant: {object_variant}")
+        if not math.isfinite(float(object_yaw_rad)):
+            raise ValueError("object_yaw_rad must be finite")
         return cls(
             episode_id=int(episode_id),
             task_seed=int(task_seed),
@@ -131,6 +142,8 @@ class ResetSpec:
             grasp_mode=grasp_mode,
             object_position=_point(object_position, "object_position"),
             target_position=_point(target_position, "target_position"),
+            object_variant=object_variant,
+            object_yaw_rad=float(object_yaw_rad),
         )
 
 
@@ -150,8 +163,15 @@ def entity_pose_map(
         if spec.scene == "obstacle"
         else config.clear_obstacle_pose
     )
+    half_yaw = 0.5 * spec.object_yaw_rad
     return {
-        "cube": (*spec.object_position, 0.0, 0.0, 0.0, 1.0),
+        "cube": (
+            *spec.object_position,
+            0.0,
+            0.0,
+            math.sin(half_yaw),
+            math.cos(half_yaw),
+        ),
         "target": (
             spec.target_position[0],
             spec.target_position[1],

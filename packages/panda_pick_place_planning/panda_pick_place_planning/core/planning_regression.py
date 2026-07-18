@@ -132,6 +132,8 @@ class PlanningRegressionRunner:
                 getattr(self.backend, "planner_id", task.planner)
             ),
             grasp_mode=task.grasp_mode,
+            object_variant=task.object_variant,
+            perception_profile=task.perception_profile,
             execution_time_sec=0.0,
             execution_success=False,
             trajectory_points=sum(

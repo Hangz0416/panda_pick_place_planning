@@ -187,6 +187,8 @@ private:
 
       bool target_set = false;
       bool pose_uses_single_ik = false;
+      geometry_msgs::msg::PoseStamped pose_target_for_fallback;
+      bool has_pose_target_for_fallback = false;
       if (goal->target_type == Motion::Goal::TARGET_TYPE_NAMED) {
         target_set = move_group_->setNamedTarget(goal->named_target);
       } else {
@@ -194,6 +196,8 @@ private:
         if (pose_target.header.frame_id.empty()) {
           pose_target.header.frame_id = move_group_->getPlanningFrame();
         }
+        pose_target_for_fallback = pose_target;
+        has_pose_target_for_fallback = true;
         if (goal->execute) {
           // Resolve an executed redundant Panda pose goal once, seeded by the
           // current state, and plan to that joint target. setPoseTarget() leaves
@@ -256,6 +260,34 @@ private:
           node_->get_logger(),
           "Planning attempt %d/%d returned retryable MoveIt error %d; retrying within %.3f s total budget",
           attempt, planning_attempts, planning_code.val, planning_budget_sec);
+      }
+      if (!planning_code && pose_uses_single_ik && has_pose_target_for_fallback &&
+        planning_code.val == moveit_msgs::msg::MoveItErrorCodes::GOAL_STATE_INVALID)
+      {
+        const double elapsed_sec = std::chrono::duration<double>(
+          std::chrono::steady_clock::now() - planning_started).count();
+        const double remaining_sec = planning_budget_sec - elapsed_sec;
+        if (remaining_sec > 0.0) {
+          // A redundant Panda pose can have one seeded IK solution that is an
+          // invalid goal while another IK branch is collision-free. Preserve
+          // the short, seeded branch as the normal path; only after MoveIt
+          // explicitly rejects that goal, let its pose sampler search once
+          // within the original budget. This never executes a trial motion.
+          move_group_->clearPoseTargets();
+          move_group_->setStartStateToCurrentState();
+          if (move_group_->setPoseTarget(pose_target_for_fallback, end_effector_link)) {
+            move_group_->setPlanningTime(remaining_sec);
+            plan = moveit::planning_interface::MoveGroupInterface::Plan();
+            const auto fallback_started = std::chrono::steady_clock::now();
+            planning_code = move_group_->plan(plan);
+            accumulated_planning_time_sec += std::chrono::duration<double>(
+              std::chrono::steady_clock::now() - fallback_started).count();
+            RCLCPP_WARN(
+              node_->get_logger(),
+              "Seeded pose IK produced GOAL_STATE_INVALID; pose-sampling fallback returned %d",
+              planning_code.val);
+          }
+        }
       }
       result->moveit_error_code = planning_code.val;
       result->planning_time_sec = accumulated_planning_time_sec;
@@ -375,6 +407,8 @@ private:
         return "start_state_path_constraint";
       case Codes::GOAL_IN_COLLISION:
         return "goal_collision";
+      case Codes::GOAL_STATE_INVALID:
+        return "goal_state_invalid";
       case Codes::GOAL_VIOLATES_PATH_CONSTRAINTS:
         return "goal_path_constraint";
       case Codes::GOAL_CONSTRAINTS_VIOLATED:

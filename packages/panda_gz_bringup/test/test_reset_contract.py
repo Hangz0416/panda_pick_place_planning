@@ -1,4 +1,5 @@
 import pytest
+import math
 
 from panda_gz_bringup.reset_contract import (
     ResetSpec,
@@ -38,6 +39,25 @@ def test_obstacle_task_maps_all_models_deterministically():
 def test_clear_task_parks_obstacle_outside_workspace():
     poses = entity_pose_map(spec(scene="clear"), CONFIG)
     assert poses["obstacle"] == CONFIG.clear_obstacle_pose
+
+
+def test_rect_prism_reset_maps_requested_yaw_to_quaternion():
+    rotated = ResetSpec.create(
+        episode_id=7,
+        task_seed=42,
+        scene="clear",
+        grasp_mode="assisted",
+        object_position=(0.59, 0.22, 0.025),
+        target_position=(0.59, -0.225, 0.025),
+        object_variant="rect_prism",
+        object_yaw_rad=0.6,
+    )
+
+    quaternion = entity_pose_map(rotated, CONFIG)["cube"][3:]
+
+    assert quaternion == pytest.approx(
+        (0.0, 0.0, math.sin(0.3), math.cos(0.3))
+    )
 
 
 @pytest.mark.parametrize(

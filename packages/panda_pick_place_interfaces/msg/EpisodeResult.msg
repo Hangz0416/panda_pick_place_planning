@@ -8,6 +8,8 @@ uint64 planner_seed
 string scene
 string grasp_mode
 string pose_source
+string object_variant
+string perception_profile
 
 bool planning_success
 bool execution_success
@@ -34,6 +36,12 @@ float64 object_position_error_m
 float64 target_position_error_m
 float64 obstacle_position_error_m
 float64 minimum_perception_confidence
+float64 object_yaw_error_rad
+bool grasp_selection_success
+float64 grasp_selection_latency_sec
+uint32 grasp_candidate_count
+float64 selected_grasp_yaw_rad
+float64 selected_grasp_path_length_rad
 uint32 collision_count
 
 string failed_state

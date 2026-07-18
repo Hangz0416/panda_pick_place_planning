@@ -64,6 +64,9 @@ class RosConversionsTest(unittest.TestCase):
             target_position=(0.58, -0.2, 0.025),
             backend="moveit",
             simulator="moveit_mock",
+            object_variant="rect_prism",
+            object_yaw_rad=-0.4,
+            perception_profile="combined",
         )
 
         message = task_to_ros(task)
@@ -72,6 +75,9 @@ class RosConversionsTest(unittest.TestCase):
         self.assertEqual(message.header.frame_id, "world")
         self.assertEqual(message.simulator, "moveit_mock")
         self.assertEqual(restored, task)
+        self.assertEqual(message.object_variant, "rect_prism")
+        self.assertAlmostEqual(message.object_yaw_rad, -0.4)
+        self.assertEqual(message.perception_profile, "combined")
 
     def test_task_rejects_non_world_frame(self):
         task = TaskSpec(
@@ -148,6 +154,14 @@ class RosConversionsTest(unittest.TestCase):
             target_position_error_m=0.006,
             obstacle_position_error_m=0.009,
             minimum_perception_confidence=0.82,
+            object_variant="rect_prism",
+            perception_profile="rgb_noise",
+            object_yaw_error_rad=0.04,
+            grasp_selection_success=True,
+            grasp_selection_latency_sec=0.08,
+            grasp_candidate_count=2,
+            selected_grasp_yaw_rad=-0.3,
+            selected_grasp_path_length_rad=1.1,
             stage_metrics={
                 "transfer": {
                     "evaluation_mode": "full_episode",
@@ -184,6 +198,11 @@ class RosConversionsTest(unittest.TestCase):
         self.assertTrue(message.perception_success)
         self.assertAlmostEqual(message.perception_latency_sec, 0.025)
         self.assertAlmostEqual(message.object_position_error_m, 0.004)
+        self.assertEqual(message.object_variant, "rect_prism")
+        self.assertEqual(message.perception_profile, "rgb_noise")
+        self.assertAlmostEqual(message.object_yaw_error_rad, 0.04)
+        self.assertTrue(message.grasp_selection_success)
+        self.assertEqual(message.grasp_candidate_count, 2)
         self.assertEqual(len(message.stage_metrics), 1)
         self.assertTrue(message.stage_metrics[0].planning_success_known)
         self.assertTrue(message.stage_metrics[0].planning_success)
@@ -208,6 +227,9 @@ class RosConversionsTest(unittest.TestCase):
         self.assertEqual(restored.pose_source, "rgbd")
         self.assertAlmostEqual(restored.target_position_error_m, 0.006)
         self.assertAlmostEqual(restored.minimum_perception_confidence, 0.82)
+        self.assertEqual(restored.object_variant, "rect_prism")
+        self.assertAlmostEqual(restored.object_yaw_error_rad, 0.04)
+        self.assertAlmostEqual(restored.selected_grasp_yaw_rad, -0.3)
         self.assertFalse(restored.planning_scene_sync_success)
         self.assertEqual(
             restored.stage_metrics["transfer"],

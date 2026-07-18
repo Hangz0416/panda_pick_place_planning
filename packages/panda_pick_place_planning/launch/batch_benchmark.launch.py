@@ -26,6 +26,8 @@ def generate_launch_description() -> LaunchDescription:
     summary_path = LaunchConfiguration("summary_path")
     pose_source = LaunchConfiguration("pose_source")
     perception_timeout = LaunchConfiguration("perception_timeout_sec")
+    object_variant = LaunchConfiguration("object_variant")
+    perception_profile = LaunchConfiguration("perception_profile")
 
     common_time = {
         "use_sim_time": ParameterValue(use_gazebo, value_type=bool)
@@ -47,6 +49,8 @@ def generate_launch_description() -> LaunchDescription:
                 "backend": backend,
                 "simulator": simulator,
                 "grasp_mode": grasp_mode,
+                "object_variant": object_variant,
+                "perception_profile": perception_profile,
                 "result_timeout_sec": ParameterValue(
                     result_timeout, value_type=float
                 ),
@@ -63,6 +67,12 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("backend", default_value="moveit"),
             DeclareLaunchArgument("simulator", default_value="moveit_mock"),
             DeclareLaunchArgument("grasp_mode", default_value="assisted"),
+            DeclareLaunchArgument(
+                "object_variant",
+                default_value="cube",
+                choices=["cube", "rect_prism"],
+            ),
+            DeclareLaunchArgument("perception_profile", default_value="nominal"),
             DeclareLaunchArgument("use_gazebo", default_value="false"),
             DeclareLaunchArgument("moveit_execute", default_value="false"),
             DeclareLaunchArgument("moveit_command_gripper", default_value="false"),

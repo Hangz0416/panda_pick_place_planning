@@ -128,6 +128,9 @@ class FakeServiceClient:
                 y=request.target_position.y,
                 z=request.target_position.z,
             )
+            response.applied_object_yaw_rad = float(
+                getattr(request, "object_yaw_rad", 0.0)
+            )
         return ImmediateFuture(
             response
         )
@@ -235,7 +238,12 @@ def pose_message(stamp_sec, position):
     return message
 
 
-def task(scene="obstacle", grasp_mode="assisted"):
+def task(
+    scene="obstacle",
+    grasp_mode="assisted",
+    object_variant="cube",
+    object_yaw_rad=0.0,
+):
     return TaskSpec(
         episode_id=1,
         task_seed=42,
@@ -246,6 +254,8 @@ def task(scene="obstacle", grasp_mode="assisted"):
         target_position=(0.59, -0.225, 0.025),
         backend="moveit",
         grasp_mode=grasp_mode,
+        object_variant=object_variant,
+        object_yaw_rad=object_yaw_rad,
     )
 
 
@@ -276,6 +286,25 @@ def clients(
 
 
 class MoveItBackendTest(unittest.TestCase):
+    def test_candidate_feasibility_is_planning_only_even_in_gazebo(self):
+        fake_clients = clients()
+        backend = MoveItBackend(
+            node=object(),
+            config=MoveItBackendConfig(
+                use_gazebo=True,
+                execute_motion=True,
+            ),
+            clients=fake_clients,
+        )
+
+        report = backend.check_pose_feasibility(
+            (0.57, -0.17, 0.24),
+            backend.downward_orientation(),
+        )
+
+        self.assertTrue(report.success)
+        self.assertFalse(fake_clients.motion.goals[-1].execute)
+
     def test_visual_estimate_replaces_cube_and_obstacle_scene_poses(self):
         fake_clients = clients()
         backend = MoveItBackend(
@@ -288,13 +317,29 @@ class MoveItBackendTest(unittest.TestCase):
             ),
             clients=fake_clients,
         )
-        backend.reset(task(scene="obstacle"))
+        backend.reset(
+            task(
+                scene="obstacle",
+                object_variant="rect_prism",
+                object_yaw_rad=1.1,
+            )
+        )
+        visual_yaw = 0.35
         estimate = SceneEstimate(
             episode_id=1,
             pose_source="rgbd",
             success=True,
             estimates={
-                "cube": SceneObjectEstimate("cube", (0.60, 0.21, 0.025)),
+                "cube": SceneObjectEstimate(
+                    "cube",
+                    (0.60, 0.21, 0.025),
+                    orientation_xyzw=(
+                        0.0,
+                        0.0,
+                        math.sin(visual_yaw / 2.0),
+                        math.cos(visual_yaw / 2.0),
+                    ),
+                ),
                 "target": SceneObjectEstimate("target", (0.58, -0.20, 0.025)),
                 "obstacle": SceneObjectEstimate("obstacle", (0.53, 0.01, 0.14)),
             },
@@ -308,9 +353,16 @@ class MoveItBackendTest(unittest.TestCase):
         obstacle_pose = obstacle_request.collision_object.primitive_poses[0]
         self.assertEqual(cube_request.collision_object.id, "cube")
         self.assertEqual(
+            list(cube_request.collision_object.primitives[0].dimensions),
+            [0.06, 0.04, 0.05],
+        )
+        self.assertEqual(
             (cube_pose.position.x, cube_pose.position.y, cube_pose.position.z),
             (0.60, 0.21, 0.025),
         )
+        self.assertAlmostEqual(cube_pose.orientation.z, math.sin(visual_yaw / 2.0))
+        self.assertAlmostEqual(cube_pose.orientation.w, math.cos(visual_yaw / 2.0))
+        self.assertNotAlmostEqual(cube_pose.orientation.z, math.sin(1.1 / 2.0))
         self.assertEqual(obstacle_request.collision_object.id, "obstacle")
         self.assertEqual(
             (

@@ -356,6 +356,9 @@ def runtime_error_result(
         grasp_mode=task.grasp_mode,
         pose_source=pose_source,
         perception_success=False,
+        object_variant=task.object_variant,
+        perception_profile=task.perception_profile,
+        grasp_selection_success=False,
         execution_time_sec=(
             float(motion.execution_time_sec) if motion is not None else 0.0
         ),

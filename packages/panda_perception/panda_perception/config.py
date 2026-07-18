@@ -38,12 +38,21 @@ class ObjectConfig:
 
 
 @dataclass(frozen=True)
+class PerturbationConfig:
+    rgb_scale: float
+    rgb_noise_stddev: float
+    depth_dropout_rate: float
+
+
+@dataclass(frozen=True)
 class PerceptionConfig:
     camera: CameraConfig
     sync_slop_sec: float
     morphology_kernel_px: int
     mad_scale: float
     minimum_confidence: float
+    orientation_min_eigenvalue_ratio: float
+    perturbation_profiles: dict[str, PerturbationConfig]
     objects: dict[str, ObjectConfig]
 
 
@@ -73,12 +82,24 @@ def load_config(path: str | Path) -> PerceptionConfig:
         str(object_id): _object_config(str(object_id), values)
         for object_id, values in processing["objects"].items()
     }
+    profiles = {
+        str(name): PerturbationConfig(
+            rgb_scale=float(values["rgb_scale"]),
+            rgb_noise_stddev=float(values["rgb_noise_stddev"]),
+            depth_dropout_rate=float(values["depth_dropout_rate"]),
+        )
+        for name, values in processing["perturbation_profiles"].items()
+    }
     config = PerceptionConfig(
         camera=camera,
         sync_slop_sec=float(processing["sync_slop_sec"]),
         morphology_kernel_px=int(processing["morphology_kernel_px"]),
         mad_scale=float(processing["mad_scale"]),
         minimum_confidence=float(processing["minimum_confidence"]),
+        orientation_min_eigenvalue_ratio=float(
+            processing["orientation_min_eigenvalue_ratio"]
+        ),
+        perturbation_profiles=profiles,
         objects=objects,
     )
     _validate(config)
@@ -121,5 +142,19 @@ def _validate(config: PerceptionConfig) -> None:
         raise ValueError("morphology kernel must be a positive odd number")
     if not 0.0 <= config.minimum_confidence <= 1.0:
         raise ValueError("minimum confidence must be in [0, 1]")
+    if config.orientation_min_eigenvalue_ratio <= 1.0:
+        raise ValueError("orientation eigenvalue ratio must be greater than one")
+    expected_profiles = {
+        "nominal", "low_light", "rgb_noise", "depth_dropout", "combined"
+    }
+    if set(config.perturbation_profiles) != expected_profiles:
+        raise ValueError("perception perturbation profiles are incomplete")
+    for profile in config.perturbation_profiles.values():
+        if not 0.0 < profile.rgb_scale <= 1.0:
+            raise ValueError("rgb_scale must be in (0, 1]")
+        if profile.rgb_noise_stddev < 0.0:
+            raise ValueError("rgb noise must be non-negative")
+        if not 0.0 <= profile.depth_dropout_rate < 1.0:
+            raise ValueError("depth dropout rate must be in [0, 1)")
     if set(config.objects) != {"cube", "target", "obstacle"}:
         raise ValueError("config must define cube, target, and obstacle")

@@ -144,11 +144,14 @@ int main(int argc, char ** argv)
   auto controller_service =
     node->create_client<controller_manager_msgs::srv::ListControllers>(
     "/controller_manager/list_controllers");
-  if (!controller_service->wait_for_service(std::chrono::seconds(10))) {
+  if (!controller_service->wait_for_service(
+      std::chrono::duration<double>(timeout_sec)))
+  {
     RCLCPP_ERROR(
       node->get_logger(),
-      "gz_ros2_control service did not appear after plugin load for entity %lu",
-      static_cast<unsigned long>(model_entity_id.load()));
+      "gz_ros2_control service did not appear within %.1f seconds after "
+      "plugin load for entity %lu",
+      timeout_sec, static_cast<unsigned long>(model_entity_id.load()));
     rclcpp::shutdown();
     return 7;
   }

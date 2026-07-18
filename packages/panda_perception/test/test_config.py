@@ -15,6 +15,14 @@ def test_shared_config_has_fixed_overhead_rgbd_contract():
     assert config.camera.update_rate_hz == 20.0
     assert config.camera.optical_frame == "overhead_camera_optical_frame"
     assert set(config.objects) == {"cube", "target", "obstacle"}
+    assert config.orientation_min_eigenvalue_ratio == 1.25
+    assert set(config.perturbation_profiles) == {
+        "nominal",
+        "low_light",
+        "rgb_noise",
+        "depth_dropout",
+        "combined",
+    }
 
 
 def test_depth_noise_is_fixed_and_lightweight():

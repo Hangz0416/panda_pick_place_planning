@@ -28,10 +28,22 @@ class EnvironmentCaptureTest(unittest.TestCase):
             "panda_pick_place_planning.core.environment_capture.package_versions",
             return_value={},
         ):
-            document = capture_environment(Path("/tmp"), "gazebo")
+            document = capture_environment(
+                Path("/tmp"),
+                "gazebo",
+                object_variant="rect_prism",
+                pose_source="rgbd",
+                perception_profile="combined",
+            )
         self.assertEqual(document["ros_distro"], "humble")
         self.assertFalse(document["experiment"]["physics_model_validated"])
         self.assertFalse(document["inertial_source"]["official_properties"])
+        self.assertEqual(
+            document["experiment"]["object_variant"], "rect_prism"
+        )
+        self.assertEqual(
+            document["experiment"]["perception_profile"], "combined"
+        )
 
     def test_source_tree_hash_excludes_recorded_results_and_media(self):
         with TemporaryDirectory() as directory:

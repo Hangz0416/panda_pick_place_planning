@@ -65,6 +65,7 @@ class EpisodeResetManager(Node):
         self.declare_parameter("world_name", "panda_pick_place")
         self.declare_parameter("scene", "clear")
         self.declare_parameter("grasp_mode", "assisted")
+        self.declare_parameter("object_variant", "cube")
         self.declare_parameter("default_episode_id", 0)
         self.declare_parameter("default_task_seed", 42)
         self.declare_parameter("default_object_position", [0.57, -0.17, 0.025])
@@ -192,6 +193,8 @@ class EpisodeResetManager(Node):
             grasp_mode=str(self.get_parameter("grasp_mode").value),
             object_position=self.get_parameter("default_object_position").value,
             target_position=self.get_parameter("default_target_position").value,
+            object_variant=str(self.get_parameter("object_variant").value),
+            object_yaw_rad=0.0,
         )
 
     def _request_spec(self, request: ResetEpisode.Request) -> ResetSpec:
@@ -211,12 +214,20 @@ class EpisodeResetManager(Node):
                 request.target_position.y,
                 request.target_position.z,
             ),
+            object_variant=str(request.object_variant or "cube"),
+            object_yaw_rad=float(request.object_yaw_rad),
         )
         configured_mode = str(self.get_parameter("grasp_mode").value)
         if spec.grasp_mode != configured_mode:
             raise ValueError(
                 "request grasp_mode does not match launch grasp_mode "
                 f"({spec.grasp_mode} != {configured_mode})"
+            )
+        configured_variant = str(self.get_parameter("object_variant").value)
+        if spec.object_variant != configured_variant:
+            raise ValueError(
+                "request object_variant does not match launch object_variant "
+                f"({spec.object_variant} != {configured_variant})"
             )
         return spec
 
@@ -306,6 +317,11 @@ class EpisodeResetManager(Node):
                 x=target_pose.position.x,
                 y=target_pose.position.y,
                 z=target_pose.position.z + marker_offset,
+            )
+            quaternion = cube_pose.orientation
+            response.applied_object_yaw_rad = math.atan2(
+                2.0 * (quaternion.w * quaternion.z + quaternion.x * quaternion.y),
+                1.0 - 2.0 * (quaternion.y ** 2 + quaternion.z ** 2),
             )
         return response
 

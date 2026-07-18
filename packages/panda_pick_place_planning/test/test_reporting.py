@@ -175,6 +175,15 @@ class ReportingTest(unittest.TestCase):
                     "object_position_error_m": 0.002,
                     "target_position_error_m": 0.003,
                     "obstacle_position_error_m": 0.004,
+                    "schema_version": 4,
+                    "object_variant": "rect_prism",
+                    "perception_profile": "nominal",
+                    "object_yaw_error_rad": 0.03,
+                    "grasp_selection_success": True,
+                    "grasp_selection_latency_sec": 0.07,
+                    "grasp_candidate_count": 2,
+                    "selected_grasp_yaw_rad": -0.2,
+                    "selected_grasp_path_length_rad": 1.1,
                 }
             )
             write_jsonl(input_path, [record])
@@ -188,9 +197,18 @@ class ReportingTest(unittest.TestCase):
                 "full_episode_perception.svg",
                 "full_episode_perception_latency.svg",
                 "full_episode_perception_error.svg",
+                "full_episode_yaw_error.svg",
+                "full_episode_grasp_selection.svg",
+                "full_episode_grasp_candidate_path.svg",
             }
             self.assertTrue(expected.issubset(chart_names))
             self.assertEqual(manifest["groups"][0]["pose_source"], "rgbd")
+            self.assertEqual(
+                manifest["groups"][0]["object_variant"], "rect_prism"
+            )
+            self.assertEqual(
+                manifest["groups"][0]["grasp_selection_success_rate"], 1.0
+            )
             for filename in expected:
                 ElementTree.parse(root / "report" / filename)
 

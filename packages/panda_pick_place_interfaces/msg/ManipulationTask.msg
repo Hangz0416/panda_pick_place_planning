@@ -7,5 +7,8 @@ string planner_id
 uint64 planner_seed
 string scene
 string grasp_mode
+string object_variant
+float64 object_yaw_rad
+string perception_profile
 geometry_msgs/Point object_position
 geometry_msgs/Point target_position
