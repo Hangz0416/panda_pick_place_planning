@@ -1,10 +1,11 @@
 """
-Classify physical grasp state without ROS dependencies.
+Experimental, fail-closed physical-grasp classifier without ROS dependencies.
 
 The classifier deliberately needs bilateral finger contact before declaring a
 grasp. After that event it measures the cube pose relative to the tool frame;
 translation or rotation drift is reported as slip instead of being hidden by a
-fixed constraint.
+fixed constraint. It is not part of the current assisted workflow or resume
+claims.
 """
 
 from __future__ import annotations

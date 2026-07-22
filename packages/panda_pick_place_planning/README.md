@@ -107,6 +107,9 @@ MoveIt mock planning-only 不执行轨迹，顶层运动指标是显式独立规
 
 ## 详细文档
 
-- 系统调用链：`../../docs/architecture.md`
-- 实验口径：`../../docs/experiments.md`
-- 能力边界：`../../docs/known_issues.md`
+- [系统调用链](../../docs/architecture.md)
+- [函数级代码走读](../../docs/code_walkthrough.md)
+- [模拟面试与答案卡](../../docs/interview_guide.md)
+- [简历项目经历](../../docs/resume_and_interview.md)
+- [实验口径](../../docs/experiments.md)
+- [能力边界](../../docs/known_issues.md)

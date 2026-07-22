@@ -5,6 +5,9 @@
 项目只保留一套抓取放置状态机。任务来自 `ManipulationTask`，执行结果统一为
 `EpisodeResult`，PyBullet 和 MoveIt/Gazebo 只在 backend 层分叉。
 
+当前产品主线固定为 RGB-D 三工件 + MoveIt/Gazebo assisted。physics monitor 虽保留在仓库，
+但属于 `experimental / fail-closed`，不参与主线调用图、正式指标或简历能力声明。
+
 ```text
 task_generator_node
         |
@@ -34,6 +37,21 @@ PickPlaceRunner
         v
 evaluator_node --> JSONL
 ```
+
+## 数据与状态所有权
+
+| 状态 | 唯一权威 | 允许的消费者 |
+| --- | --- | --- |
+| 任务真值 | `TaskSpec` / `ManipulationTask` | reset、ground-truth provider、离线误差评测 |
+| RGB-D 在线位姿 | `SceneEstimate` | 候选生成、运动目标、PlanningScene |
+| 关节执行状态 | ros2_control joint state | MoveIt 当前状态、跟踪误差、reset 验证 |
+| 工件执行状态 | Gazebo odometry/contact | attach gate、碰撞、释放稳定性、最终结果 |
+| 选中对象身份 | `select_manipulation_object` 发布的 selected ID | backend、assisted manager、碰撞监控、评测 |
+| episode 结果 | `EpisodeResult` | evaluator、JSONL、summary/report |
+| 进程退出状态 | `run_status.json.teardown` | 启动监督与工程诊断 |
+
+RGB-D 模式中，TaskSpec 真值不得作为感知失败后的 fallback。`SceneEstimate` 写入 PlanningScene
+失败时 episode 必须以 `scene_estimate_sync_failed` 结束。
 
 ## 代码入口
 
@@ -75,6 +93,17 @@ LIFT -> TRANSFER -> PLACE -> RETREAT -> DONE
 
 每次 `move_to_pose` 返回 `BackendMotionReport`。状态机负责失败阶段和任务语义，backend
 负责规划、执行、夹爪、物体状态和仿真器特有操作。
+
+## 坐标系与对象语义
+
+```text
+world → panda_link0 → ... → panda_hand → panda_grasptarget
+world → overhead_camera_link → overhead_camera_optical_frame
+```
+
+视觉估计和 pose target 都在 `world` 下表达。MoveIt 运动目标使用 `panda_grasptarget`，避免
+把手部碰撞几何的局部偏移混入目标；AttachedCollisionObject 使用实际物理连接 link
+`panda_hand`。相机点先由光学坐标系外参变换到 world，再进入 provider 和 FSM。
 
 ## PyBullet 分支
 

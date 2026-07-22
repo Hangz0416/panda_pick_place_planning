@@ -644,6 +644,11 @@ class MoveItBackend:
         if self._task.grasp_mode == "physics":
             return self._attach_physical_object()
 
+        # Cross-system transaction: Gazebo must first confirm that the exact
+        # selected entity is constrained. Only then may MoveIt replace the
+        # corresponding world object with an AttachedCollisionObject. If the
+        # PlanningScene step fails, detach Gazebo immediately to avoid split
+        # physical/planning truth.
         gazebo_attached = False
         if self.config.use_gazebo:
             if self.clients.set_assisted_object is not None:

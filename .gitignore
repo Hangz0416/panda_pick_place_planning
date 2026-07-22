@@ -36,6 +36,8 @@ results/runs/*
 docs/*
 !docs/resume_and_interview.md
 !docs/architecture.md
+!docs/code_walkthrough.md
+!docs/interview_guide.md
 !docs/experiments.md
 !docs/known_issues.md
 !docs/development_history.md

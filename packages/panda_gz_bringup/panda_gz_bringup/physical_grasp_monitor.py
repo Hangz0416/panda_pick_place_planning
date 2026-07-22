@@ -1,4 +1,9 @@
-"""Observe real Gazebo contacts and pose drift for physics-only grasps."""
+"""
+Experimental, fail-closed observation for unsupported physics grasps.
+
+This module is retained for future contact-model validation but is not part of
+the current RGB-D assisted workflow or its reported success metrics.
+"""
 
 from __future__ import annotations
 

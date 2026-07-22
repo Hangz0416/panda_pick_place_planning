@@ -93,6 +93,10 @@ class PickPlaceRunner:
         object_initial_position, _ = self.backend.object_state()
 
         self.state = PickPlaceState.PERCEPTION
+        # From this boundary onward RGB-D mode must use SceneEstimate for
+        # motion targets and PlanningScene geometry. Task truth remains owned
+        # by reset and offline error accounting; there is no perception
+        # fallback that silently turns an RGB-D episode into oracle control.
         scene_estimate = self.pose_provider.estimate(task)
         self._scene_estimate = scene_estimate
         self._stage_metrics[self.state.value] = {

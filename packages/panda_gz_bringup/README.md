@@ -4,7 +4,7 @@ ROS 2 Humble + modern Gazebo Fortress bringup for the Panda pick-place project.
 It deliberately uses `ros_gz`, `gz_ros2_control/GazeboSimSystem`, and Fortress'
 `ignition-gazebo-*` system ABI. It does not use Gazebo Classic.
 
-## Verification boundary
+## Current assisted workflow and verification boundary
 
 The Gazebo assisted runtime is verified with the complete MoveIt/controller
 stack. The fixed seed-42 regression contains 50 clear and 50 obstacle episodes;
@@ -12,20 +12,14 @@ both groups completed 50/50 tasks. The same stack also completed the readiness
 checks and deterministic reset validation. Curated raw data and summaries are
 documented in `../../docs/experiments.md`.
 
-This evidence is limited to guarded assisted grasp. The physics monitor and
-interfaces exist, but `physics_model_validated=false` deliberately rejects a
-physics-grasp launch until mass/inertia, contact geometry, friction, and runtime
-behavior receive a separate audit.
+This evidence is limited to guarded assisted grasp. Physics-related code is
+experimental / fail-closed and is not part of the recommended workflow or its
+reported metrics.
 
 The shared description has one authoritative frame chain:
 `world -> panda_link0 -> panda_hand -> panda_grasptarget`. Pose goals use the
 collision-free `panda_grasptarget`; attached objects use the physical
 `panda_hand` link.
-
-```bash
-ros2 launch panda_gz_bringup panda_gz.launch.py \
-  scene:=obstacle grasp_mode:=assisted headless:=false
-```
 
 底层组合入口为 `panda_moveit_gz.launch.py`；面向演示的唯一推荐入口是：
 
@@ -49,7 +43,7 @@ one `panda_moveit_bridge`, optional RViz, and optional evaluator / manipulation 
 task-generator nodes. The Gazebo child launch remains the sole owner of the
 state publisher and Gazebo-created controller manager. With
 `start_application:=true`, `stack_ready_gate` waits for `/clock`, joint state,
-cube odometry, all three active controllers, reset/scene/collision services,
+all workpiece odometry, all three active controllers, reset/scene/collision services,
 and motion/arm/gripper actions before starting the shared FSM.
 
 The recommended wrapper exposes `scene`, `seed`, `object_variant`, `workpiece_count`, `pose_source`,
@@ -65,7 +59,7 @@ Management interfaces:
   (`panda_pick_place_interfaces/srv/SetAssistedObject`), selecting the exact
   workpiece identity for attach/detach
 - `/panda_gz/get_physical_grasp_state`
-  (`panda_pick_place_interfaces/srv/GetPhysicalGraspState`)
+  (`panda_pick_place_interfaces/srv/GetPhysicalGraspState`, experimental)
 - `/panda_gz/get_execution_collision_state`
   (`panda_pick_place_interfaces/srv/GetExecutionCollisionState`)
 - `/panda_gz/reset_status` and `/panda_gz/grasp_status`
@@ -76,8 +70,13 @@ orientation, distance, and gripper clearance all pass. The default pre-attach
 command is 38 mm per finger, i.e. 76 mm total opening; the orientation gate
 accepts the gripper's pi-symmetric relative pose for the 60x40x50 mm rectangular
 workpiece. Gazebo's DetachableJoint cannot reattach models while they are
-already in contact. `physics` mode never sends an attach command; finger
-collision and friction alone determine the grasp.
+already in contact.
+
+## Experimental physics path (not current workflow)
+
+`physics` mode never sends an attach command; finger collision and friction
+alone determine the grasp. It remains disabled unless the model is explicitly
+validated and must not be used for resume claims or assisted benchmark results.
 
 The physics monitor requires sustained left and right finger contacts, records
 the first `panda_grasptarget -> cube` relative pose, and reports translation

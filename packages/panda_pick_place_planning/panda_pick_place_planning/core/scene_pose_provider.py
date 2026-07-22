@@ -52,7 +52,12 @@ class GroundTruthPoseProvider:
 
 
 class RGBDScenePoseProvider:
-    """Synchronous FSM adapter for the typed RGB-D scene-estimation service."""
+    """Synchronous adapter whose estimates are the RGB-D control authority.
+
+    ``TaskSpec`` is passed only to identify the episode and required objects;
+    this provider never falls back to task-truth poses after a perception
+    failure.
+    """
 
     pose_source = "rgbd"
 
